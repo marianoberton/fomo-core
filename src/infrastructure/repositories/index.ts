@@ -13,3 +13,6 @@ export type { TraceCreateInput, TraceUpdateInput, ExecutionTraceRepository } fro
 
 export { createScheduledTaskRepository } from './scheduled-task-repository.js';
 export type { ScheduledTaskRepository, ScheduledTaskUpdateInput, ScheduledTaskRunUpdateInput } from './scheduled-task-repository.js';
+
+export { createContactRepository } from './contact-repository.js';
+export type { ContactRepository } from '@/contacts/types.js';
