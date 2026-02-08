@@ -8,6 +8,7 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
+    "start": "node dist/main.js",
     "dev": "tsx watch src/main.ts",
     "build": "tsc && tsc-alias",
     "typecheck": "tsc --noEmit",
