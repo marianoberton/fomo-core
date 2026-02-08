@@ -10,6 +10,8 @@ import type { Logger } from '@/observability/logger.js';
 import type { ContactRepository } from '@/contacts/types.js';
 import type { ChannelRouter } from '@/channels/channel-router.js';
 import type { InboundProcessor } from '@/channels/inbound-processor.js';
+import type { WebhookRepository } from '@/webhooks/types.js';
+import type { WebhookProcessor } from '@/webhooks/webhook-processor.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -75,10 +77,12 @@ export interface RouteDependencies {
   executionTraceRepository: ExecutionTraceRepository;
   scheduledTaskRepository: ScheduledTaskRepository;
   contactRepository: ContactRepository;
+  webhookRepository: WebhookRepository;
   approvalGate: ApprovalGate;
   toolRegistry: ToolRegistry;
   taskManager: TaskManager;
   channelRouter: ChannelRouter;
   inboundProcessor: InboundProcessor;
+  webhookProcessor: WebhookProcessor;
   logger: Logger;
 }

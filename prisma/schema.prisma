@@ -30,6 +30,7 @@ model Project {
   approvalRequests ApprovalRequest[]
   scheduledTasks   ScheduledTask[]
   contacts         Contact[]
+  webhooks         Webhook[]
 
   @@map("projects")
 }
@@ -306,4 +307,29 @@ model ScheduledTaskRun {
   @@index([taskId, createdAt])
   @@index([status])
   @@map("scheduled_task_runs")
+}
+
+// ─── Webhooks ───────────────────────────────────────────────────
+
+model Webhook {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  agentId     String?  @map("agent_id")
+
+  name        String
+  description String?
+
+  triggerPrompt String  @map("trigger_prompt")
+  secretEnvVar  String? @map("secret_env_var")
+  allowedIps    String[] @map("allowed_ips")
+
+  status      String   @default("active")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project     Project  @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, status])
+  @@map("webhooks")
 }

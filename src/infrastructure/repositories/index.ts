@@ -16,3 +16,6 @@ export type { ScheduledTaskRepository, ScheduledTaskUpdateInput, ScheduledTaskRu
 
 export { createContactRepository } from './contact-repository.js';
 export type { ContactRepository } from '@/contacts/types.js';
+
+export { createWebhookRepository } from './webhook-repository.js';
+export type { WebhookRepository } from '@/webhooks/types.js';
