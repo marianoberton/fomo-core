@@ -1,0 +1,57 @@
+{
+  "name": "nexus-core",
+  "version": "0.1.0",
+  "description": "Model-agnostic, self-hosted autonomous agent framework for enterprise environments",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc && tsc-alias",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:unit": "vitest run --include 'src/**/*.test.ts' --exclude 'src/**/*.integration.test.ts' --exclude 'src/tools/**/*.test.ts'",
+    "test:integration": "vitest run --include 'src/**/*.integration.test.ts'",
+    "test:tools": "vitest run --include 'src/tools/**/*.test.ts'",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --check \"src/**/*.ts\"",
+    "format:fix": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.73.0",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/helmet": "^13.0.0",
+    "@fastify/rate-limit": "^10.0.0",
+    "@fastify/websocket": "^11.0.0",
+    "@prisma/client": "^6.6.0",
+    "bullmq": "^5.67.0",
+    "cron-parser": "^5.5.0",
+    "dotenv": "^16.4.0",
+    "fastify": "^5.3.0",
+    "ioredis": "^5.6.0",
+    "nanoid": "^5.1.0",
+    "openai": "^6.18.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.20.0",
+    "prettier": "^3.5.0",
+    "prisma": "^6.6.0",
+    "tsc-alias": "^1.8.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.24.0",
+    "vitest": "^3.0.0"
+  }
+}
