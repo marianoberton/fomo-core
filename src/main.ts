@@ -15,6 +15,11 @@ import {
 } from '@/infrastructure/repositories/index.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
 import { createToolRegistry } from '@/tools/registry/tool-registry.js';
+import {
+  createCalculatorTool,
+  createDateTimeTool,
+  createJsonTransformTool,
+} from '@/tools/definitions/index.js';
 import { createTaskManager } from '@/scheduling/task-manager.js';
 import { createTaskRunner } from '@/scheduling/task-runner.js';
 import { createTaskExecutor } from '@/scheduling/task-executor.js';
@@ -55,6 +60,9 @@ async function start(): Promise<void> {
     // Create shared services
     const approvalGate = createApprovalGate();
     const toolRegistry = createToolRegistry();
+    toolRegistry.register(createCalculatorTool());
+    toolRegistry.register(createDateTimeTool());
+    toolRegistry.register(createJsonTransformTool());
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
 
     // Register Fastify plugins

@@ -225,7 +225,8 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
           const fittedMessages = await memoryManager.fitToContextWindow(conversation);
 
           // Format tools for provider
-          const formattedTools = toolRegistry.formatForProvider(context);
+          const genericTools = toolRegistry.formatForProvider(context);
+          const formattedTools = provider.formatTools(genericTools);
 
           // Call LLM with streaming
           const chatResult = await executeLLMCall({
@@ -608,6 +609,7 @@ async function executeLLMCall(params: {
           stopReason: finalStopReason,
           usage: finalUsage,
           toolCallCount: toolUses.length,
+          text: textParts.join(''),
         },
       });
 

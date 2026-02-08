@@ -15,6 +15,7 @@ import type { ExecutionContext } from '@/core/types.js';
 import { createLogger } from '@/observability/logger.js';
 import type { ToolDefinitionForProvider } from '@/providers/types.js';
 import type { ExecutableTool, ToolResult } from '../types.js';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const logger = createLogger({ name: 'tool-registry' });
 
@@ -207,9 +208,7 @@ export function createToolRegistry(options?: ToolRegistryOptions): ToolRegistry 
       return this.listForContext(context).map((tool) => ({
         name: tool.id,
         description: tool.description,
-        inputSchema: tool.inputSchema._def
-          ? (tool.inputSchema as unknown as { _def: { schema: Record<string, unknown> } })._def.schema ?? {}
-          : {},
+        inputSchema: toOpenAICompatibleSchema(tool.inputSchema),
       }));
     },
 
@@ -259,5 +258,64 @@ export function createToolRegistry(options?: ToolRegistryOptions): ToolRegistry 
 
       return tool.dryRun(inputResult.value, context);
     },
+  };
+}
+
+/**
+ * Convert a Zod schema to an OpenAI-compatible JSON Schema.
+ * OpenAI requires `type: "object"` at the top level for function parameters.
+ * Discriminated unions (which produce `anyOf`) are flattened into a single
+ * object with all possible properties, making variant-specific ones optional.
+ */
+function toOpenAICompatibleSchema(zodSchema: import('zod').ZodType): Record<string, unknown> {
+  const raw = zodToJsonSchema(zodSchema, { target: 'openApi3' }) as Record<string, unknown>;
+
+  // Already a plain object — return as-is
+  if (raw['type'] === 'object') {
+    return raw;
+  }
+
+  // Discriminated union: flatten anyOf variants into one object
+  const variants = raw['anyOf'] as Record<string, unknown>[] | undefined;
+  if (!variants) {
+    return raw;
+  }
+
+  const allProperties: Record<string, unknown> = {};
+  const requiredSets: Set<string>[] = [];
+
+  for (const variant of variants) {
+    const props = variant['properties'] as Record<string, unknown> | undefined;
+    if (props) {
+      for (const [key, value] of Object.entries(props)) {
+        // Merge enum arrays for discriminator fields
+        const existing = allProperties[key] as Record<string, unknown> | undefined;
+        if (existing?.['enum'] && (value as Record<string, unknown>)['enum']) {
+          const merged = new Set([
+            ...(existing['enum'] as string[]),
+            ...((value as Record<string, unknown>)['enum'] as string[]),
+          ]);
+          allProperties[key] = { ...existing, enum: [...merged] };
+        } else if (!allProperties[key]) {
+          allProperties[key] = value;
+        }
+      }
+    }
+    const req = variant['required'] as string[] | undefined;
+    if (req) {
+      requiredSets.push(new Set(req));
+    }
+  }
+
+  // Only fields required in ALL variants are truly required
+  const commonRequired = requiredSets.length > 0
+    ? [...requiredSets[0]!].filter((key) => requiredSets.every((s) => s.has(key)))
+    : [];
+
+  return {
+    type: 'object',
+    properties: allProperties,
+    required: commonRequired,
+    additionalProperties: false,
   };
 }
