@@ -16,6 +16,7 @@ import { createApprovalGate } from '@/security/approval-gate.js';
 import { createToolRegistry } from '@/tools/registry/tool-registry.js';
 import { createTaskManager } from '@/scheduling/task-manager.js';
 import { createTaskRunner } from '@/scheduling/task-runner.js';
+import { createTaskExecutor } from '@/scheduling/task-executor.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import type { RouteDependencies } from '@/api/types.js';
@@ -84,19 +85,19 @@ async function start(): Promise<void> {
     let taskRunner: ReturnType<typeof createTaskRunner> | null = null;
     const redisUrl = process.env['REDIS_URL'];
     if (redisUrl) {
+      const onExecuteTask = createTaskExecutor({
+        projectRepository,
+        sessionRepository,
+        promptLayerRepository,
+        toolRegistry,
+        logger,
+      });
+
       taskRunner = createTaskRunner({
         repository: scheduledTaskRepository,
         logger,
         redisUrl,
-        onExecuteTask: async (task) => {
-          // TODO: Wire up actual agent execution once chat-setup is injectable
-          logger.info('Executing scheduled task', {
-            component: 'task-runner',
-            taskId: task.id,
-            taskName: task.name,
-          });
-          return { success: true, result: { message: 'Task executed' } };
-        },
+        onExecuteTask,
       });
       await taskRunner.start();
       logger.info('Task runner started (Redis connected)', { component: 'main' });
