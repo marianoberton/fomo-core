@@ -12,6 +12,8 @@ import { toolRoutes } from './tools.js';
 import { chatRoutes } from './chat.js';
 import { chatStreamRoutes } from './chat-stream.js';
 import { scheduledTaskRoutes } from './scheduled-tasks.js';
+import { contactRoutes } from './contacts.js';
+import { webhookRoutes } from './webhooks.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -27,4 +29,6 @@ export async function registerRoutes(
   await fastify.register(chatRoutes, deps);
   await fastify.register(chatStreamRoutes, deps);
   await fastify.register(scheduledTaskRoutes, deps);
+  await fastify.register(contactRoutes, deps);
+  await fastify.register(webhookRoutes, deps);
 }

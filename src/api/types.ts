@@ -7,6 +7,9 @@ import type { ApprovalGate } from '@/security/approval-gate.js';
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
 import type { TaskManager } from '@/scheduling/task-manager.js';
 import type { Logger } from '@/observability/logger.js';
+import type { ContactRepository } from '@/contacts/types.js';
+import type { ChannelRouter } from '@/channels/channel-router.js';
+import type { InboundProcessor } from '@/channels/inbound-processor.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -71,8 +74,11 @@ export interface RouteDependencies {
   promptLayerRepository: PromptLayerRepository;
   executionTraceRepository: ExecutionTraceRepository;
   scheduledTaskRepository: ScheduledTaskRepository;
+  contactRepository: ContactRepository;
   approvalGate: ApprovalGate;
   toolRegistry: ToolRegistry;
   taskManager: TaskManager;
+  channelRouter: ChannelRouter;
+  inboundProcessor: InboundProcessor;
   logger: Logger;
 }
