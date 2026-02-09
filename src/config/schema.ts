@@ -78,6 +78,31 @@ export const costConfigSchema = z.object({
   maxRequestsPerHour: z.number().int().positive('Max requests per hour must be a positive integer'),
 });
 
+// ─── MCP Server Config ─────────────────────────────────────────
+
+/**
+ * Schema for a single MCP server connection configuration.
+ * Validates transport-specific required fields via refinement.
+ */
+export const mcpServerConfigSchema = z
+  .object({
+    name: z.string().min(1, 'MCP server name cannot be empty'),
+    transport: z.enum(['stdio', 'sse']),
+    command: z.string().min(1).optional(),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    url: z.string().url('Invalid MCP server URL').optional(),
+    toolPrefix: z.string().min(1).optional(),
+  })
+  .refine(
+    (data) => data.transport !== 'stdio' || data.command !== undefined,
+    { message: 'stdio transport requires a "command" field', path: ['command'] },
+  )
+  .refine(
+    (data) => data.transport !== 'sse' || data.url !== undefined,
+    { message: 'sse transport requires a "url" field', path: ['url'] },
+  );
+
 // ─── Agent Config ───────────────────────────────────────────────
 
 /**
@@ -91,6 +116,7 @@ export const agentConfigSchema = z.object({
   fallbackProvider: llmProviderConfigSchema.optional(),
   failover: failoverConfigSchema,
   allowedTools: z.array(z.string().min(1, 'Tool ID cannot be empty')),
+  mcpServers: z.array(mcpServerConfigSchema).optional(),
   memoryConfig: memoryConfigSchema,
   costConfig: costConfigSchema,
   maxTurnsPerSession: z.number().int().positive('Max turns per session must be a positive integer'),
@@ -132,6 +158,9 @@ export type MemoryConfigInput = z.infer<typeof memoryConfigSchema>;
 
 /** Inferred type from costConfigSchema */
 export type CostConfigInput = z.infer<typeof costConfigSchema>;
+
+/** Inferred type from mcpServerConfigSchema */
+export type MCPServerConfigInput = z.infer<typeof mcpServerConfigSchema>;
 
 /** Inferred type from agentConfigSchema */
 export type AgentConfigInput = z.infer<typeof agentConfigSchema>;

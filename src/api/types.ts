@@ -6,6 +6,7 @@ import type { ScheduledTaskRepository } from '@/infrastructure/repositories/sche
 import type { ApprovalGate } from '@/security/approval-gate.js';
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
 import type { TaskManager } from '@/scheduling/task-manager.js';
+import type { MCPManager } from '@/mcp/mcp-manager.js';
 import type { Logger } from '@/observability/logger.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
@@ -74,5 +75,6 @@ export interface RouteDependencies {
   approvalGate: ApprovalGate;
   toolRegistry: ToolRegistry;
   taskManager: TaskManager;
+  mcpManager: MCPManager;
   logger: Logger;
 }

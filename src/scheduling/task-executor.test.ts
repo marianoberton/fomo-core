@@ -15,6 +15,7 @@ import {
   createMockSessionRepository,
   createMockPromptLayerRepository,
   createMockToolRegistry,
+  createMockMCPManager,
   createMockLogger,
   createSampleTrace,
   createSamplePromptSnapshot,
@@ -75,6 +76,7 @@ function createExecutorDeps(): ReturnType<typeof createMockProjectRepository> ex
       sessionRepository: ReturnType<typeof createMockSessionRepository>;
       promptLayerRepository: ReturnType<typeof createMockPromptLayerRepository>;
       toolRegistry: ReturnType<typeof createMockToolRegistry>;
+      mcpManager: ReturnType<typeof createMockMCPManager>;
       logger: ReturnType<typeof createMockLogger>;
     }
   : never {
@@ -83,6 +85,7 @@ function createExecutorDeps(): ReturnType<typeof createMockProjectRepository> ex
     sessionRepository: createMockSessionRepository(),
     promptLayerRepository: createMockPromptLayerRepository(),
     toolRegistry: createMockToolRegistry(),
+    mcpManager: createMockMCPManager(),
     logger: createMockLogger(),
   };
 }

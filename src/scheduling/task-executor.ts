@@ -12,6 +12,7 @@ import type { ProjectRepository } from '@/infrastructure/repositories/project-re
 import type { SessionRepository } from '@/infrastructure/repositories/session-repository.js';
 import type { PromptLayerRepository } from '@/infrastructure/repositories/prompt-layer-repository.js';
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
+import type { MCPManager } from '@/mcp/mcp-manager.js';
 import type { Logger } from '@/observability/logger.js';
 import {
   prepareChatRun,
@@ -28,6 +29,7 @@ export interface TaskExecutorOptions {
   sessionRepository: SessionRepository;
   promptLayerRepository: PromptLayerRepository;
   toolRegistry: ToolRegistry;
+  mcpManager: MCPManager;
   logger: Logger;
 }
 
@@ -48,6 +50,7 @@ export function createTaskExecutor(
     sessionRepository,
     promptLayerRepository,
     toolRegistry,
+    mcpManager,
     logger,
   } = options;
 
@@ -56,6 +59,7 @@ export function createTaskExecutor(
     sessionRepository,
     promptLayerRepository,
     toolRegistry,
+    mcpManager,
     logger,
   };
 

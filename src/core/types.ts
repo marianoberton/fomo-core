@@ -76,6 +76,26 @@ export interface CostConfig {
   maxRequestsPerHour: number;
 }
 
+// ─── MCP Server Config ─────────────────────────────────────────
+
+/** Configuration for a single MCP server connection (inline in AgentConfig). */
+export interface MCPServerConfigRef {
+  /** Unique identifier for this server (e.g. "google-calendar"). */
+  name: string;
+  /** Transport type: stdio spawns a subprocess, sse connects via HTTP. */
+  transport: 'stdio' | 'sse';
+  /** For stdio: command to run (e.g. "npx"). */
+  command?: string;
+  /** For stdio: arguments for the command. */
+  args?: string[];
+  /** For stdio: env var NAMES to resolve and pass to the subprocess. */
+  env?: Record<string, string>;
+  /** For sse: URL of the MCP server. */
+  url?: string;
+  /** Namespace prefix for tool IDs. Defaults to server name. */
+  toolPrefix?: string;
+}
+
 // ─── Agent Config ───────────────────────────────────────────────
 
 export interface AgentConfig {
@@ -90,6 +110,9 @@ export interface AgentConfig {
 
   /** Whitelist of tool IDs this agent can use. */
   allowedTools: string[];
+
+  /** MCP servers to connect to for external tools. */
+  mcpServers?: MCPServerConfigRef[];
 
   memoryConfig: MemoryConfig;
   costConfig: CostConfig;
