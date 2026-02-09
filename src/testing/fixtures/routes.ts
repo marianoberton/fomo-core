@@ -12,6 +12,7 @@ import type { ScheduledTaskRepository } from '@/infrastructure/repositories/sche
 import type { ApprovalGate } from '@/security/approval-gate.js';
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
 import type { TaskManager } from '@/scheduling/task-manager.js';
+import type { MCPManager } from '@/mcp/mcp-manager.js';
 import type { Logger } from '@/observability/logger.js';
 import type {
   ExecutionTrace,
@@ -145,6 +146,21 @@ export function createMockTaskManager(): {
   };
 }
 
+/** Create a mock MCPManager with all methods as vi.fn(). */
+export function createMockMCPManager(): {
+  [K in keyof MCPManager]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    connectAll: vi.fn().mockResolvedValue(undefined),
+    disconnect: vi.fn().mockResolvedValue(undefined),
+    disconnectAll: vi.fn().mockResolvedValue(undefined),
+    getConnection: vi.fn().mockReturnValue(undefined),
+    listConnections: vi.fn().mockReturnValue([]),
+    getTools: vi.fn().mockReturnValue([]),
+    getToolSchemas: vi.fn().mockReturnValue(new Map()),
+  };
+}
+
 /** Create a silent mock Logger. */
 export function createMockLogger(): Logger {
   return {
@@ -167,6 +183,7 @@ export function createMockDeps(): RouteDependencies & {
   approvalGate: ReturnType<typeof createMockApprovalGate>;
   toolRegistry: ReturnType<typeof createMockToolRegistry>;
   taskManager: ReturnType<typeof createMockTaskManager>;
+  mcpManager: ReturnType<typeof createMockMCPManager>;
 } {
   return {
     projectRepository: createMockProjectRepository(),
@@ -177,6 +194,7 @@ export function createMockDeps(): RouteDependencies & {
     approvalGate: createMockApprovalGate(),
     toolRegistry: createMockToolRegistry(),
     taskManager: createMockTaskManager(),
+    mcpManager: createMockMCPManager(),
     logger: createMockLogger(),
   };
 }

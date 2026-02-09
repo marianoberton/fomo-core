@@ -75,7 +75,7 @@ export interface ChatSetupError {
 /** Subset of RouteDependencies required by prepareChatRun. */
 type ChatSetupDeps = Pick<
   RouteDependencies,
-  'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'logger'
+  'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'logger'
 >;
 
 // ─── Setup Function ─────────────────────────────────────────────
@@ -176,20 +176,43 @@ export async function prepareChatRun(
     usageStore: createInMemoryUsageStore(),
   });
 
-  // 8. Build tool descriptions for the prompt
+  // 8. Connect MCP servers and register their tools (if configured)
+  const mcpToolIds: string[] = [];
+  if (agentConfig.mcpServers && agentConfig.mcpServers.length > 0) {
+    const { mcpManager, toolRegistry } = deps;
+
+    // Connect servers that aren't already connected
+    const needConnection = agentConfig.mcpServers.filter(
+      (s) => !mcpManager.getConnection(s.name),
+    );
+    if (needConnection.length > 0) {
+      await mcpManager.connectAll(needConnection);
+    }
+
+    // Register discovered MCP tools in the shared tool registry
+    for (const tool of mcpManager.getTools()) {
+      if (!toolRegistry.has(tool.id)) {
+        toolRegistry.register(tool);
+      }
+      mcpToolIds.push(tool.id);
+    }
+  }
+
+  // 9. Build tool descriptions for the prompt
+  const allAllowedTools = [...agentConfig.allowedTools, ...mcpToolIds];
   const executionContext = {
     projectId: agentConfig.projectId,
     sessionId,
     traceId: 'setup' as TraceId,
     agentConfig,
-    permissions: { allowedTools: new Set(agentConfig.allowedTools) },
+    permissions: { allowedTools: new Set(allAllowedTools) },
     abortSignal: new AbortController().signal,
   };
   const toolDescriptions = deps.toolRegistry
     .formatForProvider(executionContext)
     .map((t) => ({ name: t.name, description: t.description }));
 
-  // 9. Build the system prompt from layers + runtime content
+  // 10. Build the system prompt from layers + runtime content
   const systemPrompt = buildPrompt({
     identity: layers.identity,
     instructions: layers.instructions,
@@ -198,7 +221,7 @@ export async function prepareChatRun(
     retrievedMemories: [],
   });
 
-  // 10. Create snapshot for audit trail
+  // 11. Create snapshot for audit trail
   const toolDocsSection = toolDescriptions
     .map((t) => `${t.name}: ${t.description}`)
     .join('\n');

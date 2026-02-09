@@ -5,6 +5,7 @@ import {
   costConfigSchema,
   failoverConfigSchema,
   llmProviderConfigSchema,
+  mcpServerConfigSchema,
   memoryConfigSchema,
   projectConfigFileSchema,
 } from './schema.js';
@@ -395,5 +396,127 @@ describe('projectConfigFileSchema', () => {
     const config = { ...validProjectConfigFile, tags: [] };
     const result = projectConfigFileSchema.safeParse(config);
     expect(result.success).toBe(true);
+  });
+});
+
+// ─── mcpServerConfigSchema Tests ───────────────────────────────
+
+describe('mcpServerConfigSchema', () => {
+  it('accepts valid stdio config', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: 'google-calendar',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@anthropic/mcp-google-calendar'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts valid sse config', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: 'remote-server',
+      transport: 'sse',
+      url: 'http://localhost:8080/mcp',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts stdio config with env vars', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: 'with-env',
+      transport: 'stdio',
+      command: 'node',
+      env: { API_KEY: 'MY_API_KEY_ENV_VAR' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts config with custom toolPrefix', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: 'google-calendar',
+      transport: 'stdio',
+      command: 'npx',
+      toolPrefix: 'gcal',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty server name', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: '',
+      transport: 'stdio',
+      command: 'npx',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects invalid transport type', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: 'test',
+      transport: 'websocket',
+      command: 'npx',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects stdio without command', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: 'test',
+      transport: 'stdio',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects sse without url', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: 'test',
+      transport: 'sse',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects sse with invalid url', () => {
+    const result = mcpServerConfigSchema.safeParse({
+      name: 'test',
+      transport: 'sse',
+      url: 'not-a-valid-url',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ─── agentConfigSchema — mcpServers Tests ──────────────────────
+
+describe('agentConfigSchema — mcpServers', () => {
+  it('accepts agent config without mcpServers', () => {
+    const result = agentConfigSchema.safeParse(validAgentConfig);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts agent config with mcpServers', () => {
+    const config = {
+      ...validAgentConfig,
+      mcpServers: [
+        { name: 'gcal', transport: 'stdio' as const, command: 'npx' },
+        { name: 'remote', transport: 'sse' as const, url: 'http://localhost:8080/mcp' },
+      ],
+    };
+    const result = agentConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts agent config with empty mcpServers array', () => {
+    const config = { ...validAgentConfig, mcpServers: [] };
+    const result = agentConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects agent config with invalid mcpServer entry', () => {
+    const config = {
+      ...validAgentConfig,
+      mcpServers: [{ name: '', transport: 'stdio' }],
+    };
+    const result = agentConfigSchema.safeParse(config);
+    expect(result.success).toBe(false);
   });
 });

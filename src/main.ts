@@ -23,6 +23,7 @@ import {
 import { createTaskManager } from '@/scheduling/task-manager.js';
 import { createTaskRunner } from '@/scheduling/task-runner.js';
 import { createTaskExecutor } from '@/scheduling/task-executor.js';
+import { createMCPManager } from '@/mcp/mcp-manager.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import type { RouteDependencies } from '@/api/types.js';
@@ -64,6 +65,7 @@ async function start(): Promise<void> {
     toolRegistry.register(createDateTimeTool());
     toolRegistry.register(createJsonTransformTool());
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
+    const mcpManager = createMCPManager();
 
     // Register Fastify plugins
     await server.register(cors, { origin: true });
@@ -84,6 +86,7 @@ async function start(): Promise<void> {
       approvalGate,
       toolRegistry,
       taskManager,
+      mcpManager,
       logger,
     };
 
@@ -99,6 +102,7 @@ async function start(): Promise<void> {
         sessionRepository,
         promptLayerRepository,
         toolRegistry,
+        mcpManager,
         logger,
       });
 
@@ -115,6 +119,7 @@ async function start(): Promise<void> {
     // Graceful shutdown
     const shutdown = async (): Promise<void> => {
       logger.info('Shutting down...', { component: 'main' });
+      await mcpManager.disconnectAll();
       if (taskRunner) {
         await taskRunner.stop();
       }
