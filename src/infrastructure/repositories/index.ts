@@ -22,3 +22,6 @@ export type { WebhookRepository } from '@/webhooks/types.js';
 
 export { createFileRepository } from './file-repository.js';
 export type { FileRepository } from '@/files/types.js';
+
+export { createAgentRepository } from './agent-repository.js';
+export type { AgentRepository } from '@/agents/types.js';

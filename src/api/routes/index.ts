@@ -16,6 +16,7 @@ import { contactRoutes } from './contacts.js';
 import { webhookRoutes } from './webhooks.js';
 import { webhookGenericRoutes } from './webhooks-generic.js';
 import { fileRoutes } from './files.js';
+import { agentRoutes } from './agents.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -35,4 +36,5 @@ export async function registerRoutes(
   await fastify.register(webhookRoutes, deps);
   await fastify.register(webhookGenericRoutes, deps);
   await fastify.register(fileRoutes, deps);
+  await fastify.register(agentRoutes, deps);
 }

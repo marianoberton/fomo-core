@@ -1,0 +1,275 @@
+/**
+ * Agent routes — CRUD for agents.
+ */
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { z } from 'zod';
+import type { RouteDependencies } from '../types.js';
+
+// ─── Schemas ────────────────────────────────────────────────────
+
+const mcpServerSchema = z.object({
+  name: z.string().min(1),
+  command: z.string().min(1),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string()).optional(),
+});
+
+const channelConfigSchema = z.object({
+  allowedChannels: z.array(z.string()),
+  defaultChannel: z.string().optional(),
+});
+
+const promptConfigSchema = z.object({
+  identity: z.string().min(1),
+  instructions: z.string().min(1),
+  safety: z.string().min(1),
+});
+
+const limitsSchema = z.object({
+  maxTurns: z.number().int().positive().optional(),
+  maxTokensPerTurn: z.number().int().positive().optional(),
+  budgetPerDayUsd: z.number().positive().optional(),
+});
+
+const createAgentSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  promptConfig: promptConfigSchema,
+  toolAllowlist: z.array(z.string()).optional(),
+  mcpServers: z.array(mcpServerSchema).optional(),
+  channelConfig: channelConfigSchema.optional(),
+  limits: limitsSchema.optional(),
+});
+
+const updateAgentSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  promptConfig: promptConfigSchema.optional(),
+  toolAllowlist: z.array(z.string()).optional(),
+  mcpServers: z.array(mcpServerSchema).optional(),
+  channelConfig: channelConfigSchema.optional(),
+  limits: limitsSchema.optional(),
+  status: z.enum(['active', 'paused', 'disabled']).optional(),
+});
+
+const sendMessageSchema = z.object({
+  fromAgentId: z.string().min(1),
+  content: z.string().min(1),
+  context: z.record(z.unknown()).optional(),
+  replyToId: z.string().optional(),
+  waitForReply: z.boolean().optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+
+// ─── Route Registration ─────────────────────────────────────────
+
+export async function agentRoutes(
+  fastify: FastifyInstance,
+  deps: RouteDependencies,
+): Promise<void> {
+  const { agentRepository, agentRegistry, agentComms, logger } = deps;
+
+  // ─── List Agents ────────────────────────────────────────────────
+
+  fastify.get(
+    '/projects/:projectId/agents',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId } = request.params as { projectId: string };
+      const query = request.query as { status?: string };
+
+      let agents;
+      if (query.status === 'active') {
+        agents = await agentRepository.listActive(projectId);
+      } else {
+        agents = await agentRepository.list(projectId);
+      }
+
+      return reply.send({ agents });
+    },
+  );
+
+  // ─── Get Agent ──────────────────────────────────────────────────
+
+  fastify.get(
+    '/agents/:agentId',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { agentId } = request.params as { agentId: string };
+
+      const agent = await agentRegistry.get(agentId);
+
+      if (!agent) {
+        return reply.status(404).send({ error: 'Agent not found' });
+      }
+
+      return reply.send({ agent });
+    },
+  );
+
+  // ─── Get Agent by Name ──────────────────────────────────────────
+
+  fastify.get(
+    '/projects/:projectId/agents/name/:name',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, name } = request.params as { projectId: string; name: string };
+
+      const agent = await agentRegistry.getByName(projectId, name);
+
+      if (!agent) {
+        return reply.status(404).send({ error: 'Agent not found' });
+      }
+
+      return reply.send({ agent });
+    },
+  );
+
+  // ─── Create Agent ───────────────────────────────────────────────
+
+  fastify.post(
+    '/projects/:projectId/agents',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId } = request.params as { projectId: string };
+      const parseResult = createAgentSchema.safeParse(request.body);
+
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.flatten(),
+        });
+      }
+
+      const input = {
+        projectId,
+        ...parseResult.data,
+      };
+
+      try {
+        const agent = await agentRepository.create(input);
+        logger.info({ agentId: agent.id, projectId }, 'Agent created');
+        return reply.status(201).send({ agent });
+      } catch (error) {
+        // Handle unique constraint violation
+        if (error instanceof Error && error.message.includes('Unique constraint')) {
+          return reply.status(409).send({
+            error: 'Agent with this name already exists in the project',
+          });
+        }
+        throw error;
+      }
+    },
+  );
+
+  // ─── Update Agent ───────────────────────────────────────────────
+
+  fastify.patch(
+    '/agents/:agentId',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { agentId } = request.params as { agentId: string };
+      const parseResult = updateAgentSchema.safeParse(request.body);
+
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.flatten(),
+        });
+      }
+
+      try {
+        const agent = await agentRepository.update(agentId, parseResult.data);
+
+        // Invalidate cache after update
+        agentRegistry.invalidate(agentId);
+
+        logger.info({ agentId }, 'Agent updated');
+        return reply.send({ agent });
+      } catch (error) {
+        // Prisma throws if record not found
+        return reply.status(404).send({ error: 'Agent not found' });
+      }
+    },
+  );
+
+  // ─── Delete Agent ───────────────────────────────────────────────
+
+  fastify.delete(
+    '/agents/:agentId',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { agentId } = request.params as { agentId: string };
+
+      try {
+        await agentRepository.delete(agentId);
+
+        // Invalidate cache after delete
+        agentRegistry.invalidate(agentId);
+
+        logger.info({ agentId }, 'Agent deleted');
+        return reply.status(204).send();
+      } catch (error) {
+        // Prisma throws if record not found
+        return reply.status(404).send({ error: 'Agent not found' });
+      }
+    },
+  );
+
+  // ─── Send Message to Agent ──────────────────────────────────────
+
+  fastify.post(
+    '/agents/:agentId/message',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { agentId } = request.params as { agentId: string };
+      const parseResult = sendMessageSchema.safeParse(request.body);
+
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.flatten(),
+        });
+      }
+
+      // Verify target agent exists
+      const targetAgent = await agentRegistry.get(agentId);
+      if (!targetAgent) {
+        return reply.status(404).send({ error: 'Target agent not found' });
+      }
+
+      const { fromAgentId, content, context, replyToId, waitForReply, timeoutMs } =
+        parseResult.data;
+
+      const message = {
+        fromAgentId,
+        toAgentId: agentId,
+        content,
+        context,
+        replyToId,
+      };
+
+      if (waitForReply) {
+        try {
+          const replyContent = await agentComms.sendAndWait(message, timeoutMs);
+          return reply.send({ reply: replyContent });
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('timeout')) {
+            return reply.status(408).send({ error: 'Message timeout waiting for reply' });
+          }
+          throw error;
+        }
+      }
+
+      const messageId = await agentComms.send(message);
+      return reply.status(202).send({ messageId });
+    },
+  );
+
+  // ─── Refresh Agent Cache ────────────────────────────────────────
+
+  fastify.post(
+    '/agents/:agentId/refresh',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { agentId } = request.params as { agentId: string };
+
+      await agentRegistry.refresh(agentId);
+
+      logger.debug({ agentId }, 'Agent cache refreshed');
+      return reply.status(204).send();
+    },
+  );
+}

@@ -14,6 +14,7 @@ import type { WebhookRepository } from '@/webhooks/types.js';
 import type { WebhookProcessor } from '@/webhooks/webhook-processor.js';
 import type { FileRepository } from '@/files/types.js';
 import type { FileService } from '@/files/file-service.js';
+import type { AgentRepository, AgentRegistry, AgentComms } from '@/agents/types.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -81,6 +82,7 @@ export interface RouteDependencies {
   contactRepository: ContactRepository;
   webhookRepository: WebhookRepository;
   fileRepository: FileRepository;
+  agentRepository: AgentRepository;
   approvalGate: ApprovalGate;
   toolRegistry: ToolRegistry;
   taskManager: TaskManager;
@@ -88,5 +90,7 @@ export interface RouteDependencies {
   inboundProcessor: InboundProcessor;
   webhookProcessor: WebhookProcessor;
   fileService: FileService;
+  agentRegistry: AgentRegistry;
+  agentComms: AgentComms;
   logger: Logger;
 }

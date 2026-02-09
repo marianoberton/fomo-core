@@ -32,6 +32,7 @@ model Project {
   contacts         Contact[]
   webhooks         Webhook[]
   files            File[]
+  agents           Agent[]
 
   @@map("projects")
 }
@@ -74,6 +75,7 @@ model Session {
   id        String    @id
   projectId String    @map("project_id")
   contactId String?   @map("contact_id")
+  agentId   String?   @map("agent_id")
   status    String    @default("active")
   metadata  Json?
   createdAt DateTime  @default(now()) @map("created_at")
@@ -82,12 +84,14 @@ model Session {
 
   project          Project           @relation(fields: [projectId], references: [id])
   contact          Contact?          @relation(fields: [contactId], references: [id])
+  agent            Agent?            @relation(fields: [agentId], references: [id])
   messages         Message[]
   traces           ExecutionTrace[]
   approvalRequests ApprovalRequest[]
 
   @@index([projectId, status])
   @@index([contactId])
+  @@index([agentId])
   @@map("sessions")
 }
 
@@ -333,6 +337,40 @@ model Webhook {
 
   @@index([projectId, status])
   @@map("webhooks")
+}
+
+// ─── Agents ─────────────────────────────────────────────────────
+
+model Agent {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+
+  name        String
+  description String?
+
+  // Config
+  promptConfig    Json    @map("prompt_config")     // identity, instructions, safety
+  toolAllowlist   String[] @map("tool_allowlist")   // Allowed tool IDs
+  mcpServers      Json?   @map("mcp_servers")       // MCP server configs
+  channelConfig   Json?   @map("channel_config")    // Which channels this agent uses
+
+  // Limits
+  maxTurns            Int     @default(10) @map("max_turns")
+  maxTokensPerTurn    Int     @default(4000) @map("max_tokens_per_turn")
+  budgetPerDayUsd     Float   @default(10.0) @map("budget_per_day_usd")
+
+  // Status
+  status      String   @default("active")  // active, paused, disabled
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project     Project  @relation(fields: [projectId], references: [id])
+  sessions    Session[]
+
+  @@unique([projectId, name])
+  @@index([projectId, status])
+  @@map("agents")
 }
 
 // ─── Files ──────────────────────────────────────────────────────
