@@ -60,7 +60,7 @@ describe('GET /projects/:projectId/scheduled-tasks', () => {
       url: '/projects/proj-1/scheduled-tasks?status=active',
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.taskManager.listTasks).toHaveBeenCalledWith(
       'proj-1',
       'active',
@@ -163,7 +163,7 @@ describe('POST /scheduled-tasks/:id/approve', () => {
     };
     expect(body.success).toBe(true);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.taskManager.approveTask).toHaveBeenCalledWith(
       'task-1',
       'admin-user',
@@ -201,7 +201,7 @@ describe('POST /scheduled-tasks/:id/reject', () => {
     };
     expect(body.success).toBe(true);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.taskManager.rejectTask).toHaveBeenCalledWith('task-1');
   });
 
@@ -250,7 +250,7 @@ describe('POST /scheduled-tasks/:id/pause', () => {
     };
     expect(body.success).toBe(true);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.taskManager.pauseTask).toHaveBeenCalledWith('task-1');
   });
 });
@@ -275,7 +275,7 @@ describe('POST /scheduled-tasks/:id/resume', () => {
     };
     expect(body.success).toBe(true);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.taskManager.resumeTask).toHaveBeenCalledWith('task-1');
   });
 });
@@ -301,7 +301,7 @@ describe('GET /scheduled-tasks/:id/runs', () => {
     expect(body.success).toBe(true);
     expect(body.data).toHaveLength(2);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.taskManager.listRuns).toHaveBeenCalledWith(
       'task-1',
       undefined,

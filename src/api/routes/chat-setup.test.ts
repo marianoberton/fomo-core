@@ -123,7 +123,7 @@ describe('prepareChatRun', () => {
       expect(result.value.sessionId).toBe('sess-new');
     }
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: 'proj-1' }),
     );
@@ -223,7 +223,7 @@ describe('prepareChatRun', () => {
       deps,
     );
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({ metadata: { source: 'web' } }),
     );

@@ -42,4 +42,11 @@ export default tseslint.config(
       }],
     },
   },
+  // Relax rules for test files
+  {
+    files: ['**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
 );

@@ -1,7 +1,7 @@
 /**
  * File Service — combines storage and repository for complete file operations.
  */
-import type { Logger } from '@/observability/types.js';
+import type { Logger } from '@/observability/logger.js';
 import type {
   FileId,
   FileRepository,

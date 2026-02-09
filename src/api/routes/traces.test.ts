@@ -32,7 +32,7 @@ describe('traceRoutes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toHaveLength(1);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.executionTraceRepository.listBySession).toHaveBeenCalledWith(
         'sess-1' as SessionId,
       );
@@ -56,7 +56,7 @@ describe('traceRoutes', () => {
       expect(body.success).toBe(true);
       expect(body.data.id).toBe('trace-1');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.executionTraceRepository.findById).toHaveBeenCalledWith(
         'trace-1' as TraceId,
       );

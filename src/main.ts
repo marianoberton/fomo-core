@@ -12,6 +12,10 @@ import {
   createPromptLayerRepository,
   createExecutionTraceRepository,
   createScheduledTaskRepository,
+  createContactRepository,
+  createWebhookRepository,
+  createFileRepository,
+  createAgentRepository,
 } from '@/infrastructure/repositories/index.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
 import { createToolRegistry } from '@/tools/registry/tool-registry.js';
@@ -24,9 +28,17 @@ import { createTaskManager } from '@/scheduling/task-manager.js';
 import { createTaskRunner } from '@/scheduling/task-runner.js';
 import { createTaskExecutor } from '@/scheduling/task-executor.js';
 import { createMCPManager } from '@/mcp/mcp-manager.js';
+import { createChannelRouter } from '@/channels/channel-router.js';
+import { createInboundProcessor } from '@/channels/inbound-processor.js';
+import { createWebhookProcessor } from '@/webhooks/webhook-processor.js';
+import { createFileService } from '@/files/file-service.js';
+import { createLocalStorage } from '@/files/storage-local.js';
+import { createAgentRegistry } from '@/agents/agent-registry.js';
+import { createAgentComms } from '@/agents/agent-comms.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import type { RouteDependencies } from '@/api/types.js';
+import type { ProjectId } from '@/core/types.js';
 
 const logger = createLogger();
 
@@ -57,6 +69,10 @@ async function start(): Promise<void> {
     const promptLayerRepository = createPromptLayerRepository(prisma);
     const executionTraceRepository = createExecutionTraceRepository(prisma);
     const scheduledTaskRepository = createScheduledTaskRepository(prisma);
+    const contactRepository = createContactRepository(prisma);
+    const webhookRepository = createWebhookRepository(prisma);
+    const fileRepository = createFileRepository(prisma);
+    const agentRepository = createAgentRepository(prisma);
 
     // Create shared services
     const approvalGate = createApprovalGate();
@@ -66,6 +82,54 @@ async function start(): Promise<void> {
     toolRegistry.register(createJsonTransformTool());
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     const mcpManager = createMCPManager();
+
+    // Channel system
+    const channelRouter = createChannelRouter({ logger });
+
+    // Placeholder runAgent — full agent loop integration is wired via the chat route
+    const runAgent = (params: {
+      projectId: ProjectId;
+      sessionId: string;
+      userMessage: string;
+    }): Promise<{ response: string }> => {
+      void params;
+      logger.warn('runAgent placeholder called — wire full agent loop for production', {
+        component: 'main',
+      });
+      return Promise.resolve({ response: 'Agent loop not yet wired for inbound processing.' });
+    };
+
+    const defaultProjectId = (process.env['DEFAULT_PROJECT_ID'] ?? 'default') as ProjectId;
+
+    const inboundProcessor = createInboundProcessor({
+      channelRouter,
+      contactRepository,
+      sessionRepository,
+      logger,
+      defaultProjectId,
+      runAgent,
+    });
+
+    // Webhook system
+    const webhookProcessor = createWebhookProcessor({
+      webhookRepository,
+      sessionRepository,
+      logger,
+      runAgent,
+    });
+
+    // File system
+    const fileStoragePath = process.env['FILE_STORAGE_PATH'] ?? './data/files';
+    const fileStorage = createLocalStorage({ basePath: fileStoragePath });
+    const fileService = createFileService({
+      storage: fileStorage,
+      repository: fileRepository,
+      logger,
+    });
+
+    // Multi-agent system
+    const agentRegistry = createAgentRegistry({ agentRepository, logger });
+    const agentComms = createAgentComms({ logger });
 
     // Register Fastify plugins
     await server.register(cors, { origin: true });
@@ -83,10 +147,20 @@ async function start(): Promise<void> {
       promptLayerRepository,
       executionTraceRepository,
       scheduledTaskRepository,
+      contactRepository,
+      webhookRepository,
+      fileRepository,
+      agentRepository,
       approvalGate,
       toolRegistry,
       taskManager,
       mcpManager,
+      channelRouter,
+      inboundProcessor,
+      webhookProcessor,
+      fileService,
+      agentRegistry,
+      agentComms,
       logger,
     };
 

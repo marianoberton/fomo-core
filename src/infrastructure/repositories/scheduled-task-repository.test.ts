@@ -7,7 +7,22 @@ import {
 
 // ─── Mock Prisma ─────────────────────────────────────────────────
 
-function createMockPrisma() {
+const createMockPrisma = (): {
+  scheduledTask: {
+    create: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
+  };
+  scheduledTaskRun: {
+    create: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+} => {
   return {
     scheduledTask: {
       create: vi.fn(),
@@ -24,7 +39,7 @@ function createMockPrisma() {
       update: vi.fn(),
     },
   };
-}
+};
 
 // ─── Fixtures ────────────────────────────────────────────────────
 
@@ -125,8 +140,9 @@ describe('ScheduledTaskRepository', () => {
       expect(result.status).toBe('proposed');
       expect(result.proposedBy).toBe('agent-session-1');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.scheduledTask.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
           origin: 'agent_proposed',
           status: 'proposed',
@@ -147,7 +163,7 @@ describe('ScheduledTaskRepository', () => {
       expect(result?.budgetPerRunUSD).toBe(1.0);
       expect(result?.description).toBeUndefined();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.scheduledTask.findUnique).toHaveBeenCalledWith({
         where: { id: 'task-1' },
       });
@@ -180,7 +196,7 @@ describe('ScheduledTaskRepository', () => {
       expect(result?.status).toBe('paused');
       expect(result?.approvedBy).toBe('admin-1');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.scheduledTask.update).toHaveBeenCalledWith({
         where: { id: 'task-1' },
         data: {
@@ -221,7 +237,7 @@ describe('ScheduledTaskRepository', () => {
 
       await repo.listByProject('proj-1' as ProjectId, 'active');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.scheduledTask.findMany).toHaveBeenCalledWith({
         where: { projectId: 'proj-1', status: 'active' },
         orderBy: { createdAt: 'desc' },
@@ -233,7 +249,7 @@ describe('ScheduledTaskRepository', () => {
 
       await repo.listByProject('proj-1' as ProjectId);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.scheduledTask.findMany).toHaveBeenCalledWith({
         where: { projectId: 'proj-1' },
         orderBy: { createdAt: 'desc' },
@@ -255,7 +271,7 @@ describe('ScheduledTaskRepository', () => {
       expect(result).toHaveLength(1);
       expect(result[0]?.id).toBe('task-1');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.scheduledTask.findMany).toHaveBeenCalledWith({
         where: {
           status: 'active',
@@ -345,7 +361,7 @@ describe('ScheduledTaskRepository', () => {
       expect(result[0]?.id).toBe('run-1');
       expect(result[0]?.startedAt).toBeUndefined();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.scheduledTaskRun.findMany).toHaveBeenCalledWith({
         where: { taskId: 'task-1' },
         orderBy: { createdAt: 'desc' },
@@ -358,7 +374,7 @@ describe('ScheduledTaskRepository', () => {
 
       await repo.listRuns('task-1' as ScheduledTaskId, 10);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.scheduledTaskRun.findMany).toHaveBeenCalledWith({
         where: { taskId: 'task-1' },
         orderBy: { createdAt: 'desc' },

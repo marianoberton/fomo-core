@@ -5,7 +5,7 @@ import { createFileRepository } from './file-repository.js';
 
 const PROJECT_ID = 'proj_test' as ProjectId;
 
-function makeFileRecord(overrides?: Record<string, unknown>) {
+const makeFileRecord = (overrides?: Record<string, unknown>): Record<string, unknown> => {
   return {
     id: 'file_abc',
     projectId: PROJECT_ID,
@@ -22,9 +22,9 @@ function makeFileRecord(overrides?: Record<string, unknown>) {
     metadata: { source: 'upload' },
     ...overrides,
   };
-}
+};
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     file: {
       create: vi.fn(),
@@ -62,6 +62,7 @@ describe('FileRepository', () => {
       expect(file.id).toBe('file_abc');
       expect(file.originalFilename).toBe('document.pdf');
       expect(file.sizeBytes).toBe(12345);
+       
       expect(mockPrisma.file.create).toHaveBeenCalledOnce();
     });
 
@@ -120,7 +121,7 @@ describe('FileRepository', () => {
       const files = await repo.findByProject(PROJECT_ID);
 
       expect(files).toHaveLength(2);
-      expect(files[0].originalFilename).toBe('document.pdf');
+      expect(files[0]?.originalFilename).toBe('document.pdf');
     });
 
     it('respects limit and offset', async () => {
@@ -129,6 +130,7 @@ describe('FileRepository', () => {
       const repo = createFileRepository(mockPrisma);
       await repo.findByProject(PROJECT_ID, { limit: 10, offset: 5 });
 
+       
       expect(mockPrisma.file.findMany).toHaveBeenCalledWith({
         where: { projectId: PROJECT_ID },
         orderBy: { uploadedAt: 'desc' },
@@ -145,6 +147,7 @@ describe('FileRepository', () => {
       const repo = createFileRepository(mockPrisma);
       await repo.delete('file_abc');
 
+       
       expect(mockPrisma.file.delete).toHaveBeenCalledWith({
         where: { id: 'file_abc' },
       });
@@ -161,6 +164,7 @@ describe('FileRepository', () => {
       const file = await repo.updateMetadata('file_abc', { updated: true });
 
       expect(file.metadata).toEqual({ updated: true });
+       
       expect(mockPrisma.file.update).toHaveBeenCalledWith({
         where: { id: 'file_abc' },
         data: { metadata: { updated: true } },

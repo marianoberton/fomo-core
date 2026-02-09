@@ -2,6 +2,7 @@
  * WhatsApp Channel Adapter — sends/receives messages via WhatsApp Cloud API.
  */
 import type { ChannelAdapter, InboundMessage, OutboundMessage, SendResult } from '../types.js';
+import type { ProjectId } from '@/core/types.js';
 
 // ─── Config ─────────────────────────────────────────────────────
 
@@ -18,8 +19,8 @@ export interface WhatsAppAdapterConfig {
 
 interface WhatsAppSendResponse {
   messaging_product: string;
-  contacts?: Array<{ wa_id: string }>;
-  messages?: Array<{ id: string }>;
+  contacts?: { wa_id: string }[];
+  messages?: { id: string }[];
   error?: {
     message: string;
     type: string;
@@ -29,20 +30,20 @@ interface WhatsAppSendResponse {
 
 interface WhatsAppWebhookPayload {
   object: string;
-  entry?: Array<{
+  entry?: {
     id: string;
-    changes?: Array<{
+    changes?: {
       value: {
         messaging_product: string;
         metadata: {
           display_phone_number: string;
           phone_number_id: string;
         };
-        contacts?: Array<{
+        contacts?: {
           profile: { name: string };
           wa_id: string;
-        }>;
-        messages?: Array<{
+        }[];
+        messages?: {
           from: string;
           id: string;
           timestamp: string;
@@ -52,11 +53,11 @@ interface WhatsAppWebhookPayload {
             from: string;
             id: string;
           };
-        }>;
+        }[];
       };
       field: string;
-    }>;
-  }>;
+    }[];
+  }[];
 }
 
 // ─── Adapter Factory ────────────────────────────────────────────
@@ -101,12 +102,12 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
           body: JSON.stringify(body),
         });
 
-        const data = (await response.json()) as WhatsAppSendResponse;
+        const data = (await response.json()) as unknown as WhatsAppSendResponse;
 
         if (data.messages && data.messages.length > 0) {
           return {
             success: true,
-            channelMessageId: data.messages[0].id,
+            channelMessageId: data.messages[0]?.id,
           };
         }
 
@@ -122,35 +123,35 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
       }
     },
 
-    async parseInbound(payload: unknown): Promise<InboundMessage | null> {
+    parseInbound(payload: unknown): Promise<InboundMessage | null> {
       const webhook = payload as WhatsAppWebhookPayload;
 
-      if (webhook.object !== 'whatsapp_business_account') return null;
+      if (webhook.object !== 'whatsapp_business_account') return Promise.resolve(null);
 
       const entry = webhook.entry?.[0];
       const change = entry?.changes?.[0];
       const value = change?.value;
 
-      if (!value?.messages || value.messages.length === 0) return null;
+      if (!value?.messages || value.messages.length === 0) return Promise.resolve(null);
 
       const message = value.messages[0];
       const contact = value.contacts?.[0];
 
       // Only handle text messages for now
-      if (message.type !== 'text' || !message.text?.body) return null;
+      if (message?.type !== 'text' || !message.text?.body) return Promise.resolve(null);
 
-      return {
+      return Promise.resolve({
         id: `wa-${message.id}`,
-        channel: 'whatsapp',
+        channel: 'whatsapp' as const,
         channelMessageId: message.id,
-        projectId: '', // Will be resolved by inbound processor
+        projectId: '' as ProjectId, // Will be resolved by inbound processor
         senderIdentifier: message.from,
-        senderName: contact?.profile?.name,
+        senderName: contact?.profile.name,
         content: message.text.body,
         replyToChannelMessageId: message.context?.id,
         rawPayload: payload,
         receivedAt: new Date(Number(message.timestamp) * 1000),
-      };
+      });
     },
 
     async isHealthy(): Promise<boolean> {

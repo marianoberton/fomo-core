@@ -181,7 +181,7 @@ describe('mcp-manager', () => {
 
       expect(manager.getTools()).toHaveLength(1);
       expect(manager.getTools()[0]?.id).toBe('mcp:gmail:send_email');
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(calendarConn.close).toHaveBeenCalled();
       expect(manager.getConnection('google-calendar')).toBeUndefined();
     });
@@ -212,9 +212,9 @@ describe('mcp-manager', () => {
 
       expect(manager.getTools()).toHaveLength(0);
       expect(manager.listConnections()).toHaveLength(0);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(calendarConn.close).toHaveBeenCalled();
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(emailConn.close).toHaveBeenCalled();
     });
   });

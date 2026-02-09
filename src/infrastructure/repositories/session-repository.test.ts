@@ -5,7 +5,7 @@ import { createSessionRepository } from './session-repository.js';
 
 const PROJECT_ID = 'proj_test' as ProjectId;
 
-function makeSessionRecord(overrides?: Record<string, unknown>) {
+const makeSessionRecord = (overrides?: Record<string, unknown>): Record<string, unknown> => {
   return {
     id: 'sess_abc',
     projectId: PROJECT_ID,
@@ -16,9 +16,9 @@ function makeSessionRecord(overrides?: Record<string, unknown>) {
     expiresAt: null,
     ...overrides,
   };
-}
+};
 
-function makeMessageRecord(overrides?: Record<string, unknown>) {
+const makeMessageRecord = (overrides?: Record<string, unknown>): Record<string, unknown> => {
   return {
     id: 'msg_abc',
     sessionId: 'sess_abc',
@@ -30,9 +30,9 @@ function makeMessageRecord(overrides?: Record<string, unknown>) {
     createdAt: new Date('2025-01-01'),
     ...overrides,
   };
-}
+};
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     session: {
       create: vi.fn(),
@@ -119,6 +119,7 @@ describe('SessionRepository', () => {
       const repo = createSessionRepository(mockPrisma);
       await repo.listByProject(PROJECT_ID, 'active');
 
+       
       expect(mockPrisma.session.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ projectId: PROJECT_ID, status: 'active' }) as unknown,

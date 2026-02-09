@@ -91,7 +91,7 @@ function toOpenAIMessages(
     if (msg.role === 'assistant') {
       result.push({
         role: 'assistant',
-        content: textParts.join('') || null,
+        content: textParts.join('') === '' ? null : textParts.join(''),
         ...(toolCalls.length ? { tool_calls: toolCalls } : {}),
       });
     } else if (toolResults.length > 0) {
@@ -219,7 +219,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
             for (const [, buffer] of toolCallBuffers) {
               let parsedInput: Record<string, unknown> = {};
               try {
-                parsedInput = JSON.parse(buffer.argumentsJson || '{}') as Record<string, unknown>;
+                parsedInput = JSON.parse(buffer.argumentsJson ? buffer.argumentsJson : '{}') as unknown as Record<string, unknown>;
               } catch {
                 logger.warn('Failed to parse tool call arguments', {
                   component: label,
@@ -269,7 +269,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
       }
     },
 
-    async countTokens(messages: Message[]): Promise<number> {
+    countTokens(messages: Message[]): Promise<number> {
       // OpenAI doesn't have a dedicated token counting endpoint.
       // Rough estimate: ~4 chars per token for English text.
       let totalChars = 0;
@@ -280,11 +280,11 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
           for (const part of msg.content) {
             if (part.type === 'text') totalChars += part.text.length;
             else if (part.type === 'tool_result') totalChars += part.content.length;
-            else if (part.type === 'tool_use') totalChars += JSON.stringify(part.input).length;
+            else totalChars += JSON.stringify(part.input).length;
           }
         }
       }
-      return Math.ceil(totalChars / 4);
+      return Promise.resolve(Math.ceil(totalChars / 4));
     },
 
     getContextWindow(): number {

@@ -217,6 +217,7 @@ describe('MemoryManager', () => {
 
       const results = await mm.retrieveMemories({ query: 'test', topK: 5 });
       expect(results).toEqual([]);
+       
       expect(store.retrieve).not.toHaveBeenCalled();
     });
 
@@ -250,6 +251,7 @@ describe('MemoryManager', () => {
 
       const results = await mm.retrieveMemories({ query: 'sky', topK: 3 });
       expect(results).toEqual(mockResults);
+       
       expect(store.retrieve).toHaveBeenCalledWith({ query: 'sky', topK: 3 });
     });
 

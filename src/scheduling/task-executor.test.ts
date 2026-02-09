@@ -70,16 +70,14 @@ function createSetupResult(overrides?: Partial<ChatSetupResult>): ChatSetupResul
   };
 }
 
-function createExecutorDeps(): ReturnType<typeof createMockProjectRepository> extends infer P
-  ? {
-      projectRepository: ReturnType<typeof createMockProjectRepository>;
-      sessionRepository: ReturnType<typeof createMockSessionRepository>;
-      promptLayerRepository: ReturnType<typeof createMockPromptLayerRepository>;
-      toolRegistry: ReturnType<typeof createMockToolRegistry>;
-      mcpManager: ReturnType<typeof createMockMCPManager>;
-      logger: ReturnType<typeof createMockLogger>;
-    }
-  : never {
+function createExecutorDeps(): {
+  projectRepository: ReturnType<typeof createMockProjectRepository>;
+  sessionRepository: ReturnType<typeof createMockSessionRepository>;
+  promptLayerRepository: ReturnType<typeof createMockPromptLayerRepository>;
+  toolRegistry: ReturnType<typeof createMockToolRegistry>;
+  mcpManager: ReturnType<typeof createMockMCPManager>;
+  logger: ReturnType<typeof createMockLogger>;
+} {
   return {
     projectRepository: createMockProjectRepository(),
     sessionRepository: createMockSessionRepository(),
@@ -220,17 +218,17 @@ describe('createTaskExecutor', () => {
 
     await executor(task);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledTimes(2);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledWith(
       'sess-task-1',
       { role: 'user', content: 'Clean task message' },
       'trace-persist',
     );
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledWith(
       'sess-task-1',
       { role: 'assistant', content: 'Done' },
@@ -249,7 +247,7 @@ describe('createTaskExecutor', () => {
 
     await executor(task);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).not.toHaveBeenCalled();
   });
 
@@ -267,7 +265,7 @@ describe('createTaskExecutor', () => {
 
     await executor(task);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).not.toHaveBeenCalled();
   });
 
@@ -350,11 +348,13 @@ describe('createTaskExecutor', () => {
 
     await executor(task);
 
+     
     expect(deps.logger.info).toHaveBeenCalledWith(
       'Starting scheduled task execution',
       expect.objectContaining({ taskId: task.id }),
     );
 
+     
     expect(deps.logger.info).toHaveBeenCalledWith(
       'Task execution completed',
       expect.objectContaining({ taskId: task.id }),
@@ -372,6 +372,7 @@ describe('createTaskExecutor', () => {
 
     await executor(task);
 
+     
     expect(deps.logger.error).toHaveBeenCalledWith(
       'Task setup failed',
       expect.objectContaining({

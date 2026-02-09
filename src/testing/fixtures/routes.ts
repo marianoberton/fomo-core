@@ -9,10 +9,18 @@ import type { SessionRepository, Session, StoredMessage } from '@/infrastructure
 import type { PromptLayerRepository } from '@/infrastructure/repositories/prompt-layer-repository.js';
 import type { ExecutionTraceRepository } from '@/infrastructure/repositories/execution-trace-repository.js';
 import type { ScheduledTaskRepository } from '@/infrastructure/repositories/scheduled-task-repository.js';
+import type { ContactRepository } from '@/contacts/types.js';
+import type { WebhookRepository } from '@/webhooks/types.js';
+import type { FileRepository } from '@/files/types.js';
+import type { AgentRepository, AgentRegistry, AgentComms } from '@/agents/types.js';
 import type { ApprovalGate } from '@/security/approval-gate.js';
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
 import type { TaskManager } from '@/scheduling/task-manager.js';
 import type { MCPManager } from '@/mcp/mcp-manager.js';
+import type { ChannelRouter } from '@/channels/channel-router.js';
+import type { InboundProcessor } from '@/channels/inbound-processor.js';
+import type { WebhookProcessor } from '@/webhooks/webhook-processor.js';
+import type { FileService } from '@/files/file-service.js';
 import type { Logger } from '@/observability/logger.js';
 import type {
   ExecutionTrace,
@@ -161,6 +169,132 @@ export function createMockMCPManager(): {
   };
 }
 
+/** Create a mock ContactRepository with all methods as vi.fn(). */
+export function createMockContactRepository(): {
+  [K in keyof ContactRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    create: vi.fn(),
+    findById: vi.fn(),
+    findByChannel: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    list: vi.fn(),
+  };
+}
+
+/** Create a mock WebhookRepository with all methods as vi.fn(). */
+export function createMockWebhookRepository(): {
+  [K in keyof WebhookRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    create: vi.fn(),
+    findById: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    list: vi.fn(),
+    listActive: vi.fn(),
+  };
+}
+
+/** Create a mock FileRepository with all methods as vi.fn(). */
+export function createMockFileRepository(): {
+  [K in keyof FileRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    create: vi.fn(),
+    findById: vi.fn(),
+    findByProject: vi.fn(),
+    delete: vi.fn(),
+    updateMetadata: vi.fn(),
+  };
+}
+
+/** Create a mock AgentRepository with all methods as vi.fn(). */
+export function createMockAgentRepository(): {
+  [K in keyof AgentRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    create: vi.fn(),
+    findById: vi.fn(),
+    findByName: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    list: vi.fn(),
+    listActive: vi.fn(),
+  };
+}
+
+/** Create a mock ChannelRouter with all methods as vi.fn(). */
+export function createMockChannelRouter(): {
+  [K in keyof ChannelRouter]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    registerAdapter: vi.fn(),
+    getAdapter: vi.fn(),
+    send: vi.fn(),
+    parseInbound: vi.fn(),
+    listChannels: vi.fn().mockReturnValue([]),
+    isHealthy: vi.fn().mockReturnValue(true),
+  };
+}
+
+/** Create a mock InboundProcessor with all methods as vi.fn(). */
+export function createMockInboundProcessor(): {
+  [K in keyof InboundProcessor]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    process: vi.fn(),
+  };
+}
+
+/** Create a mock WebhookProcessor with all methods as vi.fn(). */
+export function createMockWebhookProcessor(): {
+  [K in keyof WebhookProcessor]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    process: vi.fn(),
+    validateSignature: vi.fn(),
+  };
+}
+
+/** Create a mock FileService with all methods as vi.fn(). */
+export function createMockFileService(): {
+  [K in keyof FileService]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    upload: vi.fn(),
+    download: vi.fn(),
+    getById: vi.fn(),
+    delete: vi.fn(),
+    getTemporaryUrl: vi.fn(),
+  };
+}
+
+/** Create a mock AgentRegistry with all methods as vi.fn(). */
+export function createMockAgentRegistry(): {
+  [K in keyof AgentRegistry]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    get: vi.fn(),
+    getByName: vi.fn(),
+    list: vi.fn().mockResolvedValue([]),
+    refresh: vi.fn().mockResolvedValue(undefined),
+    invalidate: vi.fn(),
+  };
+}
+
+/** Create a mock AgentComms with all methods as vi.fn(). */
+export function createMockAgentComms(): {
+  [K in keyof AgentComms]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    send: vi.fn(),
+    sendAndWait: vi.fn(),
+    subscribe: vi.fn().mockReturnValue(() => undefined),
+  };
+}
+
 /** Create a silent mock Logger. */
 export function createMockLogger(): Logger {
   return {
@@ -180,10 +314,20 @@ export function createMockDeps(): RouteDependencies & {
   promptLayerRepository: ReturnType<typeof createMockPromptLayerRepository>;
   executionTraceRepository: ReturnType<typeof createMockExecutionTraceRepository>;
   scheduledTaskRepository: ReturnType<typeof createMockScheduledTaskRepository>;
+  contactRepository: ReturnType<typeof createMockContactRepository>;
+  webhookRepository: ReturnType<typeof createMockWebhookRepository>;
+  fileRepository: ReturnType<typeof createMockFileRepository>;
+  agentRepository: ReturnType<typeof createMockAgentRepository>;
   approvalGate: ReturnType<typeof createMockApprovalGate>;
   toolRegistry: ReturnType<typeof createMockToolRegistry>;
   taskManager: ReturnType<typeof createMockTaskManager>;
   mcpManager: ReturnType<typeof createMockMCPManager>;
+  channelRouter: ReturnType<typeof createMockChannelRouter>;
+  inboundProcessor: ReturnType<typeof createMockInboundProcessor>;
+  webhookProcessor: ReturnType<typeof createMockWebhookProcessor>;
+  fileService: ReturnType<typeof createMockFileService>;
+  agentRegistry: ReturnType<typeof createMockAgentRegistry>;
+  agentComms: ReturnType<typeof createMockAgentComms>;
 } {
   return {
     projectRepository: createMockProjectRepository(),
@@ -191,10 +335,20 @@ export function createMockDeps(): RouteDependencies & {
     promptLayerRepository: createMockPromptLayerRepository(),
     executionTraceRepository: createMockExecutionTraceRepository(),
     scheduledTaskRepository: createMockScheduledTaskRepository(),
+    contactRepository: createMockContactRepository(),
+    webhookRepository: createMockWebhookRepository(),
+    fileRepository: createMockFileRepository(),
+    agentRepository: createMockAgentRepository(),
     approvalGate: createMockApprovalGate(),
     toolRegistry: createMockToolRegistry(),
     taskManager: createMockTaskManager(),
     mcpManager: createMockMCPManager(),
+    channelRouter: createMockChannelRouter(),
+    inboundProcessor: createMockInboundProcessor(),
+    webhookProcessor: createMockWebhookProcessor(),
+    fileService: createMockFileService(),
+    agentRegistry: createMockAgentRegistry(),
+    agentComms: createMockAgentComms(),
     logger: createMockLogger(),
   };
 }

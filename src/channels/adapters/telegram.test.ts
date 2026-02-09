@@ -67,7 +67,9 @@ describe('TelegramAdapter', () => {
       });
 
       const callArgs = vi.mocked(fetch).mock.calls[0];
-      const body = JSON.parse(callArgs[1]?.body as string);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const body = JSON.parse(callArgs?.[1]?.body as string);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(body.reply_to_message_id).toBe(999);
     });
 
@@ -88,7 +90,9 @@ describe('TelegramAdapter', () => {
       });
 
       const callArgs = vi.mocked(fetch).mock.calls[0];
-      const body = JSON.parse(callArgs[1]?.body as string);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const body = JSON.parse(callArgs?.[1]?.body as string);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(body.parse_mode).toBe('HTML');
     });
 

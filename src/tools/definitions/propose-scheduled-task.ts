@@ -12,7 +12,6 @@ import { ToolExecutionError } from '@/core/errors.js';
 import type { NexusError } from '@/core/errors.js';
 import type { ExecutableTool, ToolResult } from '@/tools/types.js';
 import type { TaskManager } from '@/scheduling/task-manager.js';
-import type { ProjectId } from '@/core/types.js';
 
 const inputSchema = z.object({
   name: z.string().min(1).max(100).describe('A short, descriptive name for the task'),

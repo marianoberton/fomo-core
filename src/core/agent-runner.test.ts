@@ -92,6 +92,7 @@ function createMockProvider(
     id: 'mock-provider',
     displayName: 'Mock Provider',
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async *chat() {
       const events = responses[callIndex] ?? [];
       callIndex++;
@@ -100,8 +101,8 @@ function createMockProvider(
       }
     },
 
-    async countTokens(messages: Message[]) {
-      return messages.length * 100; // Simple heuristic
+    countTokens(messages: Message[]) {
+      return Promise.resolve(messages.length * 100); // Simple heuristic
     },
 
     getContextWindow() {
@@ -123,10 +124,10 @@ function createMockProvider(
 }
 
 function createMockToolRegistry(
-  resolveBehavior: Map<
+  resolveBehavior = new Map<
     string,
     ReturnType<ToolRegistry['resolve']>
-  > = new Map(),
+  >(),
 ): ToolRegistry {
   return {
     register: vi.fn(),
@@ -139,34 +140,38 @@ function createMockToolRegistry(
       { name: 'get_weather', description: 'Get weather for a location', inputSchema: {} },
       { name: 'search_web', description: 'Search the web', inputSchema: {} },
     ]),
-    async resolve(toolId, input, context) {
+    resolve(toolId, input, context) {
+      void context;
       const behavior = resolveBehavior.get(toolId);
       if (behavior) {
         return behavior;
       }
-      return ok({
+      return Promise.resolve(ok({
         success: true,
         output: { result: `${toolId} executed with ${JSON.stringify(input)}` },
         durationMs: 50,
-      });
+      }));
     },
-    async resolveDryRun(toolId, input, context) {
-      return ok({
+    resolveDryRun(toolId, input, context) {
+      void toolId;
+      void input;
+      void context;
+      return Promise.resolve(ok({
         success: true,
         output: { result: 'dry run' },
         durationMs: 10,
-      });
+      }));
     },
   };
 }
 
 function createMockMemoryManager(): MemoryManager {
   return {
-    async fitToContextWindow(messages) {
-      return messages; // No pruning
+    fitToContextWindow(messages) {
+      return Promise.resolve(messages); // No pruning
     },
-    async compact(messages, sessionId) {
-      return {
+    compact(messages, sessionId) {
+      return Promise.resolve({
         messages,
         entry: {
           sessionId: sessionId as SessionId,
@@ -175,13 +180,13 @@ function createMockMemoryManager(): MemoryManager {
           tokensRecovered: 1000,
           createdAt: new Date(),
         },
-      };
+      });
     },
-    async retrieveMemories() {
-      return []; // No long-term memories
+    retrieveMemories() {
+      return Promise.resolve([]); // No long-term memories
     },
-    async storeMemory() {
-      return null;
+    storeMemory() {
+      return Promise.resolve(null);
     },
   };
 }
@@ -190,16 +195,17 @@ function createMockCostGuard(
   shouldThrowOnPreCheck = false,
 ): CostGuard {
   return {
-    async preCheck(projectId) {
+    preCheck(projectId) {
       if (shouldThrowOnPreCheck) {
         throw new BudgetExceededError(projectId, 'daily', 105, 100);
       }
+      return Promise.resolve();
     },
-    async recordUsage() {
-      // No-op
+    recordUsage() {
+      return Promise.resolve();
     },
-    async getBudgetStatus(projectId) {
-      return {
+    getBudgetStatus(projectId) {
+      return Promise.resolve({
         projectId,
         dailySpentUSD: 50,
         dailyBudgetUSD: 100,
@@ -209,7 +215,7 @@ function createMockCostGuard(
         monthlyPercentUsed: 50,
         isOverDailyBudget: false,
         isOverMonthlyBudget: false,
-      };
+      });
     },
     checkTurnTokens(tokens) {
       return tokens <= mockAgentConfig.costConfig.maxTokensPerTurn;
@@ -358,6 +364,7 @@ describe('AgentRunner', () => {
     it('should stop at max turns limit', async () => {
       // Provider always returns tool_use, creating infinite loop
       const provider = createMockProvider(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         Array(15).fill([
           { type: 'message_start', messageId: 'msg_1' },
           { type: 'tool_use_start', id: 'tool_1', name: 'get_weather' },

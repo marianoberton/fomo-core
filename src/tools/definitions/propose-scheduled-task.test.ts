@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createProposeScheduledTaskTool } from './propose-scheduled-task.js';
 import type { ExecutableTool } from '@/tools/types.js';
-import type { ExecutionContext, ProjectId, SessionId, ScheduledTaskId } from '@/core/types.js';
+import type { ExecutionContext, ProjectId, ScheduledTaskId } from '@/core/types.js';
 import type { TaskManager } from '@/scheduling/task-manager.js';
 import type { ScheduledTask } from '@/scheduling/types.js';
 import { createTestContext } from '@/testing/fixtures/context.js';
@@ -251,7 +251,7 @@ describe('propose-scheduled-task', () => {
         );
       }
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(taskManager.validateCron).toHaveBeenCalledWith('0 9 * * *');
     });
 
@@ -287,7 +287,7 @@ describe('propose-scheduled-task', () => {
 
       await tool.dryRun(validInput, context);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(taskManager.proposeTask).not.toHaveBeenCalled();
     });
   });
@@ -347,7 +347,7 @@ describe('propose-scheduled-task', () => {
 
       await tool.execute(validInput, context);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(taskManager.proposeTask).toHaveBeenCalledWith({
         projectId: context.projectId,
         name: 'Daily report',
@@ -402,7 +402,7 @@ describe('propose-scheduled-task', () => {
 
       await tool.execute(validInputRequiredOnly, context);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(taskManager.proposeTask).toHaveBeenCalledWith({
         projectId: context.projectId,
         name: 'Daily report',

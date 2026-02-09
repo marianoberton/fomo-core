@@ -3,7 +3,7 @@
  *
  * Provides a caching layer over the agent repository with configurable TTL.
  */
-import type { Logger } from 'pino';
+import type { Logger } from '@/observability/logger.js';
 import type {
   AgentId,
   AgentConfig,
@@ -51,11 +51,14 @@ export function createAgentRegistry(deps: RegistryDeps): AgentRegistry {
     async get(agentId: AgentId): Promise<AgentConfig | null> {
       const cached = cache.get(agentId);
       if (isValid(cached)) {
-        deps.logger.debug({ agentId }, 'Agent cache hit');
+        deps.logger.debug('Agent cache hit', { component: 'agent-registry', agentId });
         return cached.config;
       }
 
-      deps.logger.debug({ agentId }, 'Agent cache miss, fetching from repository');
+      deps.logger.debug('Agent cache miss, fetching from repository', {
+        component: 'agent-registry',
+        agentId,
+      });
       const config = await deps.agentRepository.findById(agentId);
 
       if (config) {
@@ -73,12 +76,20 @@ export function createAgentRegistry(deps: RegistryDeps): AgentRegistry {
           entry.config.projectId === projectId &&
           entry.config.name === name
         ) {
-          deps.logger.debug({ projectId, name }, 'Agent cache hit by name');
+          deps.logger.debug('Agent cache hit by name', {
+            component: 'agent-registry',
+            projectId,
+            name,
+          });
           return entry.config;
         }
       }
 
-      deps.logger.debug({ projectId, name }, 'Agent cache miss by name, fetching from repository');
+      deps.logger.debug('Agent cache miss by name, fetching from repository', {
+        component: 'agent-registry',
+        projectId,
+        name,
+      });
       const config = await deps.agentRepository.findByName(projectId, name);
 
       if (config) {
@@ -94,13 +105,19 @@ export function createAgentRegistry(deps: RegistryDeps): AgentRegistry {
     },
 
     async refresh(agentId: AgentId): Promise<void> {
-      deps.logger.debug({ agentId }, 'Refreshing agent cache');
+      deps.logger.debug('Refreshing agent cache', {
+        component: 'agent-registry',
+        agentId,
+      });
       cache.delete(agentId);
       await registry.get(agentId);
     },
 
     invalidate(agentId: AgentId): void {
-      deps.logger.debug({ agentId }, 'Invalidating agent cache');
+      deps.logger.debug('Invalidating agent cache', {
+        component: 'agent-registry',
+        agentId,
+      });
       cache.delete(agentId);
     },
   };

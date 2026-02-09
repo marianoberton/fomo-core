@@ -176,12 +176,6 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
             break;
           }
 
-          // Check abort signal
-          if (context.abortSignal.aborted) {
-            trace.status = 'aborted';
-            break;
-          }
-
           // Pre-check cost guard (rate limits + budgets)
           try {
             await costGuard.preCheck(agentConfig.projectId);
@@ -564,7 +558,7 @@ async function executeLLMCall(params: {
 
       // Collect streaming events
       const textParts: string[] = [];
-      const toolUses: Array<{ id: string; name: string; input: Record<string, unknown> }> = [];
+      const toolUses: { id: string; name: string; input: Record<string, unknown> }[] = [];
       let finalUsage: TokenUsage | undefined;
       let finalStopReason: string | undefined;
 
@@ -692,22 +686,18 @@ function shouldFailover(error: NexusError, failoverConfig: AgentConfig['failover
  */
 function extractToolCalls(
   message: Message,
-): Array<{ id: string; name: string; input: Record<string, unknown> }> {
+): { id: string; name: string; input: Record<string, unknown> }[] {
   if (typeof message.content === 'string') {
     return [];
   }
 
   return message.content
-    .filter((part) => part.type === 'tool_use')
-    .map((part) => {
-      if (part.type !== 'tool_use') return null;
-      return {
-        id: part.id,
-        name: part.name,
-        input: part.input,
-      };
-    })
-    .filter((t): t is { id: string; name: string; input: Record<string, unknown> } => t !== null);
+    .filter((part): part is Extract<typeof part, { type: 'tool_use' }> => part.type === 'tool_use')
+    .map((part) => ({
+      id: part.id,
+      name: part.name,
+      input: part.input,
+    }));
 }
 
 /**
@@ -737,7 +727,7 @@ function addTraceEvent(
 function extractFinalResponse(conversation: Message[]): string {
   for (let i = conversation.length - 1; i >= 0; i--) {
     const msg = conversation[i];
-    if (!msg || msg.role !== 'assistant') continue;
+    if (msg?.role !== 'assistant') continue;
 
     if (typeof msg.content === 'string') {
       return msg.content;
@@ -757,10 +747,12 @@ function extractFinalResponse(conversation: Message[]): string {
  * Delegates to the provider's cost calculation.
  */
 function calculateUsageCost(
-  _provider: string,
-  _model: string,
+  provider: string,
+  model: string,
   usage: TokenUsage,
 ): number {
+  void provider;
+  void model;
   // This will be imported from @/providers/models.js when implemented
   // For now, return a placeholder
   const inputCostPer1M = 0.003; // $3 per 1M tokens (Claude Sonnet default)

@@ -4,6 +4,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
+import type { ProjectId } from '@/core/types.js';
 import type { WebhookEvent } from '@/webhooks/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
@@ -31,10 +32,10 @@ const updateWebhookSchema = z.object({
 
 // ─── Route Registration ─────────────────────────────────────────
 
-export async function webhookGenericRoutes(
+export function webhookGenericRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
-): Promise<void> {
+): void {
   const { webhookRepository, webhookProcessor, logger } = deps;
 
   // ─── List Webhooks ──────────────────────────────────────────────
@@ -44,7 +45,7 @@ export async function webhookGenericRoutes(
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
 
-      const webhooks = await webhookRepository.list(projectId);
+      const webhooks = await webhookRepository.list(projectId as ProjectId);
 
       return reply.send({ webhooks });
     },
@@ -81,7 +82,10 @@ export async function webhookGenericRoutes(
         });
       }
 
-      const webhook = await webhookRepository.create(parseResult.data);
+      const webhook = await webhookRepository.create({
+        ...parseResult.data,
+        projectId: parseResult.data.projectId as ProjectId,
+      });
 
       logger.info('Created webhook', {
         component: 'webhooks-generic',
@@ -117,8 +121,8 @@ export async function webhookGenericRoutes(
           webhookId: webhook.id,
         });
 
-        return reply.send({ webhook });
-      } catch (error) {
+        return await reply.send({ webhook });
+      } catch {
         return reply.status(404).send({ error: 'Webhook not found' });
       }
     },
@@ -139,8 +143,8 @@ export async function webhookGenericRoutes(
           webhookId,
         });
 
-        return reply.status(204).send();
-      } catch (error) {
+        return await reply.status(204).send();
+      } catch {
         return reply.status(404).send({ error: 'Webhook not found' });
       }
     },
@@ -154,9 +158,8 @@ export async function webhookGenericRoutes(
       const { webhookId } = request.params as { webhookId: string };
 
       // Get source IP (handle proxies)
-      const sourceIp =
-        (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-        request.ip;
+      const forwarded = request.headers['x-forwarded-for'] as string | undefined;
+      const sourceIp = forwarded?.split(',')[0]?.trim() ?? request.ip;
 
       const event: WebhookEvent = {
         webhookId,
@@ -217,7 +220,7 @@ export async function webhookGenericRoutes(
       // Create a test event
       const event: WebhookEvent = {
         webhookId,
-        payload: request.body || { test: true, timestamp: new Date().toISOString() },
+        payload: request.body ?? { test: true, timestamp: new Date().toISOString() },
         headers: {},
         receivedAt: new Date(),
       };

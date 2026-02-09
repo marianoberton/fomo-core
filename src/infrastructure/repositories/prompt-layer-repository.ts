@@ -91,7 +91,7 @@ export function createPromptLayerRepository(prisma: PrismaClient): PromptLayerRe
           createdBy: input.createdBy,
           changeReason: input.changeReason,
           performanceNotes: input.performanceNotes ?? null,
-          metadata: (input.metadata as Prisma.InputJsonValue) ?? undefined,
+          metadata: input.metadata as Prisma.InputJsonValue,
         },
       });
       return toAppModel(record);

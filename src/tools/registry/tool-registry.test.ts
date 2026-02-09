@@ -52,7 +52,7 @@ describe('ToolRegistry', () => {
       const available = registry.listForContext(ctx);
 
       expect(available).toHaveLength(1);
-      expect(available[0]!.id).toBe('echo');
+      expect(available[0]?.id).toBe('echo');
     });
 
     it('blocks tool execution when not in allowedTools', async () => {
@@ -208,8 +208,8 @@ describe('ToolRegistry', () => {
       const formatted = registry.formatForProvider(ctx);
 
       expect(formatted).toHaveLength(1);
-      expect(formatted[0]!.name).toBe('echo');
-      expect(formatted[0]!.description).toBe('Echoes the input message back.');
+      expect(formatted[0]?.name).toBe('echo');
+      expect(formatted[0]?.description).toBe('Echoes the input message back.');
     });
   });
 });

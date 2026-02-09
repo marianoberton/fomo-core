@@ -7,7 +7,7 @@
  * 3. Run the agent with the message
  * 4. Send the response back via the same channel
  */
-import type { Logger } from '@/observability/types.js';
+import type { Logger } from '@/observability/logger.js';
 import type { ProjectId } from '@/core/types.js';
 import type { ChannelRouter } from './channel-router.js';
 import type { ChannelType, InboundMessage, SendResult } from './types.js';
@@ -105,7 +105,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
         // Note: This is a simplified approach. In production, you'd want to
         // query sessions by contactId directly.
         for (const s of sessions) {
-          const metadata = s.metadata as Record<string, unknown> | undefined;
+          const metadata = s.metadata;
           if (metadata?.['contactId'] === contact.id) {
             session = s;
             break;

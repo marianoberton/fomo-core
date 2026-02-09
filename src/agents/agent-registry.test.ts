@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createAgentRegistry } from './agent-registry.js';
 import type { AgentConfig, AgentRepository, AgentId, AgentRegistry } from './types.js';
 import type { ProjectId } from '@/core/types.js';
+import type { Logger } from '@/observability/logger.js';
 
 // ─── Mock Data ───────────────────────────────────────────────────
 
@@ -50,12 +51,13 @@ function createMockRepository(): AgentRepository {
 
 // ─── Mock Logger ─────────────────────────────────────────────────
 
-function createMockLogger() {
+function createMockLogger(): Logger {
   return {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    fatal: vi.fn(),
     child: vi.fn().mockReturnThis(),
   };
 }
@@ -64,7 +66,7 @@ function createMockLogger() {
 
 describe('AgentRegistry', () => {
   let mockRepository: AgentRepository;
-  let mockLogger: ReturnType<typeof createMockLogger>;
+  let mockLogger: Logger;
   let registry: AgentRegistry;
 
   beforeEach(() => {
@@ -73,7 +75,7 @@ describe('AgentRegistry', () => {
     mockLogger = createMockLogger();
     registry = createAgentRegistry({
       agentRepository: mockRepository,
-      logger: mockLogger as unknown as import('pino').Logger,
+      logger: mockLogger,
       cacheTtlMs: 1000, // 1 second for testing
     });
   });
@@ -90,10 +92,15 @@ describe('AgentRegistry', () => {
       const result = await registry.get('agent-1' as AgentId);
 
       expect(result).toEqual(mockAgent);
+       
       expect(mockRepository.findById).toHaveBeenCalledWith('agent-1');
+       
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        { agentId: 'agent-1' },
         'Agent cache miss, fetching from repository',
+        expect.objectContaining({
+          component: 'agent-registry',
+          agentId: 'agent-1',
+        }),
       );
     });
 
@@ -107,10 +114,15 @@ describe('AgentRegistry', () => {
       const result = await registry.get('agent-1' as AgentId);
 
       expect(result).toEqual(mockAgent);
+       
       expect(mockRepository.findById).toHaveBeenCalledTimes(1);
+       
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        { agentId: 'agent-1' },
         'Agent cache hit',
+        expect.objectContaining({
+          component: 'agent-registry',
+          agentId: 'agent-1',
+        }),
       );
     });
 
@@ -126,6 +138,7 @@ describe('AgentRegistry', () => {
       // Second call - cache expired
       await registry.get('agent-1' as AgentId);
 
+       
       expect(mockRepository.findById).toHaveBeenCalledTimes(2);
     });
 
@@ -145,6 +158,7 @@ describe('AgentRegistry', () => {
       const result = await registry.getByName('project-1', 'test-agent');
 
       expect(result).toEqual(mockAgent);
+       
       expect(mockRepository.findByName).toHaveBeenCalledWith('project-1', 'test-agent');
     });
 
@@ -158,6 +172,7 @@ describe('AgentRegistry', () => {
       const result = await registry.getByName('project-1', 'test-agent');
 
       expect(result).toEqual(mockAgent);
+       
       expect(mockRepository.findByName).not.toHaveBeenCalled();
     });
   });
@@ -170,6 +185,7 @@ describe('AgentRegistry', () => {
       const result = await registry.list('project-1');
 
       expect(result).toEqual(agents);
+       
       expect(mockRepository.list).toHaveBeenCalledWith('project-1');
     });
   });
@@ -184,10 +200,15 @@ describe('AgentRegistry', () => {
       // Refresh
       await registry.refresh('agent-1' as AgentId);
 
+       
       expect(mockRepository.findById).toHaveBeenCalledTimes(2);
+       
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        { agentId: 'agent-1' },
         'Refreshing agent cache',
+        expect.objectContaining({
+          component: 'agent-registry',
+          agentId: 'agent-1',
+        }),
       );
     });
   });
@@ -205,10 +226,15 @@ describe('AgentRegistry', () => {
       // Next get should fetch from repository
       await registry.get('agent-1' as AgentId);
 
+       
       expect(mockRepository.findById).toHaveBeenCalledTimes(2);
+       
       expect(mockLogger.debug).toHaveBeenCalledWith(
-        { agentId: 'agent-1' },
         'Invalidating agent cache',
+        expect.objectContaining({
+          component: 'agent-registry',
+          agentId: 'agent-1',
+        }),
       );
     });
   });

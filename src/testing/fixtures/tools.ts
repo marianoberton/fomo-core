@@ -22,28 +22,30 @@ export function createEchoTool(): ExecutableTool {
     sideEffects: false,
     supportsDryRun: true,
 
-    async execute(
+    execute(
       input: unknown,
-      _context: ExecutionContext,
+      context: ExecutionContext,
     ): Promise<Result<ToolResult, NexusError>> {
+      void context;
       const parsed = z.object({ message: z.string() }).parse(input);
-      return ok({
+      return Promise.resolve(ok({
         success: true,
         output: { echo: parsed.message },
         durationMs: 1,
-      });
+      }));
     },
 
-    async dryRun(
+    dryRun(
       input: unknown,
-      _context: ExecutionContext,
+      context: ExecutionContext,
     ): Promise<Result<ToolResult, NexusError>> {
+      void context;
       const parsed = z.object({ message: z.string() }).parse(input);
-      return ok({
+      return Promise.resolve(ok({
         success: true,
         output: { echo: parsed.message, dryRun: true },
         durationMs: 0,
-      });
+      }));
     },
   };
 }
@@ -61,28 +63,30 @@ export function createDangerousTool(): ExecutableTool {
     sideEffects: true,
     supportsDryRun: true,
 
-    async execute(
+    execute(
       input: unknown,
-      _context: ExecutionContext,
+      context: ExecutionContext,
     ): Promise<Result<ToolResult, NexusError>> {
+      void context;
       const parsed = z.object({ target: z.string() }).parse(input);
-      return ok({
+      return Promise.resolve(ok({
         success: true,
         output: { executed: parsed.target },
         durationMs: 5,
-      });
+      }));
     },
 
-    async dryRun(
+    dryRun(
       input: unknown,
-      _context: ExecutionContext,
+      context: ExecutionContext,
     ): Promise<Result<ToolResult, NexusError>> {
+      void context;
       const parsed = z.object({ target: z.string() }).parse(input);
-      return ok({
+      return Promise.resolve(ok({
         success: true,
         output: { wouldExecute: parsed.target, dryRun: true },
         durationMs: 0,
-      });
+      }));
     },
   };
 }

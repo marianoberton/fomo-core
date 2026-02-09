@@ -28,7 +28,7 @@ function toFileModel(record: {
   metadata: unknown;
 }): StoredFile {
   return {
-    id: record.id as FileId,
+    id: record.id,
     projectId: record.projectId as ProjectId,
     filename: record.filename,
     originalFilename: record.originalFilename,
@@ -64,7 +64,7 @@ export function createFileRepository(prisma: PrismaClient): FileRepository {
           publicUrl: file.publicUrl ?? null,
           uploadedBy: file.uploadedBy ?? null,
           expiresAt: file.expiresAt ?? null,
-          metadata: (file.metadata as Prisma.InputJsonValue) ?? undefined,
+          metadata: file.metadata as Prisma.InputJsonValue,
         },
       });
       return toFileModel(record);

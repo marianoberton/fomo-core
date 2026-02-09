@@ -29,13 +29,13 @@ describe('createOpenAIProvider', () => {
     vi.clearAllMocks();
   });
 
-  function createProvider(overrides?: { model?: string; providerLabel?: string }) {
+  const createProvider = (overrides?: { model?: string; providerLabel?: string }): ReturnType<typeof createOpenAIProvider> => {
     return createOpenAIProvider({
       apiKey: 'test-key',
       model: overrides?.model ?? 'gpt-4o',
       providerLabel: overrides?.providerLabel,
     });
-  }
+  };
 
   describe('metadata', () => {
     it('has correct id and displayName', () => {
@@ -85,7 +85,7 @@ describe('createOpenAIProvider', () => {
       const fn = tool['function'] as Record<string, unknown>;
       expect(fn['name']).toBe('calculator');
       expect(fn['description']).toBe('Perform math');
-      expect(fn['parameters']).toEqual(tools[0]!.inputSchema);
+      expect(fn['parameters']).toEqual(tools[0]?.inputSchema);
     });
   });
 

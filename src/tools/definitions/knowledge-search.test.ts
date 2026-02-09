@@ -96,7 +96,7 @@ describe('knowledge-search', () => {
         expect(output['query']).toBe('test query');
         expect(output['topK']).toBe(3);
       }
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(store.retrieve).not.toHaveBeenCalled();
     });
   });
@@ -128,7 +128,7 @@ describe('knowledge-search', () => {
         expect(output.results[0]?.category).toBe('fact');
       }
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(store.retrieve).toHaveBeenCalledWith({
         query: 'when was the company founded?',
         topK: 5,
@@ -159,7 +159,7 @@ describe('knowledge-search', () => {
         context,
       );
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(store.retrieve).toHaveBeenCalledWith({
         query: 'test',
         topK: 3,

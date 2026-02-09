@@ -45,12 +45,6 @@ function toPascalCase(kebab: string): string {
     .join('');
 }
 
-/** Convert kebab-case to camelCase. */
-function toCamelCase(kebab: string): string {
-  const pascal = toPascalCase(kebab);
-  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
-}
-
 // ─── Scaffold ───────────────────────────────────────────────────
 
 /** Generate implementation and test source for a new tool. */
@@ -66,7 +60,6 @@ export function scaffoldTool(input: ToolScaffoldInput): ToolScaffoldOutput {
   } = input;
 
   const pascalName = toPascalCase(id);
-  const camelName = toCamelCase(id);
   const factoryName = `create${pascalName}Tool`;
   const optionsName = `${pascalName}ToolOptions`;
 

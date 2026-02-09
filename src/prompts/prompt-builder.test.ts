@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildPrompt, createDefaultLayers } from './prompt-builder.js';
 import type { PromptBuildParams, PromptLayer } from './types.js';
-import type { ProjectId, PromptLayerId } from '@/core/types.js';
+import type { ProjectId } from '@/core/types.js';
 
 describe('buildPrompt', () => {
   function buildParams(overrides?: Partial<PromptBuildParams>): PromptBuildParams {

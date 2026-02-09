@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdir, readFile, writeFile, unlink, access } from 'fs/promises';
+import { join, dirname } from 'path';
+import type { ProjectId } from '@/core/types.js';
 import { createLocalStorage } from './storage-local.js';
 
 vi.mock('fs/promises', () => ({
@@ -28,20 +30,21 @@ describe('LocalStorage', () => {
   describe('upload', () => {
     it('uploads a file to the correct path', async () => {
       const storage = createLocalStorage({ basePath: '/data/files' });
-      
+
       const result = await storage.upload({
-        projectId: 'proj_123',
+        projectId: 'proj_123' as ProjectId,
         filename: 'document.pdf',
         mimeType: 'application/pdf',
         content: Buffer.from('file content'),
       });
 
+      // storagePath uses forward slashes (platform-independent)
       expect(result.storagePath).toBe('proj_123/2025/06/15/test-uuid-1234.pdf');
-      expect(mkdir).toHaveBeenCalledWith('/data/files/proj_123/2025/06/15', { recursive: true });
-      expect(writeFile).toHaveBeenCalledWith(
-        '/data/files/proj_123/2025/06/15/test-uuid-1234.pdf',
-        Buffer.from('file content')
-      );
+
+      // fullPath uses OS path separators (via path.join)
+      const expectedFullPath = join('/data/files', 'proj_123/2025/06/15/test-uuid-1234.pdf');
+      expect(mkdir).toHaveBeenCalledWith(dirname(expectedFullPath), { recursive: true });
+      expect(writeFile).toHaveBeenCalledWith(expectedFullPath, Buffer.from('file content'));
     });
 
     it('generates public URL when baseUrl is configured', async () => {
@@ -51,7 +54,7 @@ describe('LocalStorage', () => {
       });
 
       const result = await storage.upload({
-        projectId: 'proj_123',
+        projectId: 'proj_123' as ProjectId,
         filename: 'image.png',
         mimeType: 'image/png',
         content: Buffer.from('image data'),
@@ -64,7 +67,7 @@ describe('LocalStorage', () => {
       const storage = createLocalStorage({ basePath: '/data/files' });
 
       const result = await storage.upload({
-        projectId: 'proj_123',
+        projectId: 'proj_123' as ProjectId,
         filename: 'noextension',
         mimeType: 'application/octet-stream',
         content: Buffer.from('data'),
@@ -83,7 +86,9 @@ describe('LocalStorage', () => {
       const content = await storage.download('proj_123/2025/06/15/file.pdf');
 
       expect(content).toEqual(fileContent);
-      expect(readFile).toHaveBeenCalledWith('/data/files/proj_123/2025/06/15/file.pdf');
+      expect(readFile).toHaveBeenCalledWith(
+        join('/data/files', 'proj_123/2025/06/15/file.pdf'),
+      );
     });
   });
 
@@ -94,7 +99,9 @@ describe('LocalStorage', () => {
       const storage = createLocalStorage({ basePath: '/data/files' });
       await storage.delete('proj_123/2025/06/15/file.pdf');
 
-      expect(unlink).toHaveBeenCalledWith('/data/files/proj_123/2025/06/15/file.pdf');
+      expect(unlink).toHaveBeenCalledWith(
+        join('/data/files', 'proj_123/2025/06/15/file.pdf'),
+      );
     });
 
     it('ignores ENOENT error', async () => {
@@ -103,7 +110,7 @@ describe('LocalStorage', () => {
       vi.mocked(unlink).mockRejectedValue(error);
 
       const storage = createLocalStorage({ basePath: '/data/files' });
-      
+
       // Should not throw
       await expect(storage.delete('nonexistent')).resolves.toBeUndefined();
     });
@@ -114,7 +121,7 @@ describe('LocalStorage', () => {
       vi.mocked(unlink).mockRejectedValue(error);
 
       const storage = createLocalStorage({ basePath: '/data/files' });
-      
+
       await expect(storage.delete('somefile')).rejects.toThrow('Permission denied');
     });
   });
@@ -127,7 +134,9 @@ describe('LocalStorage', () => {
       const exists = await storage.exists('proj_123/file.pdf');
 
       expect(exists).toBe(true);
-      expect(access).toHaveBeenCalledWith('/data/files/proj_123/file.pdf');
+      expect(access).toHaveBeenCalledWith(
+        join('/data/files', 'proj_123/file.pdf'),
+      );
     });
 
     it('returns false when file does not exist', async () => {

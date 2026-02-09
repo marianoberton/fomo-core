@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Logger } from '@/observability/types.js';
+import type { Logger } from '@/observability/logger.js';
+import type { ProjectId } from '@/core/types.js';
 import type { ChannelAdapter, OutboundMessage } from './types.js';
 import { createChannelRouter } from './channel-router.js';
 
@@ -39,6 +40,7 @@ describe('ChannelRouter', () => {
       router.registerAdapter(adapter);
 
       expect(router.getAdapter('telegram')).toBe(adapter);
+       
       expect(logger.info).toHaveBeenCalledWith(
         'Registered channel adapter: telegram',
         { component: 'channel-router' }
@@ -74,6 +76,7 @@ describe('ChannelRouter', () => {
 
       expect(result.success).toBe(true);
       expect(result.channelMessageId).toBe('msg_123');
+       
       expect(adapter.send).toHaveBeenCalledWith(message);
     });
 
@@ -90,6 +93,7 @@ describe('ChannelRouter', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('No adapter registered');
+       
       expect(logger.warn).toHaveBeenCalled();
     });
 
@@ -109,6 +113,7 @@ describe('ChannelRouter', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Network error');
+       
       expect(logger.error).toHaveBeenCalled();
     });
   });
@@ -121,7 +126,7 @@ describe('ChannelRouter', () => {
         id: 'tg-123',
         channel: 'telegram',
         channelMessageId: '123',
-        projectId: '',
+        projectId: '' as ProjectId,
         senderIdentifier: '456',
         content: 'Hello!',
         rawPayload: {},
@@ -133,6 +138,7 @@ describe('ChannelRouter', () => {
 
       expect(result).not.toBeNull();
       expect(result?.channel).toBe('telegram');
+       
       expect(adapter.parseInbound).toHaveBeenCalled();
     });
 
@@ -142,6 +148,7 @@ describe('ChannelRouter', () => {
       const result = await router.parseInbound('telegram', {});
 
       expect(result).toBeNull();
+       
       expect(logger.warn).toHaveBeenCalled();
     });
   });
@@ -155,6 +162,7 @@ describe('ChannelRouter', () => {
       const isHealthy = await router.isHealthy('telegram');
 
       expect(isHealthy).toBe(true);
+       
       expect(adapter.isHealthy).toHaveBeenCalled();
     });
 

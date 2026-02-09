@@ -10,7 +10,7 @@ const SESSION_ID = 'sess_test' as SessionId;
 
 const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     $executeRaw: vi.fn().mockResolvedValue(1),
     $queryRaw: vi.fn().mockResolvedValue([]),
@@ -59,6 +59,7 @@ describe('PrismaLongTermMemoryStore', () => {
       expect(result.createdAt).toBeInstanceOf(Date);
       expect(result.metadata).toEqual({ source: 'observation' });
 
+       
       expect(mockPrisma.$executeRaw).toHaveBeenCalledOnce();
     });
 
@@ -76,6 +77,7 @@ describe('PrismaLongTermMemoryStore', () => {
       expect(result.sessionId).toBeUndefined();
       expect(result.expiresAt).toBeUndefined();
       expect(result.metadata).toBeUndefined();
+       
       expect(mockPrisma.$executeRaw).toHaveBeenCalledOnce();
     });
   });
@@ -107,6 +109,7 @@ describe('PrismaLongTermMemoryStore', () => {
       });
 
       expect(mockEmbGen).toHaveBeenCalledWith('What color is the sky?');
+       
       expect(mockPrisma.$queryRaw).toHaveBeenCalledOnce();
       expect(results).toHaveLength(1);
       expect(results[0]?.content).toBe('The sky is blue');
@@ -137,6 +140,7 @@ describe('PrismaLongTermMemoryStore', () => {
       await store.retrieve({ query: 'greeting', topK: 10 });
 
       // $executeRaw called for access count update
+       
       expect(mockPrisma.$executeRaw).toHaveBeenCalledOnce();
     });
 
@@ -148,6 +152,7 @@ describe('PrismaLongTermMemoryStore', () => {
 
       expect(results).toHaveLength(0);
       // No access count update when no results
+       
       expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
     });
 
@@ -164,6 +169,7 @@ describe('PrismaLongTermMemoryStore', () => {
       });
 
       expect(mockEmbGen).toHaveBeenCalledWith('test');
+       
       expect(mockPrisma.$queryRaw).toHaveBeenCalledOnce();
     });
   });
@@ -176,6 +182,7 @@ describe('PrismaLongTermMemoryStore', () => {
       const result = await store.delete('mem_1');
 
       expect(result).toBe(true);
+       
       expect(mockPrisma.memoryEntry.delete).toHaveBeenCalledWith({
         where: { id: 'mem_1' },
       });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Logger } from '@/observability/types.js';
+import type { Logger } from '@/observability/logger.js';
 import type { ProjectId } from '@/core/types.js';
 import type { FileRepository, FileStorage, StoredFile } from './types.js';
 import { createFileService } from './file-service.js';
@@ -81,9 +81,12 @@ describe('FileService', () => {
         content: Buffer.from('file content'),
       });
 
+       
       expect(storage.upload).toHaveBeenCalled();
+       
       expect(repository.create).toHaveBeenCalled();
       expect(result.id).toBe('file_abc');
+       
       expect(logger.info).toHaveBeenCalledTimes(2); // Starting + completed
     });
 
@@ -101,6 +104,7 @@ describe('FileService', () => {
         metadata: { source: 'api' },
       });
 
+       
       expect(repository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           uploadedBy: 'user_123',
@@ -121,6 +125,7 @@ describe('FileService', () => {
 
       expect(file.id).toBe('file_abc');
       expect(content.toString()).toBe('file content');
+       
       expect(storage.download).toHaveBeenCalledWith('proj_test/2025/01/01/uuid.pdf');
     });
 
@@ -162,8 +167,11 @@ describe('FileService', () => {
       const service = createFileService({ storage, repository, logger });
       await service.delete('file_abc');
 
+       
       expect(storage.delete).toHaveBeenCalledWith('proj_test/2025/01/01/uuid.pdf');
+       
       expect(repository.delete).toHaveBeenCalledWith('file_abc');
+       
       expect(logger.info).toHaveBeenCalledTimes(2); // Starting + completed
     });
 
@@ -185,6 +193,7 @@ describe('FileService', () => {
       const url = await service.getTemporaryUrl('file_abc');
 
       expect(url).toBe('https://public.example.com/file.pdf');
+       
       expect(storage.getSignedUrl).not.toHaveBeenCalled();
     });
 
@@ -196,6 +205,7 @@ describe('FileService', () => {
       const url = await service.getTemporaryUrl('file_abc', 7200);
 
       expect(url).toBe('https://signed-url.example.com');
+       
       expect(storage.getSignedUrl).toHaveBeenCalledWith(
         'proj_test/2025/01/01/uuid.pdf',
         7200

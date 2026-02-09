@@ -57,7 +57,7 @@ describe('GET /projects/:projectId/prompt-layers', () => {
       url: '/projects/proj-1/prompt-layers?layerType=identity',
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.promptLayerRepository.listByProject).toHaveBeenCalledWith(
       'proj-1',
       'identity',

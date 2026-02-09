@@ -187,7 +187,7 @@ describe('send-notification', () => {
         expect(output.response).toEqual({ id: 'notif-1' });
       }
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(sender.send).toHaveBeenCalledWith({
         channel: 'webhook',
         target: 'https://hooks.example.com/notify',
@@ -233,7 +233,7 @@ describe('send-notification', () => {
       );
 
       expect(result.ok).toBe(false);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(sender.send).not.toHaveBeenCalled();
     });
 

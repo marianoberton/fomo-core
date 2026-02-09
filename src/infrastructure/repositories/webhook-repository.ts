@@ -27,7 +27,7 @@ function toWebhookModel(record: {
   updatedAt: Date;
 }): Webhook {
   return {
-    id: record.id as WebhookId,
+    id: record.id,
     projectId: record.projectId as ProjectId,
     agentId: record.agentId ?? undefined,
     name: record.name,

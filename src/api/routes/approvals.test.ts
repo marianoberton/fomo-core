@@ -44,7 +44,7 @@ describe('approvalRoutes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toHaveLength(1);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.approvalGate.listPending).toHaveBeenCalledWith('proj-1' as ProjectId);
     });
   });
@@ -106,7 +106,7 @@ describe('approvalRoutes', () => {
       expect(body.success).toBe(true);
       expect(body.data.status).toBe('approved');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.approvalGate.resolve).toHaveBeenCalledWith(
         'appr-1' as ApprovalId,
         'approved',

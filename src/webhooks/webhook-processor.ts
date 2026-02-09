@@ -9,7 +9,7 @@
  * 5. Run the agent with the generated prompt
  */
 import { createHmac } from 'crypto';
-import type { Logger } from '@/observability/types.js';
+import type { Logger } from '@/observability/logger.js';
 import type { ProjectId } from '@/core/types.js';
 import type { SessionRepository } from '@/infrastructure/repositories/session-repository.js';
 import type {
@@ -60,7 +60,7 @@ function parseTemplate(template: string, data: unknown): string {
     if (typeof value === 'object') {
       return JSON.stringify(value);
     }
-    return String(value);
+    return typeof value === 'string' ? value : JSON.stringify(value);
   });
 }
 
@@ -149,8 +149,8 @@ export function createWebhookProcessor(deps: WebhookProcessorDeps): WebhookProce
 
         // 4. Validate HMAC if configured
         if (webhook.secretEnvVar) {
-          const signature = event.headers['x-webhook-signature'] ||
-                           event.headers['x-hub-signature-256'] ||
+          const signature = event.headers['x-webhook-signature'] ??
+                           event.headers['x-hub-signature-256'] ??
                            event.headers['x-signature'];
 
           if (!signature) {

@@ -77,7 +77,7 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
           id: nanoid(),
           projectId: input.projectId,
           status: 'active',
-          metadata: (input.metadata as Prisma.InputJsonValue) ?? undefined,
+          metadata: input.metadata as Prisma.InputJsonValue,
           expiresAt: input.expiresAt ?? null,
         },
       });
@@ -124,8 +124,8 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
           sessionId,
           role: message.role,
           content: message.content,
-          toolCalls: (message.toolCalls as Prisma.InputJsonValue) ?? undefined,
-          usage: (message.usage as Prisma.InputJsonValue) ?? undefined,
+          toolCalls: message.toolCalls as Prisma.InputJsonValue,
+          usage: message.usage as Prisma.InputJsonValue,
           traceId: traceId ?? null,
         },
       });

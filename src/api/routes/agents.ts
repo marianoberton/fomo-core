@@ -4,6 +4,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
+import type { AgentId, AgentMessageId } from '@/agents/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -63,10 +64,10 @@ const sendMessageSchema = z.object({
 
 // ─── Route Registration ─────────────────────────────────────────
 
-export async function agentRoutes(
+export function agentRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
-): Promise<void> {
+): void {
   const { agentRepository, agentRegistry, agentComms, logger } = deps;
 
   // ─── List Agents ────────────────────────────────────────────────
@@ -95,7 +96,7 @@ export async function agentRoutes(
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { agentId } = request.params as { agentId: string };
 
-      const agent = await agentRegistry.get(agentId);
+      const agent = await agentRegistry.get(agentId as AgentId);
 
       if (!agent) {
         return reply.status(404).send({ error: 'Agent not found' });
@@ -144,8 +145,8 @@ export async function agentRoutes(
 
       try {
         const agent = await agentRepository.create(input);
-        logger.info({ agentId: agent.id, projectId }, 'Agent created');
-        return reply.status(201).send({ agent });
+        logger.info('Agent created', { component: 'agents', agentId: agent.id, projectId });
+        return await reply.status(201).send({ agent });
       } catch (error) {
         // Handle unique constraint violation
         if (error instanceof Error && error.message.includes('Unique constraint')) {
@@ -174,14 +175,14 @@ export async function agentRoutes(
       }
 
       try {
-        const agent = await agentRepository.update(agentId, parseResult.data);
+        const agent = await agentRepository.update(agentId as AgentId, parseResult.data);
 
         // Invalidate cache after update
-        agentRegistry.invalidate(agentId);
+        agentRegistry.invalidate(agentId as AgentId);
 
-        logger.info({ agentId }, 'Agent updated');
-        return reply.send({ agent });
-      } catch (error) {
+        logger.info('Agent updated', { component: 'agents', agentId });
+        return await reply.send({ agent });
+      } catch {
         // Prisma throws if record not found
         return reply.status(404).send({ error: 'Agent not found' });
       }
@@ -196,14 +197,14 @@ export async function agentRoutes(
       const { agentId } = request.params as { agentId: string };
 
       try {
-        await agentRepository.delete(agentId);
+        await agentRepository.delete(agentId as AgentId);
 
         // Invalidate cache after delete
-        agentRegistry.invalidate(agentId);
+        agentRegistry.invalidate(agentId as AgentId);
 
-        logger.info({ agentId }, 'Agent deleted');
-        return reply.status(204).send();
-      } catch (error) {
+        logger.info('Agent deleted', { component: 'agents', agentId });
+        return await reply.status(204).send();
+      } catch {
         // Prisma throws if record not found
         return reply.status(404).send({ error: 'Agent not found' });
       }
@@ -226,7 +227,7 @@ export async function agentRoutes(
       }
 
       // Verify target agent exists
-      const targetAgent = await agentRegistry.get(agentId);
+      const targetAgent = await agentRegistry.get(agentId as AgentId);
       if (!targetAgent) {
         return reply.status(404).send({ error: 'Target agent not found' });
       }
@@ -235,17 +236,17 @@ export async function agentRoutes(
         parseResult.data;
 
       const message = {
-        fromAgentId,
-        toAgentId: agentId,
+        fromAgentId: fromAgentId as AgentId,
+        toAgentId: agentId as AgentId,
         content,
         context,
-        replyToId,
+        replyToId: replyToId as AgentMessageId | undefined,
       };
 
       if (waitForReply) {
         try {
           const replyContent = await agentComms.sendAndWait(message, timeoutMs);
-          return reply.send({ reply: replyContent });
+          return await reply.send({ reply: replyContent });
         } catch (error) {
           if (error instanceof Error && error.message.includes('timeout')) {
             return reply.status(408).send({ error: 'Message timeout waiting for reply' });
@@ -266,9 +267,9 @@ export async function agentRoutes(
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { agentId } = request.params as { agentId: string };
 
-      await agentRegistry.refresh(agentId);
+      await agentRegistry.refresh(agentId as AgentId);
 
-      logger.debug({ agentId }, 'Agent cache refreshed');
+      logger.debug('Agent cache refreshed', { component: 'agents', agentId });
       return reply.status(204).send();
     },
   );

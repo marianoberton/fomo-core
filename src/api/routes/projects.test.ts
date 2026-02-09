@@ -69,7 +69,7 @@ describe('project routes', () => {
 
       await app.inject({ method: 'GET', url: '/projects?owner=alice' });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.projectRepository.list).toHaveBeenCalledWith({
         owner: 'alice',
         status: undefined,
@@ -83,7 +83,7 @@ describe('project routes', () => {
 
       await app.inject({ method: 'GET', url: '/projects?status=paused' });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.projectRepository.list).toHaveBeenCalledWith({
         owner: undefined,
         status: 'paused',
@@ -97,7 +97,7 @@ describe('project routes', () => {
 
       await app.inject({ method: 'GET', url: '/projects?tags=a,b,c' });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.projectRepository.list).toHaveBeenCalledWith({
         owner: undefined,
         status: undefined,
@@ -181,7 +181,7 @@ describe('project routes', () => {
         }),
       });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.projectRepository.create).toHaveBeenCalledWith({
         name: 'With Extras',
         owner: 'bob',
@@ -289,7 +289,7 @@ describe('project routes', () => {
         body: JSON.stringify({ status: 'paused', tags: ['updated'] }),
       });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.projectRepository.update).toHaveBeenCalledWith(
         'proj-1',
         expect.objectContaining({
@@ -339,7 +339,7 @@ describe('project routes', () => {
 
       await app.inject({ method: 'DELETE', url: '/projects/proj-99' });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.projectRepository.delete).toHaveBeenCalledWith('proj-99');
     });
 

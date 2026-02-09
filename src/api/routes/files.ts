@@ -4,6 +4,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
+import type { ProjectId } from '@/core/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -21,10 +22,10 @@ const listQuerySchema = z.object({
 
 // ─── Route Registration ─────────────────────────────────────────
 
-export async function fileRoutes(
+export function fileRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
-): Promise<void> {
+): void {
   const { fileService, fileRepository, logger } = deps;
 
   // ─── Upload File ────────────────────────────────────────────────
@@ -44,7 +45,7 @@ export async function fileRoutes(
       const { projectId, filename, mimeType, expiresIn } = query.data;
 
       // Get raw body as buffer
-      const content = request.body as Buffer;
+      const content = request.body as Buffer | undefined;
 
       if (!content || content.length === 0) {
         return reply.status(400).send({ error: 'Empty file body' });
@@ -61,7 +62,7 @@ export async function fileRoutes(
         : undefined;
 
       const file = await fileService.upload({
-        projectId,
+        projectId: projectId as ProjectId,
         filename,
         mimeType: resolvedMimeType,
         content,
@@ -90,7 +91,7 @@ export async function fileRoutes(
       try {
         const { file, content } = await fileService.download(fileId);
 
-        return reply
+        return await reply
           .header('Content-Type', file.mimeType)
           .header('Content-Disposition', `attachment; filename="${file.originalFilename}"`)
           .header('Content-Length', file.sizeBytes)
@@ -149,7 +150,7 @@ export async function fileRoutes(
       const { projectId } = request.params as { projectId: string };
       const query = listQuerySchema.parse(request.query);
 
-      const files = await fileRepository.findByProject(projectId, {
+      const files = await fileRepository.findByProject(projectId as ProjectId, {
         limit: query.limit,
         offset: query.offset,
       });
@@ -173,7 +174,7 @@ export async function fileRoutes(
           fileId,
         });
 
-        return reply.status(204).send();
+        return await reply.status(204).send();
       } catch (error) {
         if ((error as Error).message.includes('not found')) {
           return reply.status(404).send({ error: 'File not found' });

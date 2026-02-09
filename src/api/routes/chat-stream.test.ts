@@ -126,17 +126,17 @@ describe('handleChatStreamMessage', () => {
     expect(events[1]).toEqual(expect.objectContaining({ type: 'content_delta', text: 'Hi' }));
     expect(events[2]).toEqual(expect.objectContaining({ type: 'agent_complete' }));
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledTimes(2);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledWith(
       'sess-1',
       { role: 'user', content: 'Hello' },
       'trace-1',
     );
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledWith(
       'sess-1',
       { role: 'assistant', content: 'Hi' },
@@ -163,7 +163,7 @@ describe('handleChatStreamMessage', () => {
       message: 'Project not found',
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).not.toHaveBeenCalled();
   });
 
@@ -192,7 +192,7 @@ describe('handleChatStreamMessage', () => {
       message: 'Budget exceeded',
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).not.toHaveBeenCalled();
   });
 

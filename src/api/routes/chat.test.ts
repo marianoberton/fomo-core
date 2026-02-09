@@ -253,17 +253,17 @@ describe('POST /chat', () => {
       payload: { projectId: 'proj-1', message: 'Hello' },
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledTimes(2);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledWith(
       'sess-1',
       { role: 'user', content: 'Hello' },
       'trace-1',
     );
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(deps.sessionRepository.addMessage).toHaveBeenCalledWith(
       'sess-1',
       { role: 'assistant', content: 'Response text' },

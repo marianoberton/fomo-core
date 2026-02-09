@@ -5,7 +5,7 @@ import { createContactRepository } from './contact-repository.js';
 
 const PROJECT_ID = 'proj_test' as ProjectId;
 
-function makeContactRecord(overrides?: Record<string, unknown>) {
+const makeContactRecord = (overrides?: Record<string, unknown>): Record<string, unknown> => {
   return {
     id: 'contact_abc',
     projectId: PROJECT_ID,
@@ -22,9 +22,9 @@ function makeContactRecord(overrides?: Record<string, unknown>) {
     updatedAt: new Date('2025-01-01'),
     ...overrides,
   };
-}
+};
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     contact: {
       create: vi.fn(),
@@ -58,6 +58,7 @@ describe('ContactRepository', () => {
       expect(contact.id).toBe('contact_abc');
       expect(contact.name).toBe('John Doe');
       expect(contact.phone).toBe('+1234567890');
+       
       expect(mockPrisma.contact.create).toHaveBeenCalledOnce();
     });
 
@@ -108,6 +109,7 @@ describe('ContactRepository', () => {
       });
 
       expect(contact?.phone).toBe('+1234567890');
+       
       expect(mockPrisma.contact.findUnique).toHaveBeenCalledWith({
         where: { projectId_phone: { projectId: PROJECT_ID, phone: '+1234567890' } },
       });
@@ -160,6 +162,7 @@ describe('ContactRepository', () => {
       const contact = await repo.update('contact_abc', { name: 'John Updated' });
 
       expect(contact.name).toBe('John Updated');
+       
       expect(mockPrisma.contact.update).toHaveBeenCalledWith({
         where: { id: 'contact_abc' },
         data: { name: 'John Updated' },
@@ -174,6 +177,7 @@ describe('ContactRepository', () => {
       const repo = createContactRepository(mockPrisma);
       await repo.delete('contact_abc');
 
+       
       expect(mockPrisma.contact.delete).toHaveBeenCalledWith({
         where: { id: 'contact_abc' },
       });
@@ -191,7 +195,7 @@ describe('ContactRepository', () => {
       const contacts = await repo.list(PROJECT_ID);
 
       expect(contacts).toHaveLength(2);
-      expect(contacts[0].name).toBe('John Doe');
+      expect(contacts[0]?.name).toBe('John Doe');
     });
 
     it('respects limit and offset', async () => {
@@ -200,6 +204,7 @@ describe('ContactRepository', () => {
       const repo = createContactRepository(mockPrisma);
       await repo.list(PROJECT_ID, { limit: 10, offset: 5 });
 
+       
       expect(mockPrisma.contact.findMany).toHaveBeenCalledWith({
         where: { projectId: PROJECT_ID },
         orderBy: { createdAt: 'desc' },

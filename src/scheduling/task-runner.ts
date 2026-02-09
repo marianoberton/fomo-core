@@ -59,8 +59,8 @@ function parseRedisUrl(url: string): { host: string; port: number; password?: st
   const parsed = new URL(url);
   return {
     host: parsed.hostname,
-    port: Number(parsed.port) || 6379,
-    password: parsed.password || undefined,
+    port: parsed.port ? Number(parsed.port) : 6379,
+    password: parsed.password ? parsed.password : undefined,
   };
 }
 
@@ -80,8 +80,8 @@ export function createTaskRunner(options: TaskRunnerOptions): TaskRunner {
 
   const connection = parseRedisUrl(redisUrl);
 
-  let queue: Queue | null = null;
-  let worker: Worker | null = null;
+  let queue: Queue<{ taskId: string }> | null = null;
+  let worker: Worker<{ taskId: string }> | null = null;
   let schedulerInterval: ReturnType<typeof setInterval> | null = null;
 
   /** Poll for due tasks and enqueue them. */
@@ -142,15 +142,15 @@ export function createTaskRunner(options: TaskRunnerOptions): TaskRunner {
 
   return {
     async start(): Promise<void> {
-      queue = new Queue(QUEUE_NAME, { connection });
+      queue = new Queue<{ taskId: string }>(QUEUE_NAME, { connection });
 
-      worker = new Worker(
+      worker = new Worker<{ taskId: string }>(
         QUEUE_NAME,
         async (job) => {
-          const taskId = job.data.taskId as string;
+          const taskId = job.data.taskId;
           const task = await repository.findById(taskId as Parameters<typeof repository.findById>[0]);
 
-          if (!task || task.status !== 'active') {
+          if (task?.status !== 'active') {
             logger.warn('Skipping task execution (not active)', {
               component: 'task-runner',
               taskId,
@@ -168,7 +168,8 @@ export function createTaskRunner(options: TaskRunnerOptions): TaskRunner {
 
           try {
             // Execute with timeout
-            const timeoutPromise = new Promise<never>((_, reject) => {
+            const timeoutPromise = new Promise<never>((resolve, reject) => {
+              void resolve;
               setTimeout(() => {
                 reject(new Error('Task execution timeout'));
               }, task.timeoutMs);

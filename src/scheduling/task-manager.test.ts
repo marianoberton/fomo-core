@@ -87,8 +87,10 @@ describe('TaskManager', () => {
         expect(result.value.id).toBe('task-1');
       }
 
+       
       expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ origin: 'static' }));
 
+       
       expect(repo.update).toHaveBeenCalledWith(
         'task-1',
         expect.objectContaining({ nextRunAt: expect.any(Date) as Date }),
@@ -109,6 +111,7 @@ describe('TaskManager', () => {
         expect(result.error.code).toBe('VALIDATION_ERROR');
       }
 
+       
       expect(repo.create).not.toHaveBeenCalled();
     });
   });
@@ -133,6 +136,7 @@ describe('TaskManager', () => {
         expect(result.value.status).toBe('proposed');
       }
 
+       
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({ origin: 'agent_proposed' }),
       );
@@ -151,6 +155,7 @@ describe('TaskManager', () => {
         expect(result.error).toBeInstanceOf(ValidationError);
       }
 
+       
       expect(repo.create).not.toHaveBeenCalled();
     });
   });
@@ -182,6 +187,7 @@ describe('TaskManager', () => {
         expect(result.value.approvedBy).toBe('admin');
       }
 
+       
       expect(repo.update).toHaveBeenCalledWith(
         'task-1',
         expect.objectContaining({
@@ -216,6 +222,7 @@ describe('TaskManager', () => {
         expect(result.error.code).toBe('VALIDATION_ERROR');
       }
 
+       
       expect(repo.update).not.toHaveBeenCalled();
     });
   });
@@ -241,6 +248,7 @@ describe('TaskManager', () => {
         expect(result.value.status).toBe('rejected');
       }
 
+       
       expect(repo.update).toHaveBeenCalledWith('task-1', { status: 'rejected' });
     });
 
@@ -267,6 +275,7 @@ describe('TaskManager', () => {
         expect(result.error.code).toBe('VALIDATION_ERROR');
       }
 
+       
       expect(repo.update).not.toHaveBeenCalled();
     });
   });
@@ -288,6 +297,7 @@ describe('TaskManager', () => {
         expect(result.value.status).toBe('paused');
       }
 
+       
       expect(repo.update).toHaveBeenCalledWith('task-1', {
         status: 'paused',
         nextRunAt: null,
@@ -306,6 +316,7 @@ describe('TaskManager', () => {
         expect(result.error.code).toBe('VALIDATION_ERROR');
       }
 
+       
       expect(repo.update).not.toHaveBeenCalled();
     });
   });
@@ -332,6 +343,7 @@ describe('TaskManager', () => {
         expect(result.value.nextRunAt).toBeInstanceOf(Date);
       }
 
+       
       expect(repo.update).toHaveBeenCalledWith(
         'task-1',
         expect.objectContaining({
@@ -353,6 +365,7 @@ describe('TaskManager', () => {
         expect(result.error.code).toBe('VALIDATION_ERROR');
       }
 
+       
       expect(repo.update).not.toHaveBeenCalled();
     });
   });
@@ -367,6 +380,7 @@ describe('TaskManager', () => {
 
       expect(task).toEqual(sampleTask);
 
+       
       expect(repo.findById).toHaveBeenCalledWith('task-1');
     });
   });
@@ -381,6 +395,7 @@ describe('TaskManager', () => {
 
       expect(tasks).toEqual([sampleTask]);
 
+       
       expect(repo.listByProject).toHaveBeenCalledWith('proj-1', 'active');
     });
   });
@@ -395,6 +410,7 @@ describe('TaskManager', () => {
 
       expect(runs).toEqual([sampleRun]);
 
+       
       expect(repo.listRuns).toHaveBeenCalledWith('task-1', 10);
     });
   });

@@ -4,7 +4,17 @@ import { createPromptLayerRepository, type PromptLayerRepository } from './promp
 
 // ─── Mock Prisma ─────────────────────────────────────────────────
 
-function createMockPrisma() {
+const createMockPrisma = (): {
+  promptLayer: {
+    create: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
+  };
+  $transaction: ReturnType<typeof vi.fn>;
+} => {
   return {
     promptLayer: {
       create: vi.fn(),
@@ -16,7 +26,7 @@ function createMockPrisma() {
     },
     $transaction: vi.fn(),
   };
-}
+};
 
 // ─── Tests ──────────────────────────────────────────────────────
 
@@ -26,7 +36,7 @@ describe('PromptLayerRepository', () => {
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+     
     repo = createPromptLayerRepository(mockPrisma as never);
   });
 
@@ -156,7 +166,7 @@ describe('PromptLayerRepository', () => {
 
       const result = await repo.activate('pl-1' as PromptLayerId);
       expect(result).toBe(true);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
     });
 
@@ -206,7 +216,7 @@ describe('PromptLayerRepository', () => {
 
       await repo.listByProject('proj-1' as ProjectId, 'safety');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.promptLayer.findMany).toHaveBeenCalledWith({
         where: { projectId: 'proj-1', layerType: 'safety' },
         orderBy: { version: 'desc' },
@@ -218,7 +228,7 @@ describe('PromptLayerRepository', () => {
 
       await repo.listByProject('proj-1' as ProjectId);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockPrisma.promptLayer.findMany).toHaveBeenCalledWith({
         where: { projectId: 'proj-1' },
         orderBy: { version: 'desc' },

@@ -166,7 +166,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): LLMP
               if (currentToolId) {
                 let parsedInput: Record<string, unknown> = {};
                 try {
-                  parsedInput = JSON.parse(toolInputJson || '{}') as Record<string, unknown>;
+                  parsedInput = JSON.parse(toolInputJson ? toolInputJson : '{}') as Record<string, unknown>;
                 } catch {
                   logger.warn('Failed to parse tool input JSON', {
                     component: 'anthropic',
@@ -177,7 +177,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): LLMP
                 yield {
                   type: 'tool_use_end',
                   id: currentToolId,
-                  name: currentToolName || '',
+                  name: currentToolName ?? '',
                   input: parsedInput,
                 };
                 currentToolId = undefined;

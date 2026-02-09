@@ -44,7 +44,7 @@ export function createMCPExecutableTool(options: MCPToolAdapterOptions): Executa
   return {
     id: toolId,
     name: toolInfo.name,
-    description: toolInfo.description || `MCP tool from ${serverName}`,
+    description: toolInfo.description ? toolInfo.description : `MCP tool from ${serverName}`,
     category: 'mcp',
     inputSchema,
     riskLevel: 'medium',

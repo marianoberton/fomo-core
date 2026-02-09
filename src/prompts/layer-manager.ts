@@ -50,12 +50,12 @@ export async function resolveActiveLayers(
     repo.getActiveLayer(projectId, 'safety'),
   ]);
 
-  const missing: PromptLayerType[] = [];
-  if (!identity) missing.push('identity');
-  if (!instructions) missing.push('instructions');
-  if (!safety) missing.push('safety');
+  if (!identity || !instructions || !safety) {
+    const missing: PromptLayerType[] = [];
+    if (!identity) missing.push('identity');
+    if (!instructions) missing.push('instructions');
+    if (!safety) missing.push('safety');
 
-  if (missing.length > 0) {
     return err(
       new NexusError({
         message: `Missing active prompt layers for project "${projectId}": ${missing.join(', ')}`,
@@ -67,9 +67,9 @@ export async function resolveActiveLayers(
   }
 
   return ok({
-    identity: identity!,
-    instructions: instructions!,
-    safety: safety!,
+    identity,
+    instructions,
+    safety,
   });
 }
 

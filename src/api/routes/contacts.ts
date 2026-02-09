@@ -4,6 +4,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
+import type { ProjectId } from '@/core/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -39,10 +40,10 @@ const listQuerySchema = z.object({
 
 // ─── Route Registration ─────────────────────────────────────────
 
-export async function contactRoutes(
+export function contactRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
-): Promise<void> {
+): void {
   const { contactRepository } = deps;
 
   // ─── List Contacts ──────────────────────────────────────────────
@@ -53,7 +54,7 @@ export async function contactRoutes(
       const { projectId } = request.params as { projectId: string };
       const query = listQuerySchema.parse(request.query);
 
-      const contacts = await contactRepository.list(projectId, {
+      const contacts = await contactRepository.list(projectId as ProjectId, {
         limit: query.limit,
         offset: query.offset,
       });
@@ -93,7 +94,10 @@ export async function contactRoutes(
         });
       }
 
-      const contact = await contactRepository.create(parseResult.data);
+      const contact = await contactRepository.create({
+        ...parseResult.data,
+        projectId: parseResult.data.projectId as ProjectId,
+      });
 
       return reply.status(201).send({ contact });
     },
@@ -117,8 +121,8 @@ export async function contactRoutes(
 
       try {
         const contact = await contactRepository.update(contactId, parseResult.data);
-        return reply.send({ contact });
-      } catch (error) {
+        return await reply.send({ contact });
+      } catch {
         // Prisma throws if record not found
         return reply.status(404).send({ error: 'Contact not found' });
       }
@@ -134,8 +138,8 @@ export async function contactRoutes(
 
       try {
         await contactRepository.delete(contactId);
-        return reply.status(204).send();
-      } catch (error) {
+        return await reply.status(204).send();
+      } catch {
         // Prisma throws if record not found
         return reply.status(404).send({ error: 'Contact not found' });
       }

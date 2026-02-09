@@ -99,9 +99,13 @@ describe('resolveActiveLayers', () => {
     const repo = createMockRepo();
     await resolveActiveLayers('proj-1' as ProjectId, repo);
 
+     
     expect(repo.getActiveLayer).toHaveBeenCalledTimes(3);
+     
     expect(repo.getActiveLayer).toHaveBeenCalledWith('proj-1', 'identity');
+     
     expect(repo.getActiveLayer).toHaveBeenCalledWith('proj-1', 'instructions');
+     
     expect(repo.getActiveLayer).toHaveBeenCalledWith('proj-1', 'safety');
   });
 });

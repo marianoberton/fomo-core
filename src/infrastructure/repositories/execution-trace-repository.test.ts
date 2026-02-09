@@ -16,7 +16,7 @@ const PROMPT_SNAPSHOT: PromptSnapshot = {
   runtimeContextHash: 'def',
 };
 
-function makeTraceRecord(overrides?: Record<string, unknown>) {
+const makeTraceRecord = (overrides?: Record<string, unknown>): Record<string, unknown> => {
   return {
     id: 'trace_abc',
     projectId: PROJECT_ID,
@@ -32,7 +32,7 @@ function makeTraceRecord(overrides?: Record<string, unknown>) {
     completedAt: null,
     ...overrides,
   };
-}
+};
 
 function makeTraceEvent(type = 'llm_request'): TraceEvent {
   return {
@@ -44,7 +44,7 @@ function makeTraceEvent(type = 'llm_request'): TraceEvent {
   };
 }
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     executionTrace: {
       create: vi.fn(),
@@ -139,6 +139,7 @@ describe('ExecutionTraceRepository', () => {
       const result = await repo.addEvents('trace_abc' as TraceId, [newEvent]);
 
       expect(result).toBe(true);
+       
       expect(mockPrisma.executionTrace.update).toHaveBeenCalledWith({
         where: { id: 'trace_abc' },
         data: {

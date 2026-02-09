@@ -47,7 +47,7 @@ export function createDatabase(options?: DatabaseOptions): Database {
   });
 
   if (options?.logQueries) {
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+     
     client.$on('query' as never, (e: unknown) => {
       const event = e as { query: string; duration: number };
       logger.debug('Prisma query', {
@@ -58,7 +58,7 @@ export function createDatabase(options?: DatabaseOptions): Database {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+   
   client.$on('error' as never, (e: unknown) => {
     const event = e as { message: string };
     logger.error('Prisma error', {

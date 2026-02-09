@@ -24,7 +24,7 @@ function makeConfig(): AgentConfig {
   };
 }
 
-function makePrismaRecord(overrides?: Record<string, unknown>) {
+const makePrismaRecord = (overrides?: Record<string, unknown>): Record<string, unknown> => {
   return {
     id: 'proj_abc',
     name: 'Test Project',
@@ -38,9 +38,9 @@ function makePrismaRecord(overrides?: Record<string, unknown>) {
     updatedAt: new Date('2025-01-01'),
     ...overrides,
   };
-}
+};
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     project: {
       create: vi.fn(),
@@ -75,6 +75,7 @@ describe('ProjectRepository', () => {
       expect(project.name).toBe('Test Project');
       expect(project.owner).toBe('admin');
       expect(project.status).toBe('active');
+       
       expect(mockPrisma.project.create).toHaveBeenCalledOnce();
     });
   });
@@ -155,6 +156,7 @@ describe('ProjectRepository', () => {
       const repo = createProjectRepository(mockPrisma);
       await repo.list({ owner: 'admin', status: 'active' });
 
+       
       expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ owner: 'admin', status: 'active' }) as unknown,

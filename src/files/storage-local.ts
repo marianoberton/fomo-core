@@ -28,8 +28,8 @@ function generateStoragePath(projectId: string, filename: string): string {
   const ext = filename.includes('.') ? filename.split('.').pop() : '';
   const storageName = ext ? `${uuid}.${ext}` : uuid;
   
-  // Path: projectId/year/month/day/uuid.ext
-  return join(projectId, year.toString(), month, day, storageName);
+  // Path: projectId/year/month/day/uuid.ext (always forward slashes for portability)
+  return [projectId, year.toString(), month, day, storageName].join('/');
 }
 
 // ─── Storage Factory ────────────────────────────────────────────

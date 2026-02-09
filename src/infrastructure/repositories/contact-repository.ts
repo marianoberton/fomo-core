@@ -31,7 +31,7 @@ function toContactModel(record: {
   updatedAt: Date;
 }): Contact {
   return {
-    id: record.id as ContactId,
+    id: record.id,
     projectId: record.projectId as ProjectId,
     name: record.name,
     displayName: record.displayName ?? undefined,
@@ -66,7 +66,7 @@ export function createContactRepository(prisma: PrismaClient): ContactRepository
           slackId: input.slackId ?? null,
           timezone: input.timezone ?? null,
           language: input.language ?? 'es',
-          metadata: (input.metadata as Prisma.InputJsonValue) ?? undefined,
+          metadata: input.metadata as Prisma.InputJsonValue,
         },
       });
       return toContactModel(record);

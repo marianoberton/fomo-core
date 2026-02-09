@@ -2,6 +2,7 @@
  * Telegram Channel Adapter — sends/receives messages via Telegram Bot API.
  */
 import type { ChannelAdapter, InboundMessage, OutboundMessage, SendResult } from '../types.js';
+import type { ProjectId } from '@/core/types.js';
 
 // ─── Config ─────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ interface TelegramUpdate {
     reply_to_message?: {
       message_id: number;
     };
-    photo?: Array<{ file_id: string }>;
+    photo?: { file_id: string }[];
     document?: { file_id: string };
   };
 }
@@ -86,7 +87,7 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
           body: JSON.stringify(body),
         });
 
-        const data = (await response.json()) as TelegramSendResponse;
+        const data = (await response.json()) as unknown as TelegramSendResponse;
 
         if (data.ok && data.result) {
           return {
@@ -107,14 +108,14 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
       }
     },
 
-    async parseInbound(payload: unknown): Promise<InboundMessage | null> {
+    parseInbound(payload: unknown): Promise<InboundMessage | null> {
       const update = payload as TelegramUpdate;
       const message = update.message;
 
-      if (!message) return null;
+      if (!message) return Promise.resolve(null);
 
       const text = message.text;
-      if (!text) return null; // Skip non-text messages for now
+      if (!text) return Promise.resolve(null); // Skip non-text messages for now
 
       const chat = message.chat;
       const from = message.from;
@@ -126,11 +127,11 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
         senderName = parts.length > 0 ? parts.join(' ') : from.username;
       }
 
-      return {
+      return Promise.resolve({
         id: `tg-${message.message_id}`,
-        channel: 'telegram',
+        channel: 'telegram' as const,
         channelMessageId: String(message.message_id),
-        projectId: '', // Will be resolved by inbound processor
+        projectId: '' as ProjectId, // Will be resolved by inbound processor
         senderIdentifier: String(chat.id),
         senderName,
         content: text,
@@ -139,13 +140,13 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
           : undefined,
         rawPayload: payload,
         receivedAt: new Date(message.date * 1000),
-      };
+      });
     },
 
     async isHealthy(): Promise<boolean> {
       try {
         const response = await fetch(`${baseUrl()}/getMe`);
-        const data = (await response.json()) as { ok: boolean };
+        const data = (await response.json()) as unknown as { ok: boolean };
         return data.ok;
       } catch {
         return false;

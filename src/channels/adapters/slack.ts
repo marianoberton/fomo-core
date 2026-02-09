@@ -2,6 +2,7 @@
  * Slack Channel Adapter — sends/receives messages via Slack Web API.
  */
 import type { ChannelAdapter, InboundMessage, OutboundMessage, SendResult } from '../types.js';
+import type { ProjectId } from '@/core/types.js';
 
 // ─── Config ─────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export function createSlackAdapter(config: SlackAdapterConfig): ChannelAdapter {
           body: JSON.stringify(body),
         });
 
-        const data = (await response.json()) as SlackSendResponse;
+        const data = (await response.json()) as unknown as SlackSendResponse;
 
         if (data.ok && data.ts) {
           return {
@@ -106,35 +107,35 @@ export function createSlackAdapter(config: SlackAdapterConfig): ChannelAdapter {
       }
     },
 
-    async parseInbound(payload: unknown): Promise<InboundMessage | null> {
+    parseInbound(payload: unknown): Promise<InboundMessage | null> {
       const event = payload as SlackEventPayload;
 
       // Handle URL verification challenge
       if (event.type === 'url_verification') {
         // This should be handled at the route level, not here
-        return null;
+        return Promise.resolve(null);
       }
 
       // Handle message events
-      if (event.event?.type !== 'message') return null;
+      if (event.event?.type !== 'message') return Promise.resolve(null);
 
       const messageEvent = event.event;
 
       // Skip bot messages to avoid loops
-      if (!messageEvent.user) return null;
+      if (!messageEvent.user) return Promise.resolve(null);
 
-      return {
+      return Promise.resolve({
         id: `slack-${messageEvent.ts}`,
-        channel: 'slack',
+        channel: 'slack' as const,
         channelMessageId: messageEvent.ts,
-        projectId: '', // Will be resolved by inbound processor
+        projectId: '' as ProjectId, // Will be resolved by inbound processor
         senderIdentifier: messageEvent.channel,
         senderName: messageEvent.user, // This is user ID, would need API call for name
         content: messageEvent.text,
         replyToChannelMessageId: messageEvent.thread_ts,
         rawPayload: payload,
         receivedAt: new Date(Number(messageEvent.event_ts) * 1000),
-      };
+      });
     },
 
     async isHealthy(): Promise<boolean> {
@@ -144,7 +145,7 @@ export function createSlackAdapter(config: SlackAdapterConfig): ChannelAdapter {
             'Authorization': `Bearer ${getToken()}`,
           },
         });
-        const data = (await response.json()) as { ok: boolean };
+        const data = (await response.json()) as unknown as { ok: boolean };
         return data.ok;
       } catch {
         return false;

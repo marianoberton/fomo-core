@@ -296,8 +296,8 @@ function toOpenAICompatibleSchema(zodSchema: import('zod').ZodType): Record<stri
             ...((value as Record<string, unknown>)['enum'] as string[]),
           ]);
           allProperties[key] = { ...existing, enum: [...merged] };
-        } else if (!allProperties[key]) {
-          allProperties[key] = value;
+        } else {
+          allProperties[key] ??= value;
         }
       }
     }
@@ -308,8 +308,9 @@ function toOpenAICompatibleSchema(zodSchema: import('zod').ZodType): Record<stri
   }
 
   // Only fields required in ALL variants are truly required
-  const commonRequired = requiredSets.length > 0
-    ? [...requiredSets[0]!].filter((key) => requiredSets.every((s) => s.has(key)))
+  const firstSet = requiredSets[0];
+  const commonRequired = firstSet
+    ? [...firstSet].filter((key) => requiredSets.every((s) => s.has(key)))
     : [];
 
   return {

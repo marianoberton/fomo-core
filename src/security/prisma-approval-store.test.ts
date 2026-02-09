@@ -22,7 +22,7 @@ function makeRequest(overrides?: Partial<ApprovalRequest>): ApprovalRequest {
   };
 }
 
-function makePrismaRecord(request: ApprovalRequest) {
+const makePrismaRecord = (request: ApprovalRequest): Record<string, unknown> => {
   return {
     id: request.id,
     projectId: request.projectId,
@@ -38,9 +38,9 @@ function makePrismaRecord(request: ApprovalRequest) {
     resolvedBy: request.resolvedBy ?? null,
     resolutionNote: request.resolutionNote ?? null,
   };
-}
+};
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     approvalRequest: {
       create: vi.fn(),
@@ -67,6 +67,7 @@ describe('PrismaApprovalStore', () => {
       const request = makeRequest();
       await store.create(request);
 
+       
       expect(mockPrisma.approvalRequest.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           id: request.id,
@@ -119,6 +120,7 @@ describe('PrismaApprovalStore', () => {
 
       expect(result).toBeDefined();
       expect(result?.status).toBe('approved');
+       
       expect(mockPrisma.approvalRequest.update).toHaveBeenCalledWith({
         where: { id: 'appr_1' },
         data: expect.objectContaining({
@@ -151,6 +153,7 @@ describe('PrismaApprovalStore', () => {
       const result = await store.listPending(PROJECT_ID);
 
       expect(result).toHaveLength(2);
+       
       expect(mockPrisma.approvalRequest.findMany).toHaveBeenCalledWith({
         where: { projectId: PROJECT_ID, status: 'pending' },
         orderBy: { requestedAt: 'desc' },

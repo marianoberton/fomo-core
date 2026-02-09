@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Logger } from '@/observability/types.js';
+import type { Logger } from '@/observability/logger.js';
 import type { ProjectId } from '@/core/types.js';
 import type { WebhookRepository, Webhook, WebhookEvent } from './types.js';
 import type { SessionRepository } from '@/infrastructure/repositories/session-repository.js';

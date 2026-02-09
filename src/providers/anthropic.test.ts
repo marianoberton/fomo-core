@@ -2,11 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message, ChatEvent, ToolDefinitionForProvider } from './types.js';
 
 // Mock the Anthropic SDK
-const mockStream = {
-  [Symbol.asyncIterator]: vi.fn(),
-  finalMessage: vi.fn(),
-};
-
 const mockCreate = vi.fn();
 vi.mock('@anthropic-ai/sdk', () => {
   class MockAnthropic {
@@ -33,12 +28,12 @@ describe('createAnthropicProvider', () => {
     vi.clearAllMocks();
   });
 
-  function createProvider() {
+  const createProvider = (): ReturnType<typeof createAnthropicProvider> => {
     return createAnthropicProvider({
       apiKey: 'test-key',
       model: 'claude-sonnet-4-5-20250929',
     });
-  }
+  };
 
   describe('metadata', () => {
     it('has correct id and displayName', () => {
@@ -79,7 +74,7 @@ describe('createAnthropicProvider', () => {
       const tool = formatted[0] as Record<string, unknown>;
       expect(tool['name']).toBe('search');
       expect(tool['description']).toBe('Search the web');
-      expect(tool['input_schema']).toEqual(tools[0]!.inputSchema);
+      expect(tool['input_schema']).toEqual(tools[0]?.inputSchema);
     });
   });
 

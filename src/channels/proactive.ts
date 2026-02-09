@@ -6,7 +6,7 @@
  * - Scheduled sending via BullMQ
  */
 import type { Queue, Job } from 'bullmq';
-import type { Logger } from '@/observability/types.js';
+import type { Logger } from '@/observability/logger.js';
 import type { ContactId } from '@/contacts/types.js';
 import type { ChannelRouter } from './channel-router.js';
 import type { ChannelType, SendResult } from './types.js';
@@ -110,7 +110,7 @@ export function createProactiveMessenger(deps: ProactiveMessengerDeps): Proactiv
         delayMs: delay,
       });
 
-      return job.id!;
+      return job.id ?? '';
     },
 
     async cancel(jobId: string): Promise<boolean> {

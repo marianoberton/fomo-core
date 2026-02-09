@@ -1,7 +1,7 @@
 /**
  * Channel Router — routes messages to appropriate channel adapters.
  */
-import type { Logger } from '@/observability/types.js';
+import type { Logger } from '@/observability/logger.js';
 import type {
   ChannelAdapter,
   ChannelType,

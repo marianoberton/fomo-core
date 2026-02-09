@@ -59,7 +59,7 @@ describe('session routes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toHaveLength(2);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.listByProject).toHaveBeenCalledWith(
         'proj-1',
         undefined,
@@ -79,7 +79,7 @@ describe('session routes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toHaveLength(0);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.listByProject).toHaveBeenCalledWith(
         'proj-1',
         'active',
@@ -104,7 +104,7 @@ describe('session routes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toBeDefined();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.findById).toHaveBeenCalledWith('sess-1');
     });
 
@@ -144,9 +144,9 @@ describe('session routes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toBeDefined();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.projectRepository.findById).toHaveBeenCalledWith('proj-1');
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: 'proj-1',
@@ -171,7 +171,7 @@ describe('session routes', () => {
       const body = JSON.parse(response.body) as ApiResponse<Session>;
       expect(body.success).toBe(true);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: 'proj-1',
@@ -212,7 +212,7 @@ describe('session routes', () => {
       expect(body.error?.code).toBe('NOT_FOUND');
       expect(body.error?.message).toContain('nonexistent');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.create).not.toHaveBeenCalled();
     });
   });
@@ -234,7 +234,7 @@ describe('session routes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toEqual({ updated: true });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.updateStatus).toHaveBeenCalledWith('sess-1', 'paused');
     });
 
@@ -319,9 +319,9 @@ describe('session routes', () => {
       expect(body.success).toBe(true);
       expect(body.data).toHaveLength(2);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.findById).toHaveBeenCalledWith('sess-1');
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.getMessages).toHaveBeenCalledWith('sess-1');
     });
 
@@ -339,7 +339,7 @@ describe('session routes', () => {
       expect(body.error?.code).toBe('NOT_FOUND');
       expect(body.error?.message).toContain('nonexistent');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.getMessages).not.toHaveBeenCalled();
     });
 

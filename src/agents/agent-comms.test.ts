@@ -4,15 +4,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createAgentComms } from './agent-comms.js';
 import type { AgentId, AgentMessage, AgentMessageId, AgentComms } from './types.js';
+import type { Logger } from '@/observability/logger.js';
 
 // ─── Mock Logger ─────────────────────────────────────────────────
 
-function createMockLogger() {
+function createMockLogger(): Logger {
   return {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    fatal: vi.fn(),
     child: vi.fn().mockReturnThis(),
   };
 }
@@ -20,14 +22,12 @@ function createMockLogger() {
 // ─── Tests ───────────────────────────────────────────────────────
 
 describe('AgentComms', () => {
-  let mockLogger: ReturnType<typeof createMockLogger>;
+  let mockLogger: Logger;
   let comms: AgentComms;
 
   beforeEach(() => {
     mockLogger = createMockLogger();
-    comms = createAgentComms({
-      logger: mockLogger as unknown as import('pino').Logger,
-    });
+    comms = createAgentComms({ logger: mockLogger });
   });
 
   afterEach(() => {
@@ -44,13 +44,15 @@ describe('AgentComms', () => {
 
       expect(messageId).toBeDefined();
       expect(typeof messageId).toBe('string');
+       
       expect(mockLogger.info).toHaveBeenCalledWith(
+        'Agent message sent',
         expect.objectContaining({
+          component: 'agent-comms',
           messageId,
           from: 'agent-1',
           to: 'agent-2',
         }),
-        'Agent message sent',
       );
     });
 
@@ -64,11 +66,13 @@ describe('AgentComms', () => {
       });
 
       expect(messageId).toBeDefined();
+       
       expect(mockLogger.info).toHaveBeenCalledWith(
+        'Agent message sent',
         expect.objectContaining({
+          component: 'agent-comms',
           hasReplyTo: true,
         }),
-        'Agent message sent',
       );
     });
   });
@@ -76,7 +80,7 @@ describe('AgentComms', () => {
   describe('subscribe', () => {
     it('should receive messages sent to subscribed agent', async () => {
       const receivedMessages: AgentMessage[] = [];
-      const handler = (message: AgentMessage) => {
+      const handler = (message: AgentMessage): void => {
         receivedMessages.push(message);
       };
 
@@ -91,16 +95,16 @@ describe('AgentComms', () => {
       });
 
       expect(receivedMessages).toHaveLength(1);
-      expect(receivedMessages[0].content).toBe('Hello!');
-      expect(receivedMessages[0].fromAgentId).toBe('agent-1');
-      expect(receivedMessages[0].toAgentId).toBe('agent-2');
+      expect(receivedMessages[0]?.content).toBe('Hello!');
+      expect(receivedMessages[0]?.fromAgentId).toBe('agent-1');
+      expect(receivedMessages[0]?.toAgentId).toBe('agent-2');
 
       unsubscribe();
     });
 
     it('should not receive messages after unsubscribing', async () => {
       const receivedMessages: AgentMessage[] = [];
-      const handler = (message: AgentMessage) => {
+      const handler = (message: AgentMessage): void => {
         receivedMessages.push(message);
       };
 
@@ -141,19 +145,17 @@ describe('AgentComms', () => {
       });
 
       expect(agent2Messages).toHaveLength(1);
-      expect(agent2Messages[0].content).toBe('For agent 2');
+      expect(agent2Messages[0]?.content).toBe('For agent 2');
 
       expect(agent3Messages).toHaveLength(1);
-      expect(agent3Messages[0].content).toBe('For agent 3');
+      expect(agent3Messages[0]?.content).toBe('For agent 3');
     });
   });
 
   describe('sendAndWait', () => {
     it('should wait for and receive reply', async () => {
       // Set up agent-2 to reply to messages after a small delay
-      // This ensures the reply listener is registered before the reply is sent
       comms.subscribe('agent-2' as AgentId, (message) => {
-        // Use setImmediate to ensure reply is sent after listener is registered
         setImmediate(() => {
           void comms.send({
             fromAgentId: 'agent-2' as AgentId,
@@ -175,24 +177,25 @@ describe('AgentComms', () => {
       );
 
       expect(reply).toBe('Reply to: Original message');
+       
       expect(mockLogger.debug).toHaveBeenCalledWith(
+        'Agent received reply',
         expect.objectContaining({
+          component: 'agent-comms',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           originalMessageId: expect.any(String),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           replyMessageId: expect.any(String),
         }),
-        'Agent received reply',
       );
     });
 
     it('should timeout if no reply received', async () => {
       vi.useFakeTimers();
-      
-      // Recreate comms with fake timers
-      comms = createAgentComms({
-        logger: mockLogger as unknown as import('pino').Logger,
-      });
 
-      // Start the promise and immediately attach a catch handler to prevent unhandled rejection
+      // Recreate comms with fake timers
+      comms = createAgentComms({ logger: mockLogger });
+
       const replyPromise = comms.sendAndWait(
         {
           fromAgentId: 'agent-1' as AgentId,
@@ -200,48 +203,47 @@ describe('AgentComms', () => {
           content: 'Will timeout',
         },
         1000,
-      ).catch((e: Error) => e); // Catch and return error instead of rejecting
+      ).catch((e: unknown) => e);
 
       // Advance time past timeout
       await vi.advanceTimersByTimeAsync(1500);
 
       const result = await replyPromise;
-      
+
       expect(result).toBeInstanceOf(Error);
       expect((result as Error).message).toBe('Agent response timeout after 1000ms');
+       
       expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Agent message timed out waiting for reply',
         expect.objectContaining({
+          component: 'agent-comms',
           timeoutMs: 1000,
         }),
-        'Agent message timed out waiting for reply',
       );
-      
+
       vi.useRealTimers();
     });
 
     it('should use default timeout value', async () => {
       vi.useFakeTimers();
-      
-      // Recreate comms with fake timers
-      comms = createAgentComms({
-        logger: mockLogger as unknown as import('pino').Logger,
-      });
 
-      // Start the promise and immediately attach a catch handler to prevent unhandled rejection
+      // Recreate comms with fake timers
+      comms = createAgentComms({ logger: mockLogger });
+
       const replyPromise = comms.sendAndWait({
         fromAgentId: 'agent-1' as AgentId,
         toAgentId: 'agent-2' as AgentId,
         content: 'Default timeout',
-      }).catch((e: Error) => e); // Catch and return error instead of rejecting
+      }).catch((e: unknown) => e);
 
       // Advance past 30 seconds (default timeout)
       await vi.advanceTimersByTimeAsync(35000);
 
       const result = await replyPromise;
-      
+
       expect(result).toBeInstanceOf(Error);
       expect((result as Error).message).toBe('Agent response timeout after 30000ms');
-      
+
       vi.useRealTimers();
     });
   });

@@ -5,7 +5,7 @@ import { createWebhookRepository } from './webhook-repository.js';
 
 const PROJECT_ID = 'proj_test' as ProjectId;
 
-function makeWebhookRecord(overrides?: Record<string, unknown>) {
+const makeWebhookRecord = (overrides?: Record<string, unknown>): Record<string, unknown> => {
   return {
     id: 'webhook_abc',
     projectId: PROJECT_ID,
@@ -20,9 +20,9 @@ function makeWebhookRecord(overrides?: Record<string, unknown>) {
     updatedAt: new Date('2025-01-01'),
     ...overrides,
   };
-}
+};
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     webhook: {
       create: vi.fn(),
@@ -57,6 +57,7 @@ describe('WebhookRepository', () => {
       expect(webhook.id).toBe('webhook_abc');
       expect(webhook.name).toBe('New Lead Webhook');
       expect(webhook.status).toBe('active');
+       
       expect(mockPrisma.webhook.create).toHaveBeenCalledOnce();
     });
 
@@ -108,6 +109,7 @@ describe('WebhookRepository', () => {
       const webhook = await repo.update('webhook_abc', { status: 'paused' });
 
       expect(webhook.status).toBe('paused');
+       
       expect(mockPrisma.webhook.update).toHaveBeenCalledWith({
         where: { id: 'webhook_abc' },
         data: { status: 'paused' },
@@ -122,6 +124,7 @@ describe('WebhookRepository', () => {
       const repo = createWebhookRepository(mockPrisma);
       await repo.delete('webhook_abc');
 
+       
       expect(mockPrisma.webhook.delete).toHaveBeenCalledWith({
         where: { id: 'webhook_abc' },
       });
@@ -139,7 +142,7 @@ describe('WebhookRepository', () => {
       const webhooks = await repo.list(PROJECT_ID);
 
       expect(webhooks).toHaveLength(2);
-      expect(webhooks[0].name).toBe('New Lead Webhook');
+      expect(webhooks[0]?.name).toBe('New Lead Webhook');
     });
   });
 
@@ -152,6 +155,7 @@ describe('WebhookRepository', () => {
       const repo = createWebhookRepository(mockPrisma);
       await repo.listActive(PROJECT_ID);
 
+       
       expect(mockPrisma.webhook.findMany).toHaveBeenCalledWith({
         where: { projectId: PROJECT_ID, status: 'active' },
         orderBy: { createdAt: 'desc' },

@@ -108,7 +108,7 @@ export function createTaskExecutor(
     // 3. Execute the agent run with abort signal based on task timeout
     const abortController = new AbortController();
     const timeoutId = setTimeout(
-      () => abortController.abort(),
+      () => { abortController.abort(); },
       task.timeoutMs,
     );
 

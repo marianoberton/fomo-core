@@ -193,7 +193,7 @@ describe('mcp-tool-adapter', () => {
 
         await tool.execute({ date: '2026-01-01' }, context);
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+         
         expect(connection.callTool).toHaveBeenCalledWith(
           'list_events',
           { date: '2026-01-01' },
@@ -345,7 +345,7 @@ describe('mcp-tool-adapter', () => {
 
         await tool.execute(undefined, context);
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+         
         expect(connection.callTool).toHaveBeenCalledWith('list_events', {});
       });
     });
@@ -370,7 +370,7 @@ describe('mcp-tool-adapter', () => {
           );
         }
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+         
         expect(connection.callTool).not.toHaveBeenCalled();
       });
 
@@ -398,7 +398,7 @@ describe('mcp-tool-adapter', () => {
           connection,
         });
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+         
         expect(tool.healthCheck).toBeDefined();
         const healthFn = tool.healthCheck?.bind(tool);
         const healthy = healthFn ? await healthFn() : false;
@@ -414,7 +414,7 @@ describe('mcp-tool-adapter', () => {
           connection,
         });
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+         
         expect(tool.healthCheck).toBeDefined();
         const healthFn = tool.healthCheck?.bind(tool);
         const healthy = healthFn ? await healthFn() : false;
@@ -430,7 +430,7 @@ describe('mcp-tool-adapter', () => {
           connection,
         });
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
+         
         expect(tool.healthCheck).toBeDefined();
         const healthFn = tool.healthCheck?.bind(tool);
         const healthy = healthFn ? await healthFn() : false;

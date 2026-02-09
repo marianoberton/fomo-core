@@ -7,10 +7,10 @@ import { getSlackUrlChallenge } from '@/channels/adapters/slack.js';
 
 // ─── Route Registration ─────────────────────────────────────────
 
-export async function webhookRoutes(
+export function webhookRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
-): Promise<void> {
+): void {
   const { channelRouter, inboundProcessor, logger } = deps;
 
   // ─── Telegram Webhook ───────────────────────────────────────────

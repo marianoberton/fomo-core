@@ -83,10 +83,10 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
           projectId: input.projectId,
           name: input.name,
           description: input.description ?? null,
-          promptConfig: input.promptConfig as Prisma.InputJsonValue,
+          promptConfig: input.promptConfig as unknown as Prisma.InputJsonValue,
           toolAllowlist: input.toolAllowlist ?? [],
-          mcpServers: (input.mcpServers ?? []) as Prisma.InputJsonValue,
-          channelConfig: channelConfig as Prisma.InputJsonValue,
+          mcpServers: (input.mcpServers ?? []) as unknown as Prisma.InputJsonValue,
+          channelConfig: channelConfig as unknown as Prisma.InputJsonValue,
           maxTurns: limits.maxTurns,
           maxTokensPerTurn: limits.maxTokensPerTurn,
           budgetPerDayUsd: limits.budgetPerDayUsd,
@@ -123,16 +123,16 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
         updateData.description = input.description;
       }
       if (input.promptConfig !== undefined) {
-        updateData.promptConfig = input.promptConfig as Prisma.InputJsonValue;
+        updateData.promptConfig = input.promptConfig as unknown as Prisma.InputJsonValue;
       }
       if (input.toolAllowlist !== undefined) {
         updateData.toolAllowlist = input.toolAllowlist;
       }
       if (input.mcpServers !== undefined) {
-        updateData.mcpServers = input.mcpServers as Prisma.InputJsonValue;
+        updateData.mcpServers = input.mcpServers as unknown as Prisma.InputJsonValue;
       }
       if (input.channelConfig !== undefined) {
-        updateData.channelConfig = input.channelConfig as Prisma.InputJsonValue;
+        updateData.channelConfig = input.channelConfig as unknown as Prisma.InputJsonValue;
       }
       if (input.status !== undefined) {
         updateData.status = input.status;

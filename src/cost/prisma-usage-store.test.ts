@@ -5,7 +5,7 @@ import { createPrismaUsageStore } from './prisma-usage-store.js';
 
 const PROJECT_ID = 'proj_test' as ProjectId;
 
-function createMockPrisma() {
+function createMockPrisma(): PrismaClient {
   return {
     usageRecord: {
       aggregate: vi.fn(),
@@ -36,10 +36,12 @@ describe('PrismaUsageStore', () => {
       const spend = await store.getDailySpend(PROJECT_ID);
 
       expect(spend).toBe(42.5);
+       
       expect(mockPrisma.usageRecord.aggregate).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             projectId: PROJECT_ID,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             timestamp: expect.objectContaining({ gte: expect.any(Date) }) as unknown,
           }) as unknown,
           _sum: { costUsd: true },
@@ -109,6 +111,7 @@ describe('PrismaUsageStore', () => {
         costUSD: 0.012,
       });
 
+       
       expect(mockPrisma.usageRecord.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           projectId: PROJECT_ID,

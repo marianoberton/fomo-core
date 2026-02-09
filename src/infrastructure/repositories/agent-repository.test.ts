@@ -83,7 +83,9 @@ describe('AgentRepository', () => {
 
       const result = await repository.create(createInput);
 
+       
       expect(mockPrismaAgent.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
           projectId: 'project-1',
           name: 'test-agent',
@@ -115,7 +117,9 @@ describe('AgentRepository', () => {
 
       await repository.create(inputWithoutLimits);
 
+       
       expect(mockPrismaAgent.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
           maxTurns: 10,
           maxTokensPerTurn: 4000,
@@ -131,6 +135,7 @@ describe('AgentRepository', () => {
 
       const result = await repository.findById('agent-1' as AgentId);
 
+       
       expect(mockPrismaAgent.findUnique).toHaveBeenCalledWith({
         where: { id: 'agent-1' },
       });
@@ -155,6 +160,7 @@ describe('AgentRepository', () => {
 
       const result = await repository.findByName('project-1', 'test-agent');
 
+       
       expect(mockPrismaAgent.findUnique).toHaveBeenCalledWith({
         where: {
           projectId_name: { projectId: 'project-1', name: 'test-agent' },
@@ -180,8 +186,10 @@ describe('AgentRepository', () => {
         status: 'paused',
       });
 
+       
       expect(mockPrismaAgent.update).toHaveBeenCalledWith({
         where: { id: 'agent-1' },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
           name: 'updated-agent',
           status: 'paused',
@@ -201,8 +209,10 @@ describe('AgentRepository', () => {
         limits: { maxTurns: 20 },
       });
 
+       
       expect(mockPrismaAgent.update).toHaveBeenCalledWith({
         where: { id: 'agent-1' },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
           maxTurns: 20,
         }),
@@ -216,6 +226,7 @@ describe('AgentRepository', () => {
 
       await repository.delete('agent-1' as AgentId);
 
+       
       expect(mockPrismaAgent.delete).toHaveBeenCalledWith({
         where: { id: 'agent-1' },
       });
@@ -228,6 +239,7 @@ describe('AgentRepository', () => {
 
       const result = await repository.list('project-1');
 
+       
       expect(mockPrismaAgent.findMany).toHaveBeenCalledWith({
         where: { projectId: 'project-1' },
         orderBy: { createdAt: 'desc' },
@@ -242,6 +254,7 @@ describe('AgentRepository', () => {
 
       const result = await repository.listActive('project-1');
 
+       
       expect(mockPrismaAgent.findMany).toHaveBeenCalledWith({
         where: { projectId: 'project-1', status: 'active' },
         orderBy: { createdAt: 'desc' },
