@@ -12,6 +12,8 @@ import type { ChannelRouter } from '@/channels/channel-router.js';
 import type { InboundProcessor } from '@/channels/inbound-processor.js';
 import type { WebhookRepository } from '@/webhooks/types.js';
 import type { WebhookProcessor } from '@/webhooks/webhook-processor.js';
+import type { FileRepository } from '@/files/types.js';
+import type { FileService } from '@/files/file-service.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -78,11 +80,13 @@ export interface RouteDependencies {
   scheduledTaskRepository: ScheduledTaskRepository;
   contactRepository: ContactRepository;
   webhookRepository: WebhookRepository;
+  fileRepository: FileRepository;
   approvalGate: ApprovalGate;
   toolRegistry: ToolRegistry;
   taskManager: TaskManager;
   channelRouter: ChannelRouter;
   inboundProcessor: InboundProcessor;
   webhookProcessor: WebhookProcessor;
+  fileService: FileService;
   logger: Logger;
 }

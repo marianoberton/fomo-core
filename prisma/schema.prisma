@@ -31,6 +31,7 @@ model Project {
   scheduledTasks   ScheduledTask[]
   contacts         Contact[]
   webhooks         Webhook[]
+  files            File[]
 
   @@map("projects")
 }
@@ -332,4 +333,32 @@ model Webhook {
 
   @@index([projectId, status])
   @@map("webhooks")
+}
+
+// ─── Files ──────────────────────────────────────────────────────
+
+model File {
+  id               String   @id @default(cuid())
+  projectId        String   @map("project_id")
+
+  filename         String
+  originalFilename String   @map("original_filename")
+  mimeType         String   @map("mime_type")
+  sizeBytes        Int      @map("size_bytes")
+
+  storageProvider  String   @map("storage_provider")
+  storagePath      String   @map("storage_path")
+  publicUrl        String?  @map("public_url")
+
+  uploadedBy       String?  @map("uploaded_by")
+  uploadedAt       DateTime @default(now()) @map("uploaded_at")
+  expiresAt        DateTime? @map("expires_at")
+
+  metadata         Json?
+
+  project          Project  @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, uploadedAt])
+  @@index([projectId, mimeType])
+  @@map("files")
 }

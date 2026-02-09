@@ -15,6 +15,7 @@ import { scheduledTaskRoutes } from './scheduled-tasks.js';
 import { contactRoutes } from './contacts.js';
 import { webhookRoutes } from './webhooks.js';
 import { webhookGenericRoutes } from './webhooks-generic.js';
+import { fileRoutes } from './files.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -33,4 +34,5 @@ export async function registerRoutes(
   await fastify.register(contactRoutes, deps);
   await fastify.register(webhookRoutes, deps);
   await fastify.register(webhookGenericRoutes, deps);
+  await fastify.register(fileRoutes, deps);
 }
