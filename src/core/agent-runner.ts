@@ -8,6 +8,7 @@
  * MemoryManager, CostGuard, and observability via ExecutionTrace.
  */
 import type { LLMProvider, Message, TokenUsage } from '@/providers/types.js';
+import { calculateCost } from '@/providers/models.js';
 import type { ToolRegistry } from '@/tools/registry/index.js';
 import type { MemoryManager } from '@/memory/index.js';
 import type { CostGuard } from '@/cost/index.js';
@@ -752,14 +753,5 @@ function calculateUsageCost(
   usage: TokenUsage,
 ): number {
   void provider;
-  void model;
-  // This will be imported from @/providers/models.js when implemented
-  // For now, return a placeholder
-  const inputCostPer1M = 0.003; // $3 per 1M tokens (Claude Sonnet default)
-  const outputCostPer1M = 0.015; // $15 per 1M tokens
-
-  const inputCost = (usage.inputTokens / 1_000_000) * inputCostPer1M;
-  const outputCost = (usage.outputTokens / 1_000_000) * outputCostPer1M;
-
-  return inputCost + outputCost;
+  return calculateCost(model, usage.inputTokens, usage.outputTokens);
 }

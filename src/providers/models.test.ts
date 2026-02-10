@@ -4,7 +4,7 @@ import { getModelMeta, calculateCost } from './models.js';
 describe('getModelMeta', () => {
   it('returns metadata for known Anthropic models', () => {
     const meta = getModelMeta('claude-sonnet-4-5-20250929');
-    expect(meta.contextWindow).toBe(200_000);
+    expect(meta.contextWindow).toBe(1_000_000);
     expect(meta.supportsTools).toBe(true);
     expect(meta.inputPricePer1M).toBe(3);
   });
@@ -17,7 +17,7 @@ describe('getModelMeta', () => {
 
   it('returns metadata for known Google models', () => {
     const meta = getModelMeta('gemini-2.5-pro');
-    expect(meta.contextWindow).toBe(1_048_576);
+    expect(meta.contextWindow).toBe(2_097_152);
   });
 
   it('returns conservative defaults for unknown models', () => {

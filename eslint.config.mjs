@@ -49,4 +49,11 @@ export default tseslint.config(
       '@typescript-eslint/unbound-method': 'off',
     },
   },
+  // CLI scripts use console for terminal output (not server code)
+  {
+    files: ['src/cli/**/*.ts', 'prisma/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 );

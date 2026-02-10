@@ -161,6 +161,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
           max_tokens: params.maxTokens,
           temperature: params.temperature,
           stream: true,
+          stream_options: { include_usage: true },
           ...(tools?.length ? { tools } : {}),
           ...(params.stopSequences?.length ? { stop: params.stopSequences } : {}),
         });
@@ -172,16 +173,26 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
           name: string;
           argumentsJson: string;
         }>();
+        let finalStopReason: 'tool_use' | 'max_tokens' | 'end_turn' | undefined;
+        let finalUsage: { prompt_tokens: number; completion_tokens: number } | undefined;
 
         for await (const chunk of stream) {
-          const choice = chunk.choices[0];
-          if (!choice) continue;
-
           // First chunk has the message ID
           if (chunk.id && !messageId) {
             messageId = chunk.id;
             yield { type: 'message_start', messageId };
           }
+
+          // Usage chunk (comes last, choices array is empty)
+          if (chunk.usage) {
+            finalUsage = {
+              prompt_tokens: chunk.usage.prompt_tokens,
+              completion_tokens: chunk.usage.completion_tokens,
+            };
+          }
+
+          const choice = chunk.choices[0];
+          if (!choice) continue;
 
           const delta = choice.delta;
 
@@ -213,7 +224,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
             }
           }
 
-          // Stream end
+          // Stream end (finish_reason)
           if (choice.finish_reason) {
             // Flush all pending tool calls
             for (const [, buffer] of toolCallBuffers) {
@@ -231,26 +242,29 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
             }
             toolCallBuffers.clear();
 
-            const stopReason = choice.finish_reason === 'tool_calls'
+            finalStopReason = choice.finish_reason === 'tool_calls'
               ? 'tool_use' as const
               : choice.finish_reason === 'length'
                 ? 'max_tokens' as const
                 : choice.finish_reason === 'stop'
                   ? 'end_turn' as const
                   : 'end_turn' as const;
-
-            // Usage comes on the final chunk
-            const usage = chunk.usage;
-            yield {
-              type: 'message_end',
-              stopReason,
-              usage: {
-                inputTokens: usage?.prompt_tokens ?? 0,
-                outputTokens: usage?.completion_tokens ?? 0,
-              },
-            };
           }
         }
+
+        // After stream ends, yield message_end with accumulated usage
+        if (!finalStopReason) {
+          throw new Error('Stream ended without finish_reason');
+        }
+
+        yield {
+          type: 'message_end',
+          stopReason: finalStopReason,
+          usage: {
+            inputTokens: finalUsage?.prompt_tokens ?? 0,
+            outputTokens: finalUsage?.completion_tokens ?? 0,
+          },
+        };
       } catch (error) {
         if (error instanceof OpenAI.APIError) {
           logger.error('OpenAI API error', {

@@ -207,6 +207,8 @@ async function start(): Promise<void> {
     await server.listen({ port, host });
     logger.info(`Server listening on ${host}:${port}`, { component: 'main' });
   } catch (err: unknown) {
+    // eslint-disable-next-line no-console
+    console.error('STARTUP ERROR:', err);
     logger.fatal('Failed to start server', {
       component: 'main',
       error: err instanceof Error ? err.message : String(err),

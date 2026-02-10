@@ -44,7 +44,7 @@ describe('createAnthropicProvider', () => {
 
     it('returns known context window', () => {
       const provider = createProvider();
-      expect(provider.getContextWindow()).toBe(200_000);
+      expect(provider.getContextWindow()).toBe(1_000_000);
     });
 
     it('reports tool support', () => {
