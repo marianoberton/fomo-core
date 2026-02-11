@@ -8,6 +8,8 @@ import Redis from 'ioredis';
 export interface TestRedis {
   /** Redis client connected to test instance. */
   client: Redis;
+  /** Redis connection URL. */
+  url: string;
   /** Flush test database (delete all keys). */
   flush: () => Promise<void>;
   /** Disconnect from Redis. */
@@ -35,6 +37,7 @@ export async function createTestRedis(): Promise<TestRedis> {
 
   return {
     client,
+    url: testRedisUrl,
 
     /**
      * Flush test database.

@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:unit": "vitest run src --exclude src/**/*.integration.test.ts --exclude src/tools/**/*.test.ts",
-    "test:integration": "vitest run src/**/*.integration.test.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:tools": "vitest run src/tools/**/*.test.ts",
     "test:e2e": "vitest run tests/e2e/**/*.test.ts",
     "test:security": "vitest run tests/security/**/*.test.ts",

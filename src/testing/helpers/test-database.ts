@@ -62,23 +62,21 @@ export async function createTestDatabase(): Promise<TestDatabase> {
      * Faster than running migrations between tests.
      */
     reset: async () => {
-      // Delete in dependency order (children first)
-      await prisma.$transaction([
-        prisma.message.deleteMany(),
-        prisma.executionTrace.deleteMany(),
-        prisma.session.deleteMany(),
-        prisma.memoryEntry.deleteMany(),
-        prisma.usageRecord.deleteMany(),
-        prisma.approvalRequest.deleteMany(),
-        prisma.scheduledTaskRun.deleteMany(),
-        prisma.scheduledTask.deleteMany(),
-        prisma.promptLayer.deleteMany(),
-        prisma.webhook.deleteMany(),
-        prisma.file.deleteMany(),
-        prisma.contact.deleteMany(),
-        prisma.agent.deleteMany(),
-        prisma.project.deleteMany(),
-      ]);
+      // Delete in dependency order (children first), sequentially to avoid deadlocks
+      await prisma.message.deleteMany();
+      await prisma.approvalRequest.deleteMany();
+      await prisma.executionTrace.deleteMany();
+      await prisma.session.deleteMany();
+      await prisma.memoryEntry.deleteMany();
+      await prisma.usageRecord.deleteMany();
+      await prisma.scheduledTaskRun.deleteMany();
+      await prisma.scheduledTask.deleteMany();
+      await prisma.promptLayer.deleteMany();
+      await prisma.webhook.deleteMany();
+      await prisma.file.deleteMany();
+      await prisma.contact.deleteMany();
+      await prisma.agent.deleteMany();
+      await prisma.project.deleteMany();
     },
 
     /**
@@ -118,7 +116,6 @@ export async function createTestDatabase(): Promise<TestDatabase> {
             isActive: true,
             createdBy: 'test-user',
             changeReason: 'Test seed',
-            contentHash: 'test-hash-identity',
             createdAt: new Date(),
           },
           {
@@ -130,7 +127,6 @@ export async function createTestDatabase(): Promise<TestDatabase> {
             isActive: true,
             createdBy: 'test-user',
             changeReason: 'Test seed',
-            contentHash: 'test-hash-instructions',
             createdAt: new Date(),
           },
           {
@@ -142,7 +138,6 @@ export async function createTestDatabase(): Promise<TestDatabase> {
             isActive: true,
             createdBy: 'test-user',
             changeReason: 'Test seed',
-            contentHash: 'test-hash-safety',
             createdAt: new Date(),
           },
         ],
