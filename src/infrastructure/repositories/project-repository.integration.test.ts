@@ -210,16 +210,16 @@ describe('ProjectRepository Integration', () => {
     });
   });
 
-  describe('findAll', () => {
+  describe('list', () => {
     it('returns empty array when no projects exist', async () => {
       const repo = createProjectRepository(testDb.prisma);
 
-      const projects = await repo.findAll();
+      const projects = await repo.list();
 
       expect(projects).toEqual([]);
     });
 
-    it('returns all projects', async () => {
+    it('returns all projects when no filters provided', async () => {
       const repo = createProjectRepository(testDb.prisma);
 
       // Create multiple projects
@@ -227,13 +227,62 @@ describe('ProjectRepository Integration', () => {
       await testDb.seed();
       await testDb.seed();
 
-      const projects = await repo.findAll();
+      const projects = await repo.list();
 
       expect(projects).toHaveLength(3);
       projects.forEach((project) => {
         expect(project.id).toBeDefined();
         expect(project.config).toBeDefined();
       });
+    });
+
+    it('filters by owner', async () => {
+      const repo = createProjectRepository(testDb.prisma);
+
+      await repo.create({
+        name: 'Owned by Alice',
+        owner: 'alice',
+        config: {
+          projectId: nanoid() as ProjectId,
+          provider: { provider: 'anthropic', apiKey: 'key', model: 'claude-sonnet-4-5' },
+          maxTurnsPerSession: 10,
+          allowedTools: [],
+          memoryConfig: { contextWindow: 200_000, pruneStrategy: 'turn-based', pruneThreshold: 50, enableCompaction: false, enableLongTerm: false, categories: [] },
+          costConfig: { dailyBudgetUSD: 100, monthlyBudgetUSD: 1000, alertThresholdPercent: 80 },
+          securityConfig: { enableApprovalGate: false, enableInputSanitization: true, highRiskToolsRequireApproval: [] },
+          failoverProvider: undefined,
+        },
+      });
+
+      await repo.create({
+        name: 'Owned by Bob',
+        owner: 'bob',
+        config: {
+          projectId: nanoid() as ProjectId,
+          provider: { provider: 'anthropic', apiKey: 'key', model: 'claude-sonnet-4-5' },
+          maxTurnsPerSession: 10,
+          allowedTools: [],
+          memoryConfig: { contextWindow: 200_000, pruneStrategy: 'turn-based', pruneThreshold: 50, enableCompaction: false, enableLongTerm: false, categories: [] },
+          costConfig: { dailyBudgetUSD: 100, monthlyBudgetUSD: 1000, alertThresholdPercent: 80 },
+          securityConfig: { enableApprovalGate: false, enableInputSanitization: true, highRiskToolsRequireApproval: [] },
+          failoverProvider: undefined,
+        },
+      });
+
+      const aliceProjects = await repo.list({ owner: 'alice' });
+      expect(aliceProjects).toHaveLength(1);
+      expect(aliceProjects[0]?.name).toBe('Owned by Alice');
+    });
+
+    it('returns projects ordered by createdAt desc', async () => {
+      const repo = createProjectRepository(testDb.prisma);
+
+      await testDb.seed();
+      await testDb.seed();
+
+      const projects = await repo.list();
+      expect(projects).toHaveLength(2);
+      expect(projects[0]!.createdAt.getTime()).toBeGreaterThanOrEqual(projects[1]!.createdAt.getTime());
     });
   });
 
@@ -284,7 +333,7 @@ describe('ProjectRepository Integration', () => {
     });
   });
 
-  describe('findByTags', () => {
+  describe('list with tag filters', () => {
     it('queries by tags using hasSome operator', async () => {
       const repo = createProjectRepository(testDb.prisma);
 
@@ -328,16 +377,16 @@ describe('ProjectRepository Integration', () => {
         },
       });
 
-      // Query by tags
-      const productionProjects = await repo.findByTags(['production']);
+      // hasSome: matches projects that have at least one of the given tags
+      const productionProjects = await repo.list({ tags: ['production'] });
       expect(productionProjects).toHaveLength(2);
 
-      const apiProjects = await repo.findByTags(['api']);
+      const apiProjects = await repo.list({ tags: ['api'] });
       expect(apiProjects).toHaveLength(2);
 
-      const productionApi = await repo.findByTags(['production', 'api']);
-      expect(productionApi).toHaveLength(1);
-      expect(productionApi[0]?.name).toBe('Project A');
+      // hasSome with ['production', 'api'] matches all 3 (A has both, B has api, C has production)
+      const anyProductionOrApi = await repo.list({ tags: ['production', 'api'] });
+      expect(anyProductionOrApi).toHaveLength(3);
     });
   });
 
@@ -345,26 +394,56 @@ describe('ProjectRepository Integration', () => {
     it('deletes project from database', async () => {
       const repo = createProjectRepository(testDb.prisma);
 
-      const seed = await testDb.seed();
-      const projectId = seed.projectId;
+      // Create project without child rows (seed creates prompt layers which block delete via FK)
+      const project = await repo.create({
+        name: 'To Delete',
+        owner: 'test-user',
+        config: {
+          projectId: nanoid() as ProjectId,
+          provider: { provider: 'anthropic', apiKey: 'key', model: 'claude-sonnet-4-5' },
+          maxTurnsPerSession: 10,
+          allowedTools: [],
+          memoryConfig: { contextWindow: 200_000, pruneStrategy: 'turn-based', pruneThreshold: 50, enableCompaction: false, enableLongTerm: false, categories: [] },
+          costConfig: { dailyBudgetUSD: 100, monthlyBudgetUSD: 1000, alertThresholdPercent: 80 },
+          securityConfig: { enableApprovalGate: false, enableInputSanitization: true, highRiskToolsRequireApproval: [] },
+          failoverProvider: undefined,
+        },
+      });
 
       // Verify exists
-      const before = await repo.findById(projectId);
+      const before = await repo.findById(project.id);
       expect(before).not.toBeNull();
 
       // Delete
-      await repo.delete(projectId);
+      const result = await repo.delete(project.id);
+      expect(result).toBe(true);
 
       // Verify deleted
-      const after = await repo.findById(projectId);
+      const after = await repo.findById(project.id);
       expect(after).toBeNull();
+    });
+
+    it('returns false when project has child rows (FK constraint)', async () => {
+      const repo = createProjectRepository(testDb.prisma);
+
+      // Seed creates project + prompt layers (FK dependency)
+      const seed = await testDb.seed();
+
+      // Delete fails silently due to FK constraint
+      const result = await repo.delete(seed.projectId);
+      expect(result).toBe(false);
+
+      // Project still exists
+      const after = await repo.findById(seed.projectId);
+      expect(after).not.toBeNull();
     });
 
     it('handles deleting non-existent project gracefully', async () => {
       const repo = createProjectRepository(testDb.prisma);
 
-      // Should not throw
-      await expect(repo.delete('non-existent' as ProjectId)).resolves.not.toThrow();
+      // Returns false instead of throwing
+      const result = await repo.delete('non-existent' as ProjectId);
+      expect(result).toBe(false);
     });
   });
 });
