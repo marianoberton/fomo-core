@@ -19,7 +19,7 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:security": "vitest run --config vitest.security.config.ts",
     "test:performance": "vitest run --config vitest.performance.config.ts",
-    "test:all": "vitest run",
+    "test:all": "pnpm test:unit && pnpm test:integration && pnpm test:e2e && pnpm test:security && pnpm test:performance",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
