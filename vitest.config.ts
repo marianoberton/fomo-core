@@ -1,5 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
+import { config as loadEnv } from 'dotenv';
+
+// Load .env file for integration tests (e.g., OPENAI_API_KEY)
+loadEnv();
 
 export default defineConfig({
   resolve: {
