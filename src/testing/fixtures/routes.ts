@@ -99,6 +99,7 @@ export function createMockApprovalGate(): {
     resolve: vi.fn(),
     get: vi.fn(),
     listPending: vi.fn(),
+    listAll: vi.fn().mockResolvedValue([]),
     isApproved: vi.fn(),
   };
 }
@@ -222,6 +223,7 @@ export function createMockAgentRepository(): {
     delete: vi.fn(),
     list: vi.fn(),
     listActive: vi.fn(),
+    listAll: vi.fn(),
   };
 }
 
@@ -349,6 +351,7 @@ export function createMockDeps(): RouteDependencies & {
     fileService: createMockFileService(),
     agentRegistry: createMockAgentRegistry(),
     agentComms: createMockAgentComms(),
+    longTermMemoryStore: null,
     logger: createMockLogger(),
   };
 }

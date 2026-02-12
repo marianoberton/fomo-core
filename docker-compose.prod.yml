@@ -1,30 +1,36 @@
+# Production deployment — VPS
+# Usage:
+#   1. Copy .env.production.example to .env.production
+#   2. Fill in DB_PASSWORD, CORS_ORIGIN, etc.
+#   3. docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: nexus-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: nexus
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.production}
       POSTGRES_DB: nexus_core
-    ports:
-      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_core"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
     container_name: nexus-redis
-    ports:
-      - "6380:6379"
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   app:
@@ -32,10 +38,11 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: nexus-app
+    restart: unless-stopped
     ports:
       - "3002:3002"
     environment:
-      DATABASE_URL: postgresql://nexus:nexus@postgres:5432/nexus_core?schema=public
+      DATABASE_URL: postgresql://nexus:${DB_PASSWORD}@postgres:5432/nexus_core?schema=public
       REDIS_URL: redis://redis:6379
       PORT: 3002
       HOST: 0.0.0.0
@@ -53,4 +60,5 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
   filedata:

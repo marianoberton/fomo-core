@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
+import { paginationSchema, paginate } from '../pagination.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -39,22 +40,22 @@ export function scheduledTaskRoutes(
   const { taskManager } = opts;
 
   // GET /projects/:projectId/scheduled-tasks
+  const taskListQuerySchema = z.object({ status: z.string().optional() });
+
   fastify.get(
     '/projects/:projectId/scheduled-tasks',
     async (
-      request: FastifyRequest<{
-        Params: { projectId: string };
-        Querystring: { status?: string };
-      }>,
+      request: FastifyRequest<{ Params: { projectId: string } }>,
       reply: FastifyReply,
     ) => {
       const { projectId } = request.params;
-      const { status } = request.query;
+      const query = paginationSchema.merge(taskListQuerySchema).parse(request.query);
+      const { limit, offset, status } = query;
       const tasks = await taskManager.listTasks(
         projectId as Parameters<typeof taskManager.listTasks>[0],
         status,
       );
-      await sendSuccess(reply, tasks);
+      await sendSuccess(reply, paginate(tasks, limit, offset));
     },
   );
 

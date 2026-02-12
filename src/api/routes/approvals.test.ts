@@ -40,9 +40,9 @@ describe('approvalRoutes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ success: boolean; data: unknown[] }>();
+      const body = response.json<{ success: boolean; data: { items: unknown[]; total: number; limit: number; offset: number } }>();
       expect(body.success).toBe(true);
-      expect(body.data).toHaveLength(1);
+      expect(body.data.items).toHaveLength(1);
 
        
       expect(deps.approvalGate.listPending).toHaveBeenCalledWith('proj-1' as ProjectId);

@@ -17,6 +17,9 @@ import { webhookRoutes } from './webhooks.js';
 import { webhookGenericRoutes } from './webhooks-generic.js';
 import { fileRoutes } from './files.js';
 import { agentRoutes } from './agents.js';
+import { dashboardRoutes } from './dashboard.js';
+import { usageRoutes } from './usage.js';
+import { wsDashboardRoutes } from './ws-dashboard.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -37,4 +40,7 @@ export async function registerRoutes(
   await fastify.register(webhookGenericRoutes, deps);
   await fastify.register(fileRoutes, deps);
   await fastify.register(agentRoutes, deps);
+  await fastify.register(dashboardRoutes, deps);
+  await fastify.register(usageRoutes, deps);
+  await fastify.register(wsDashboardRoutes, deps);
 }

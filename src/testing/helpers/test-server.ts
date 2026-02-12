@@ -158,14 +158,20 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     fileService,
     agentRegistry,
     agentComms,
+    longTermMemoryStore: null,
     logger,
   };
 
   // Register error handler
   registerErrorHandler(server);
 
-  // Register routes
-  registerRoutes(server, deps);
+  // Register routes under /api/v1 prefix (matches production setup)
+  await server.register(
+    async (prefixed) => {
+      await prefixed.register(registerRoutes, deps);
+    },
+    { prefix: '/api/v1' },
+  );
 
   // Start server on random port for tests
   await server.listen({ port: 0, host: '127.0.0.1' });

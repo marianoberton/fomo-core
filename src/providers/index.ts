@@ -21,3 +21,5 @@ export { createOpenAIProvider } from './openai.js';
 export type { OpenAIProviderOptions } from './openai.js';
 export { getModelMeta, calculateCost } from './models.js';
 export type { ModelMeta } from './models.js';
+export { createEmbeddingProvider, resolveEmbeddingProvider } from './embeddings.js';
+export type { EmbeddingProviderOptions } from './embeddings.js';

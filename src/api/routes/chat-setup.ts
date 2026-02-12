@@ -75,7 +75,7 @@ export interface ChatSetupError {
 /** Subset of RouteDependencies required by prepareChatRun. */
 type ChatSetupDeps = Pick<
   RouteDependencies,
-  'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'logger'
+  'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'longTermMemoryStore' | 'logger'
 >;
 
 // ─── Setup Function ─────────────────────────────────────────────
@@ -154,7 +154,11 @@ export async function prepareChatRun(
   // 6. Resolve LLM provider
   const provider = createProvider(agentConfig.provider);
 
-  // 7. Create per-request services
+  // 7. Create per-request services (with optional long-term memory)
+  const longTermStore = agentConfig.memoryConfig.longTerm.enabled
+    ? deps.longTermMemoryStore ?? undefined
+    : undefined;
+
   const memoryManager = createMemoryManager({
     memoryConfig: agentConfig.memoryConfig,
     contextWindowSize: 200_000,
@@ -169,6 +173,7 @@ export async function prepareChatRun(
       }
       return Promise.resolve(total);
     },
+    longTermStore,
   });
 
   const costGuard = createCostGuard({
@@ -212,23 +217,33 @@ export async function prepareChatRun(
     .formatForProvider(executionContext)
     .map((t) => ({ name: t.name, description: t.description }));
 
-  // 10. Build the system prompt from layers + runtime content
+  // 10. Retrieve relevant long-term memories for context injection
+  const retrievedMemories = await memoryManager.retrieveMemories({
+    query: sanitized.sanitized,
+    topK: agentConfig.memoryConfig.longTerm.retrievalTopK,
+  });
+
+  // 11. Build the system prompt from layers + runtime content
   const systemPrompt = buildPrompt({
     identity: layers.identity,
     instructions: layers.instructions,
     safety: layers.safety,
     toolDescriptions,
-    retrievedMemories: [],
+    retrievedMemories: retrievedMemories.map((m) => ({
+      content: m.content,
+      category: m.category,
+    })),
   });
 
-  // 11. Create snapshot for audit trail
+  // 12. Create snapshot for audit trail
   const toolDocsSection = toolDescriptions
     .map((t) => `${t.name}: ${t.description}`)
     .join('\n');
+  const memorySection = retrievedMemories.map((m) => m.content).join('\n');
   const promptSnapshot = createPromptSnapshot(
     layers,
     computeHash(toolDocsSection),
-    computeHash(''),
+    computeHash(memorySection),
   );
 
   return ok({

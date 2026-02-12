@@ -23,7 +23,11 @@ import {
   createCalculatorTool,
   createDateTimeTool,
   createJsonTransformTool,
+  createKnowledgeSearchTool,
 } from '@/tools/definitions/index.js';
+import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
+import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
+import type { LongTermMemoryStore } from '@/memory/memory-manager.js';
 import { createTaskManager } from '@/scheduling/task-manager.js';
 import { createTaskRunner } from '@/scheduling/task-runner.js';
 import { createTaskExecutor } from '@/scheduling/task-executor.js';
@@ -83,6 +87,17 @@ async function start(): Promise<void> {
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     const mcpManager = createMCPManager();
 
+    // Long-term memory (pgvector embeddings) — enabled when OPENAI_API_KEY is set
+    let longTermMemoryStore: LongTermMemoryStore | null = null;
+    const embeddingGenerator = resolveEmbeddingProvider('openai');
+    if (embeddingGenerator) {
+      longTermMemoryStore = createPrismaMemoryStore(prisma, embeddingGenerator);
+      toolRegistry.register(createKnowledgeSearchTool({ store: longTermMemoryStore }));
+      logger.info('Long-term memory enabled (pgvector + OpenAI embeddings)', { component: 'main' });
+    } else {
+      logger.info('Long-term memory disabled (no embedding API key)', { component: 'main' });
+    }
+
     // Channel system
     const channelRouter = createChannelRouter({ logger });
 
@@ -132,7 +147,10 @@ async function start(): Promise<void> {
     const agentComms = createAgentComms({ logger });
 
     // Register Fastify plugins
-    await server.register(cors, { origin: true });
+    const corsOrigin = process.env['CORS_ORIGIN'];
+    await server.register(cors, {
+      origin: corsOrigin ? corsOrigin.split(',') : true,
+    });
     await server.register(helmet);
     await server.register(rateLimit, { max: 100, timeWindow: '1 minute' });
     await server.register(websocketPlugin);
@@ -161,11 +179,17 @@ async function start(): Promise<void> {
       fileService,
       agentRegistry,
       agentComms,
+      longTermMemoryStore,
       logger,
     };
 
-    // Register API routes
-    await server.register(registerRoutes, deps);
+    // Register API routes under /api/v1 prefix
+    await server.register(
+      async (prefixed) => {
+        await prefixed.register(registerRoutes, deps);
+      },
+      { prefix: '/api/v1' },
+    );
 
     // Conditionally start task runner if Redis is configured
     let taskRunner: ReturnType<typeof createTaskRunner> | null = null;

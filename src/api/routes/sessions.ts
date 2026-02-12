@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { ProjectId, SessionId } from '@/core/types.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound } from '../error-handler.js';
+import { paginationSchema, paginate } from '../pagination.js';
 
 // ─── Zod Schemas ────────────────────────────────────────────────
 
@@ -32,15 +33,16 @@ export function sessionRoutes(
   const { sessionRepository, projectRepository } = deps;
 
   // GET /projects/:projectId/sessions
-  fastify.get<{ Params: { projectId: string }; Querystring: { status?: string } }>(
+  fastify.get<{ Params: { projectId: string } }>(
     '/projects/:projectId/sessions',
     async (request, reply) => {
-      const query = sessionListQuerySchema.parse(request.query);
+      const query = paginationSchema.merge(sessionListQuerySchema).parse(request.query);
+      const { limit, offset, ...filters } = query;
       const sessions = await sessionRepository.listByProject(
         request.params.projectId as ProjectId,
-        query.status,
+        filters.status,
       );
-      return sendSuccess(reply, sessions);
+      return sendSuccess(reply, paginate(sessions, limit, offset));
     },
   );
 

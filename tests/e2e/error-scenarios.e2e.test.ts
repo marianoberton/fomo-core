@@ -99,7 +99,7 @@ describe('Error Scenarios E2E', () => {
     it('returns 400 for invalid JSON body', async () => {
       const response = await server.inject({
         method: 'POST',
-        url: '/chat',
+        url: '/api/v1/chat',
         headers: { 'content-type': 'application/json' },
         payload: 'not-json{',
       });
@@ -110,7 +110,7 @@ describe('Error Scenarios E2E', () => {
     it('returns 400 for missing required fields in project create', async () => {
       const response = await server.inject({
         method: 'POST',
-        url: '/projects',
+        url: '/api/v1/projects',
         payload: {},
       });
 
@@ -123,7 +123,7 @@ describe('Error Scenarios E2E', () => {
     it('returns 400 for name exceeding max length', async () => {
       const response = await server.inject({
         method: 'POST',
-        url: '/projects',
+        url: '/api/v1/projects',
         payload: {
           name: 'x'.repeat(201), // max 200
           owner: 'user',
@@ -139,7 +139,7 @@ describe('Error Scenarios E2E', () => {
 
       const response = await server.inject({
         method: 'POST',
-        url: '/chat',
+        url: '/api/v1/chat',
         payload: {
           projectId,
         },
@@ -155,7 +155,7 @@ describe('Error Scenarios E2E', () => {
     it('returns 404 for non-existent project in GET', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/projects/does-not-exist',
+        url: '/api/v1/projects/does-not-exist',
       });
 
       expect(response.statusCode).toBe(404);
@@ -170,7 +170,7 @@ describe('Error Scenarios E2E', () => {
     it('returns 404 for non-existent project in PUT', async () => {
       const response = await server.inject({
         method: 'PUT',
-        url: '/projects/does-not-exist',
+        url: '/api/v1/projects/does-not-exist',
         payload: { name: 'New Name' },
       });
 
@@ -180,7 +180,7 @@ describe('Error Scenarios E2E', () => {
     it('returns 404 for non-existent session', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/sessions/does-not-exist',
+        url: '/api/v1/sessions/does-not-exist',
       });
 
       expect(response.statusCode).toBe(404);
@@ -189,7 +189,7 @@ describe('Error Scenarios E2E', () => {
     it('returns 404 for messages of non-existent session', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/sessions/does-not-exist/messages',
+        url: '/api/v1/sessions/does-not-exist/messages',
       });
 
       expect(response.statusCode).toBe(404);
@@ -198,7 +198,7 @@ describe('Error Scenarios E2E', () => {
     it('returns 404 for non-existent project in chat', async () => {
       const response = await server.inject({
         method: 'POST',
-        url: '/chat',
+        url: '/api/v1/chat',
         payload: {
           projectId: 'non-existent',
           message: 'Hello',
@@ -215,7 +215,7 @@ describe('Error Scenarios E2E', () => {
 
       const response = await server.inject({
         method: 'POST',
-        url: '/chat',
+        url: '/api/v1/chat',
         payload: {
           projectId,
           sessionId: 'non-existent',
@@ -264,7 +264,7 @@ describe('Error Scenarios E2E', () => {
 
       const response = await server.inject({
         method: 'POST',
-        url: '/chat',
+        url: '/api/v1/chat',
         payload: {
           projectId,
           message: 'Hello',
@@ -295,7 +295,7 @@ describe('Error Scenarios E2E', () => {
 
       const response = await server.inject({
         method: 'POST',
-        url: '/chat',
+        url: '/api/v1/chat',
         payload: {
           projectId,
           message: 'Do something',
@@ -345,7 +345,7 @@ describe('Error Scenarios E2E', () => {
 
       const response = await server.inject({
         method: 'POST',
-        url: '/chat',
+        url: '/api/v1/chat',
         payload: {
           projectId,
           message: 'Keep calculating',
@@ -365,7 +365,7 @@ describe('Error Scenarios E2E', () => {
 
       const response = await server.inject({
         method: 'GET',
-        url: `/projects/${projectId}`,
+        url: `/api/v1/projects/${projectId}`,
       });
 
       const body = JSON.parse(response.payload) as { success: boolean; data: unknown; error?: unknown };
@@ -377,7 +377,7 @@ describe('Error Scenarios E2E', () => {
     it('error responses have { success: false, error: { code, message } } structure', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/projects/does-not-exist',
+        url: '/api/v1/projects/does-not-exist',
       });
 
       const body = JSON.parse(response.payload) as {

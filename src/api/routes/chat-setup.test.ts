@@ -30,7 +30,7 @@ vi.mock('@/providers/factory.js', () => ({
 vi.mock('@/memory/memory-manager.js', () => ({
   createMemoryManager: vi.fn().mockReturnValue({
     fitToContextWindow: vi.fn(),
-    retrieveMemories: vi.fn(),
+    retrieveMemories: vi.fn().mockResolvedValue([]),
   }),
 }));
 

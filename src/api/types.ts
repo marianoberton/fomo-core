@@ -16,6 +16,7 @@ import type { WebhookProcessor } from '@/webhooks/webhook-processor.js';
 import type { FileRepository } from '@/files/types.js';
 import type { FileService } from '@/files/file-service.js';
 import type { AgentRepository, AgentRegistry, AgentComms } from '@/agents/types.js';
+import type { LongTermMemoryStore } from '@/memory/memory-manager.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -94,5 +95,7 @@ export interface RouteDependencies {
   fileService: FileService;
   agentRegistry: AgentRegistry;
   agentComms: AgentComms;
+  /** Long-term memory store for pgvector semantic search (null if embeddings not configured). */
+  longTermMemoryStore: LongTermMemoryStore | null;
   logger: Logger;
 }

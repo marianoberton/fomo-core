@@ -130,6 +130,8 @@ export interface AgentRepository {
   list(projectId: string): Promise<AgentConfig[]>;
   /** List only active agents in a project. */
   listActive(projectId: string): Promise<AgentConfig[]>;
+  /** List all agents across all projects. */
+  listAll(): Promise<AgentConfig[]>;
 }
 
 // ─── Agent Registry Interface ────────────────────────────────────

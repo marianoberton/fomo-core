@@ -46,6 +46,7 @@ function createMockRepository(): AgentRepository {
     delete: vi.fn(),
     list: vi.fn(),
     listActive: vi.fn(),
+    listAll: vi.fn(),
   };
 }
 

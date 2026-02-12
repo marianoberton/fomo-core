@@ -176,5 +176,12 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
       });
       return records.map(toAgentConfig);
     },
+
+    async listAll(): Promise<AgentConfig[]> {
+      const records = await prisma.agent.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+      return records.map(toAgentConfig);
+    },
   };
 }

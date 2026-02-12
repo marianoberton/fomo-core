@@ -46,9 +46,9 @@ describe('project routes', () => {
       const res = await app.inject({ method: 'GET', url: '/projects' });
 
       expect(res.statusCode).toBe(200);
-      const body = JSON.parse(res.body) as SuccessBody<unknown[]>;
+      const body = JSON.parse(res.body) as SuccessBody<{ items: unknown[]; total: number; limit: number; offset: number }>;
       expect(body.success).toBe(true);
-      expect(body.data).toHaveLength(1);
+      expect(body.data.items).toHaveLength(1);
     });
 
     it('returns an empty array when no projects exist', async () => {
@@ -58,9 +58,9 @@ describe('project routes', () => {
       const res = await app.inject({ method: 'GET', url: '/projects' });
 
       expect(res.statusCode).toBe(200);
-      const body = JSON.parse(res.body) as SuccessBody<unknown[]>;
+      const body = JSON.parse(res.body) as SuccessBody<{ items: unknown[]; total: number; limit: number; offset: number }>;
       expect(body.success).toBe(true);
-      expect(body.data).toHaveLength(0);
+      expect(body.data.items).toHaveLength(0);
     });
 
     it('passes owner filter to repository', async () => {

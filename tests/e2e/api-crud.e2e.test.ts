@@ -53,7 +53,7 @@ describe('API CRUD E2E', () => {
 
       const response = await server.inject({
         method: 'POST',
-        url: '/projects',
+        url: '/api/v1/projects',
         payload: {
           name: 'E2E Test Project',
           owner: 'e2e-user',
@@ -71,19 +71,20 @@ describe('API CRUD E2E', () => {
       expect(body.data.id).toBeDefined();
     });
 
-    it('GET /projects lists all projects', async () => {
+    it('GET /projects lists all projects (paginated)', async () => {
       await seedE2EProject(testDb);
       await seedE2EProject(testDb);
 
       const response = await server.inject({
         method: 'GET',
-        url: '/projects',
+        url: '/api/v1/projects',
       });
 
       expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.payload) as { success: boolean; data: unknown[] };
+      const body = JSON.parse(response.payload) as { success: boolean; data: { items: unknown[]; total: number } };
       expect(body.success).toBe(true);
-      expect(body.data).toHaveLength(2);
+      expect(body.data.items).toHaveLength(2);
+      expect(body.data.total).toBe(2);
     });
 
     it('GET /projects?owner=alice filters by owner', async () => {
@@ -91,7 +92,7 @@ describe('API CRUD E2E', () => {
       const projectId = nanoid() as ProjectId;
       await server.inject({
         method: 'POST',
-        url: '/projects',
+        url: '/api/v1/projects',
         payload: {
           name: 'Alice Project',
           owner: 'alice',
@@ -103,13 +104,13 @@ describe('API CRUD E2E', () => {
 
       const response = await server.inject({
         method: 'GET',
-        url: '/projects?owner=alice',
+        url: '/api/v1/projects?owner=alice',
       });
 
       expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.payload) as { success: boolean; data: Array<{ owner: string }> };
-      expect(body.data).toHaveLength(1);
-      expect(body.data[0]?.owner).toBe('alice');
+      const body = JSON.parse(response.payload) as { success: boolean; data: { items: Array<{ owner: string }>; total: number } };
+      expect(body.data.items).toHaveLength(1);
+      expect(body.data.items[0]?.owner).toBe('alice');
     });
 
     it('GET /projects/:id retrieves a project', async () => {
@@ -117,7 +118,7 @@ describe('API CRUD E2E', () => {
 
       const response = await server.inject({
         method: 'GET',
-        url: `/projects/${projectId}`,
+        url: `/api/v1/projects/${projectId}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -129,7 +130,7 @@ describe('API CRUD E2E', () => {
     it('GET /projects/:id returns 404 for non-existent project', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/projects/non-existent-id',
+        url: '/api/v1/projects/non-existent-id',
       });
 
       expect(response.statusCode).toBe(404);
@@ -143,7 +144,7 @@ describe('API CRUD E2E', () => {
 
       const response = await server.inject({
         method: 'PUT',
-        url: `/projects/${projectId}`,
+        url: `/api/v1/projects/${projectId}`,
         payload: {
           name: 'Updated Name',
           tags: ['updated'],
@@ -174,7 +175,7 @@ describe('API CRUD E2E', () => {
 
       const response = await server.inject({
         method: 'DELETE',
-        url: `/projects/${projectId}`,
+        url: `/api/v1/projects/${projectId}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -184,7 +185,7 @@ describe('API CRUD E2E', () => {
       // Verify it's gone
       const getResponse = await server.inject({
         method: 'GET',
-        url: `/projects/${projectId}`,
+        url: `/api/v1/projects/${projectId}`,
       });
       expect(getResponse.statusCode).toBe(404);
     });
@@ -203,7 +204,7 @@ describe('API CRUD E2E', () => {
     it('POST /projects/:projectId/sessions creates a session', async () => {
       const response = await server.inject({
         method: 'POST',
-        url: `/projects/${projectId}/sessions`,
+        url: `/api/v1/projects/${projectId}/sessions`,
         payload: {
           metadata: { source: 'e2e-test' },
         },
@@ -220,7 +221,7 @@ describe('API CRUD E2E', () => {
     it('POST /projects/:projectId/sessions returns 404 for non-existent project', async () => {
       const response = await server.inject({
         method: 'POST',
-        url: '/projects/non-existent/sessions',
+        url: '/api/v1/projects/non-existent/sessions',
         payload: {},
       });
 
@@ -231,14 +232,14 @@ describe('API CRUD E2E', () => {
       // Create session first
       const createResponse = await server.inject({
         method: 'POST',
-        url: `/projects/${projectId}/sessions`,
+        url: `/api/v1/projects/${projectId}/sessions`,
         payload: {},
       });
       const { data: session } = JSON.parse(createResponse.payload) as { data: { id: string } };
 
       const response = await server.inject({
         method: 'GET',
-        url: `/sessions/${session.id}`,
+        url: `/api/v1/sessions/${session.id}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -249,7 +250,7 @@ describe('API CRUD E2E', () => {
     it('GET /sessions/:id returns 404 for non-existent session', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: '/sessions/non-existent',
+        url: '/api/v1/sessions/non-existent',
       });
 
       expect(response.statusCode).toBe(404);
@@ -258,14 +259,14 @@ describe('API CRUD E2E', () => {
     it('PATCH /sessions/:id/status updates session status', async () => {
       const createResponse = await server.inject({
         method: 'POST',
-        url: `/projects/${projectId}/sessions`,
+        url: `/api/v1/projects/${projectId}/sessions`,
         payload: {},
       });
       const { data: session } = JSON.parse(createResponse.payload) as { data: { id: string } };
 
       const response = await server.inject({
         method: 'PATCH',
-        url: `/sessions/${session.id}/status`,
+        url: `/api/v1/sessions/${session.id}/status`,
         payload: { status: 'paused' },
       });
 
@@ -274,33 +275,34 @@ describe('API CRUD E2E', () => {
       expect(body.data.updated).toBe(true);
     });
 
-    it('GET /projects/:projectId/sessions lists sessions by project', async () => {
+    it('GET /projects/:projectId/sessions lists sessions by project (paginated)', async () => {
       // Create multiple sessions
       await server.inject({
         method: 'POST',
-        url: `/projects/${projectId}/sessions`,
+        url: `/api/v1/projects/${projectId}/sessions`,
         payload: {},
       });
       await server.inject({
         method: 'POST',
-        url: `/projects/${projectId}/sessions`,
+        url: `/api/v1/projects/${projectId}/sessions`,
         payload: {},
       });
 
       const response = await server.inject({
         method: 'GET',
-        url: `/projects/${projectId}/sessions`,
+        url: `/api/v1/projects/${projectId}/sessions`,
       });
 
       expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.payload) as { success: boolean; data: unknown[] };
-      expect(body.data).toHaveLength(2);
+      const body = JSON.parse(response.payload) as { success: boolean; data: { items: unknown[]; total: number } };
+      expect(body.data.items).toHaveLength(2);
+      expect(body.data.total).toBe(2);
     });
 
     it('GET /sessions/:id/messages returns messages for session', async () => {
       const createResponse = await server.inject({
         method: 'POST',
-        url: `/projects/${projectId}/sessions`,
+        url: `/api/v1/projects/${projectId}/sessions`,
         payload: {},
       });
       const { data: session } = JSON.parse(createResponse.payload) as { data: { id: string } };
@@ -318,7 +320,7 @@ describe('API CRUD E2E', () => {
 
       const response = await server.inject({
         method: 'GET',
-        url: `/sessions/${session.id}/messages`,
+        url: `/api/v1/sessions/${session.id}/messages`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -335,7 +337,7 @@ describe('API CRUD E2E', () => {
     it('POST /projects rejects empty name', async () => {
       const response = await server.inject({
         method: 'POST',
-        url: '/projects',
+        url: '/api/v1/projects',
         payload: {
           name: '',
           owner: 'user',
@@ -352,7 +354,7 @@ describe('API CRUD E2E', () => {
     it('POST /projects rejects missing owner', async () => {
       const response = await server.inject({
         method: 'POST',
-        url: '/projects',
+        url: '/api/v1/projects',
         payload: {
           name: 'Test',
           config: {},
@@ -366,14 +368,14 @@ describe('API CRUD E2E', () => {
       const { projectId } = await seedE2EProject(testDb);
       const createResponse = await server.inject({
         method: 'POST',
-        url: `/projects/${projectId}/sessions`,
+        url: `/api/v1/projects/${projectId}/sessions`,
         payload: {},
       });
       const { data: session } = JSON.parse(createResponse.payload) as { data: { id: string } };
 
       const response = await server.inject({
         method: 'PATCH',
-        url: `/sessions/${session.id}/status`,
+        url: `/api/v1/sessions/${session.id}/status`,
         payload: { status: 'invalid-status' },
       });
 

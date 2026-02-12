@@ -5,6 +5,8 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import type { AgentId, AgentMessageId } from '@/agents/types.js';
+import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { paginationSchema, paginate } from '../pagination.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -72,20 +74,25 @@ export function agentRoutes(
 
   // ─── List Agents ────────────────────────────────────────────────
 
+  const listAgentsQuerySchema = z.object({
+    status: z.string().optional(),
+  });
+
   fastify.get(
     '/projects/:projectId/agents',
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
-      const query = request.query as { status?: string };
+      const query = paginationSchema.merge(listAgentsQuerySchema).parse(request.query);
+      const { limit, offset, status } = query;
 
       let agents;
-      if (query.status === 'active') {
+      if (status === 'active') {
         agents = await agentRepository.listActive(projectId);
       } else {
         agents = await agentRepository.list(projectId);
       }
 
-      return reply.send({ agents });
+      return sendSuccess(reply, paginate(agents, limit, offset));
     },
   );
 
@@ -99,10 +106,10 @@ export function agentRoutes(
       const agent = await agentRegistry.get(agentId as AgentId);
 
       if (!agent) {
-        return reply.status(404).send({ error: 'Agent not found' });
+        return sendNotFound(reply, 'Agent', agentId);
       }
 
-      return reply.send({ agent });
+      return sendSuccess(reply, agent);
     },
   );
 
@@ -116,10 +123,10 @@ export function agentRoutes(
       const agent = await agentRegistry.getByName(projectId, name);
 
       if (!agent) {
-        return reply.status(404).send({ error: 'Agent not found' });
+        return sendNotFound(reply, 'Agent', name);
       }
 
-      return reply.send({ agent });
+      return sendSuccess(reply, agent);
     },
   );
 
@@ -146,13 +153,16 @@ export function agentRoutes(
       try {
         const agent = await agentRepository.create(input);
         logger.info('Agent created', { component: 'agents', agentId: agent.id, projectId });
-        return await reply.status(201).send({ agent });
+        return await sendSuccess(reply, agent, 201);
       } catch (error) {
         // Handle unique constraint violation
         if (error instanceof Error && error.message.includes('Unique constraint')) {
-          return reply.status(409).send({
-            error: 'Agent with this name already exists in the project',
-          });
+          return sendError(
+            reply,
+            'CONFLICT',
+            'Agent with this name already exists in the project',
+            409,
+          );
         }
         throw error;
       }
@@ -181,10 +191,10 @@ export function agentRoutes(
         agentRegistry.invalidate(agentId as AgentId);
 
         logger.info('Agent updated', { component: 'agents', agentId });
-        return await reply.send({ agent });
+        return await sendSuccess(reply, agent);
       } catch {
         // Prisma throws if record not found
-        return reply.status(404).send({ error: 'Agent not found' });
+        return sendNotFound(reply, 'Agent', agentId);
       }
     },
   );
@@ -271,6 +281,42 @@ export function agentRoutes(
 
       logger.debug('Agent cache refreshed', { component: 'agents', agentId });
       return reply.status(204).send();
+    },
+  );
+
+  // ─── Pause Agent ─────────────────────────────────────────────────
+
+  fastify.post(
+    '/projects/:projectId/agents/:agentId/pause',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { agentId } = request.params as { projectId: string; agentId: string };
+
+      try {
+        const agent = await agentRepository.update(agentId as AgentId, { status: 'paused' });
+        agentRegistry.invalidate(agentId as AgentId);
+        logger.info('Agent paused', { component: 'agents', agentId });
+        return await sendSuccess(reply, agent);
+      } catch {
+        return sendNotFound(reply, 'Agent', agentId);
+      }
+    },
+  );
+
+  // ─── Resume Agent ────────────────────────────────────────────────
+
+  fastify.post(
+    '/projects/:projectId/agents/:agentId/resume',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { agentId } = request.params as { projectId: string; agentId: string };
+
+      try {
+        const agent = await agentRepository.update(agentId as AgentId, { status: 'active' });
+        agentRegistry.invalidate(agentId as AgentId);
+        logger.info('Agent resumed', { component: 'agents', agentId });
+        return await sendSuccess(reply, agent);
+      } catch {
+        return sendNotFound(reply, 'Agent', agentId);
+      }
     },
   );
 }

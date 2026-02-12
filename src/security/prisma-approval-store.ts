@@ -96,5 +96,12 @@ export function createPrismaApprovalStore(prisma: PrismaClient): ApprovalStore {
       });
       return records.map(toAppModel);
     },
+
+    async listAll(): Promise<ApprovalRequest[]> {
+      const records = await prisma.approvalRequest.findMany({
+        orderBy: { requestedAt: 'desc' },
+      });
+      return records.map(toAppModel);
+    },
   };
 }

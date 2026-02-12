@@ -34,6 +34,8 @@ export interface ApprovalStore {
   update(id: ApprovalId, updates: Partial<ApprovalRequest>): Promise<ApprovalRequest | null>;
   /** List pending approval requests for a project. */
   listPending(projectId: ProjectId): Promise<ApprovalRequest[]>;
+  /** List all approval requests across all projects. */
+  listAll(): Promise<ApprovalRequest[]>;
 }
 
 // ─── RBAC Context ───────────────────────────────────────────────

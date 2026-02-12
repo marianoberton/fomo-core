@@ -55,11 +55,11 @@ describe('session routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body) as ApiResponse<Session[]>;
+      const body = JSON.parse(response.body) as { success: boolean; data: { items: Session[]; total: number; limit: number; offset: number } };
       expect(body.success).toBe(true);
-      expect(body.data).toHaveLength(2);
+      expect(body.data.items).toHaveLength(2);
 
-       
+
       expect(deps.sessionRepository.listByProject).toHaveBeenCalledWith(
         'proj-1',
         undefined,
@@ -75,9 +75,9 @@ describe('session routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body) as ApiResponse<Session[]>;
+      const body = JSON.parse(response.body) as { success: boolean; data: { items: Session[]; total: number; limit: number; offset: number } };
       expect(body.success).toBe(true);
-      expect(body.data).toHaveLength(0);
+      expect(body.data.items).toHaveLength(0);
 
        
       expect(deps.sessionRepository.listByProject).toHaveBeenCalledWith(

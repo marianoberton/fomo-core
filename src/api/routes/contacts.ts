@@ -5,6 +5,8 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import type { ProjectId } from '@/core/types.js';
+import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { paginationSchema, paginate } from '../pagination.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -33,10 +35,7 @@ const updateContactSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
-const listQuerySchema = z.object({
-  limit: z.string().transform(Number).optional(),
-  offset: z.string().transform(Number).optional(),
-});
+// listQuerySchema replaced by paginationSchema from pagination.ts
 
 // ─── Route Registration ─────────────────────────────────────────
 
@@ -52,14 +51,14 @@ export function contactRoutes(
     '/projects/:projectId/contacts',
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
-      const query = listQuerySchema.parse(request.query);
+      const query = paginationSchema.parse(request.query);
 
       const contacts = await contactRepository.list(projectId as ProjectId, {
         limit: query.limit,
         offset: query.offset,
       });
 
-      return reply.send({ contacts });
+      return sendSuccess(reply, paginate(contacts, query.limit, query.offset));
     },
   );
 

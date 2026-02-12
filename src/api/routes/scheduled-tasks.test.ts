@@ -46,10 +46,10 @@ describe('GET /projects/:projectId/scheduled-tasks', () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body) as {
       success: boolean;
-      data: unknown[];
+      data: { items: unknown[]; total: number; limit: number; offset: number };
     };
     expect(body.success).toBe(true);
-    expect(body.data).toHaveLength(2);
+    expect(body.data.items).toHaveLength(2);
   });
 
   it('filters by status query param', async () => {

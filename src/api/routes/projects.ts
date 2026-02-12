@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { AgentConfig, ProjectId } from '@/core/types.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound } from '../error-handler.js';
+import { paginationSchema, paginate } from '../pagination.js';
 
 // ─── Zod Schemas ────────────────────────────────────────────────
 
@@ -42,16 +43,17 @@ export function projectRoutes(
 ): void {
   const { projectRepository } = deps;
 
-  // GET /projects — list with optional filters
+  // GET /projects — list with optional filters and pagination
   fastify.get('/projects', async (request, reply) => {
-    const query = projectFiltersSchema.parse(request.query);
+    const query = paginationSchema.merge(projectFiltersSchema).parse(request.query);
+    const { limit, offset, ...filterParams } = query;
     const filters = {
-      owner: query.owner,
-      status: query.status,
-      tags: query.tags ? query.tags.split(',') : undefined,
+      owner: filterParams.owner,
+      status: filterParams.status,
+      tags: filterParams.tags ? filterParams.tags.split(',') : undefined,
     };
     const projects = await projectRepository.list(filters);
-    return sendSuccess(reply, projects);
+    return sendSuccess(reply, paginate(projects, limit, offset));
   });
 
   // GET /projects/:id
@@ -90,5 +92,23 @@ export function projectRoutes(
     const deleted = await projectRepository.delete(request.params.id as ProjectId);
     if (!deleted) return sendNotFound(reply, 'Project', request.params.id);
     return sendSuccess(reply, { deleted: true });
+  });
+
+  // POST /projects/:id/pause
+  fastify.post<{ Params: { id: string } }>('/projects/:id/pause', async (request, reply) => {
+    const project = await projectRepository.update(request.params.id as ProjectId, {
+      status: 'paused',
+    });
+    if (!project) return sendNotFound(reply, 'Project', request.params.id);
+    return sendSuccess(reply, project);
+  });
+
+  // POST /projects/:id/resume
+  fastify.post<{ Params: { id: string } }>('/projects/:id/resume', async (request, reply) => {
+    const project = await projectRepository.update(request.params.id as ProjectId, {
+      status: 'active',
+    });
+    if (!project) return sendNotFound(reply, 'Project', request.params.id);
+    return sendSuccess(reply, project);
   });
 }

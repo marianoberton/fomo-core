@@ -56,6 +56,11 @@ export interface ApprovalGate {
   listPending(projectId: ProjectId): Promise<ApprovalRequest[]>;
 
   /**
+   * List all approvals across all projects.
+   */
+  listAll(): Promise<ApprovalRequest[]>;
+
+  /**
    * Check if a specific approval has been granted.
    * Also checks for expiration.
    */
@@ -93,6 +98,10 @@ export function createInMemoryApprovalStore(): ApprovalStore {
           (r) => r.projectId === projectId && r.status === 'pending',
         ),
       );
+    },
+
+    listAll(): Promise<ApprovalRequest[]> {
+      return Promise.resolve([...requests.values()]);
     },
   };
 }
@@ -203,6 +212,11 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
     async listPending(projectId: ProjectId): Promise<ApprovalRequest[]> {
       const pending = await store.listPending(projectId);
       return pending.map(checkExpiration).filter((r) => r.status === 'pending');
+    },
+
+    async listAll(): Promise<ApprovalRequest[]> {
+      const all = await store.listAll();
+      return all.map(checkExpiration);
     },
 
     async isApproved(approvalId: ApprovalId): Promise<boolean> {
