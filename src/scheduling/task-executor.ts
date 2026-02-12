@@ -14,6 +14,7 @@ import type { PromptLayerRepository } from '@/infrastructure/repositories/prompt
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
 import type { MCPManager } from '@/mcp/mcp-manager.js';
 import type { Logger } from '@/observability/logger.js';
+import type { LongTermMemoryStore } from '@/memory/memory-manager.js';
 import {
   prepareChatRun,
   extractAssistantResponse,
@@ -31,6 +32,7 @@ export interface TaskExecutorOptions {
   toolRegistry: ToolRegistry;
   mcpManager: MCPManager;
   logger: Logger;
+  longTermMemoryStore?: LongTermMemoryStore | null;
 }
 
 // ─── Factory ────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ export function createTaskExecutor(
     toolRegistry,
     mcpManager,
     logger,
+    longTermMemoryStore = null,
   } = options;
 
   const chatSetupDeps = {
@@ -61,6 +64,7 @@ export function createTaskExecutor(
     toolRegistry,
     mcpManager,
     logger,
+    longTermMemoryStore,
   };
 
   return async (task: ScheduledTask): Promise<TaskExecutionResult> => {

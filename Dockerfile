@@ -20,10 +20,10 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
-COPY package.json pnpm-lock.yaml tsconfig.json ./
+COPY package.json pnpm-lock.yaml tsconfig.json tsconfig.build.json ./
 COPY src ./src
 
-RUN pnpm build
+RUN pnpm tsc -p tsconfig.build.json && pnpm tsc-alias -p tsconfig.build.json
 
 # ─── Stage 3: Production ─────────────────────────────────────────
 FROM node:22-alpine AS runner
