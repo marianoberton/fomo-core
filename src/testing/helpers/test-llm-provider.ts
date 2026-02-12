@@ -2,7 +2,7 @@
  * Mock LLM provider for testing.
  * Provides configurable responses without real API calls.
  */
-import type { LLMProvider, ChatParams, ChatEvent, Message, ToolDefinition } from '@/providers/types.js';
+import type { LLMProvider, ChatParams, ChatEvent, Message, ToolDefinitionForProvider } from '@/providers/types.js';
 
 /** Configuration for mock LLM provider. */
 export interface MockLLMProviderConfig {
@@ -55,11 +55,7 @@ export function createMockLLMProvider(config?: MockLLMProviderConfig): LLMProvid
       // Yield message start
       yield {
         type: 'message_start',
-        message: {
-          id: 'mock-msg-1',
-          role: 'assistant',
-          content: [],
-        },
+        messageId: 'mock-msg-1',
       };
 
       // Yield text response as chunks
@@ -73,35 +69,30 @@ export function createMockLLMProvider(config?: MockLLMProviderConfig): LLMProvid
 
         yield {
           type: 'content_delta',
-          delta: {
-            type: 'text',
-            text: word + ' ',
-          },
+          text: word + ' ',
         };
       }
 
       // Yield tool calls if configured
       for (const toolCall of toolCalls) {
         yield {
-          type: 'tool_call',
-          toolCall: {
-            id: toolCall.id,
-            name: toolCall.name,
-            input: toolCall.input,
-          },
+          type: 'tool_use_start',
+          id: toolCall.id,
+          name: toolCall.name,
+        };
+        yield {
+          type: 'tool_use_end',
+          id: toolCall.id,
+          name: toolCall.name,
+          input: toolCall.input,
         };
       }
-
-      // Yield usage
-      yield {
-        type: 'usage',
-        usage,
-      };
 
       // Yield message end
       yield {
         type: 'message_end',
         stopReason: toolCalls.length > 0 ? 'tool_use' : 'end_turn',
+        usage,
       };
     },
 
@@ -136,11 +127,11 @@ export function createMockLLMProvider(config?: MockLLMProviderConfig): LLMProvid
     /**
      * Format tools (pass-through for mock).
      */
-    formatTools: (tools: ToolDefinition[]): unknown[] => {
+    formatTools: (tools: ToolDefinitionForProvider[]): unknown[] => {
       return tools.map((tool) => ({
         type: 'function',
         function: {
-          name: tool.id,
+          name: tool.name,
           description: tool.description,
           parameters: tool.inputSchema,
         },
@@ -150,11 +141,12 @@ export function createMockLLMProvider(config?: MockLLMProviderConfig): LLMProvid
     /**
      * Format tool result (pass-through for mock).
      */
-    formatToolResult: (result: { toolCallId: string; output: unknown; error?: string }): unknown => {
+    formatToolResult: (result: { toolUseId: string; content: string; isError: boolean }): unknown => {
       return {
         type: 'tool_result',
-        tool_call_id: result.toolCallId,
-        content: result.error || JSON.stringify(result.output),
+        tool_use_id: result.toolUseId,
+        content: result.content,
+        is_error: result.isError,
       };
     },
   };

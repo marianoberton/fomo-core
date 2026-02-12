@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import type { ProjectId, AgentConfig } from '@/core/types.js';
 import type { Prisma } from '@prisma/client';
+import { createTestAgentConfig } from '@/testing/fixtures/context.js';
 
 /** Test database instance with helpers for isolation and seeding. */
 export interface TestDatabase {
@@ -41,7 +42,7 @@ export interface SeedResult {
  */
 export async function createTestDatabase(): Promise<TestDatabase> {
   const testDbUrl =
-    process.env.TEST_DATABASE_URL ||
+    process.env['TEST_DATABASE_URL'] ||
     'postgresql://nexus:nexus@localhost:5433/nexus_core_test?schema=public';
 
   const prisma = new PrismaClient({
@@ -88,7 +89,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
      */
     seed: async (data?: SeedData) => {
       const projectId = (data?.projectId || nanoid()) as ProjectId;
-      const config = data?.config || defaultTestConfig(projectId);
+      const config = data?.config || createTestAgentConfig({ projectId });
 
       // Create project
       await prisma.project.create({
@@ -97,7 +98,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
           name: 'Test Project',
           owner: 'test-user',
           tags: ['test'],
-          configJson: config as Prisma.InputJsonValue,
+          configJson: config as unknown as Prisma.InputJsonValue,
           status: 'active',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -153,45 +154,6 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     disconnect: async () => {
       await prisma.$disconnect();
     },
-  };
-}
-
-/**
- * Default test agent config.
- * Minimal valid configuration for testing.
- *
- * @param projectId - Project ID for config.
- * @returns Default agent config.
- */
-function defaultTestConfig(projectId: ProjectId): AgentConfig {
-  return {
-    projectId,
-    provider: {
-      provider: 'anthropic',
-      apiKey: 'test-key',
-      model: 'claude-sonnet-4-5',
-    },
-    maxTurnsPerSession: 10,
-    allowedTools: ['calculator', 'date-time', 'json-transform'],
-    memoryConfig: {
-      contextWindow: 200_000,
-      pruneStrategy: 'turn-based',
-      pruneThreshold: 50,
-      enableCompaction: false,
-      enableLongTerm: false,
-      categories: [],
-    },
-    costConfig: {
-      dailyBudgetUSD: 100,
-      monthlyBudgetUSD: 1000,
-      alertThresholdPercent: 80,
-    },
-    securityConfig: {
-      enableApprovalGate: false,
-      enableInputSanitization: true,
-      highRiskToolsRequireApproval: [],
-    },
-    failoverProvider: undefined,
   };
 }
 

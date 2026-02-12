@@ -7,7 +7,6 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import websocketPlugin from '@fastify/websocket';
 import type { PrismaClient } from '@prisma/client';
-import type Redis from 'ioredis';
 import { createLogger } from '@/observability/logger.js';
 import {
   createProjectRepository,
@@ -39,13 +38,12 @@ import { createAgentComms } from '@/agents/agent-comms.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import type { RouteDependencies } from '@/api/types.js';
+import type { ProjectId } from '@/core/types.js';
 
 /** Options for creating test server. */
 export interface TestServerOptions {
   /** Prisma client for database access. */
   prisma: PrismaClient;
-  /** Redis client for BullMQ/caching. */
-  redis?: Redis;
   /** Whether to use mock LLM providers (default: true). */
   mockProviders?: boolean;
 }
@@ -58,7 +56,7 @@ export interface TestServerOptions {
  * @returns Fastify server instance.
  */
 export async function createTestServer(options: TestServerOptions): Promise<FastifyInstance> {
-  const { prisma, redis, mockProviders = true } = options;
+  const { prisma } = options;
 
   const logger = createLogger();
 
@@ -98,42 +96,46 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
   // Channel system
   const channelRouter = createChannelRouter({ logger });
 
+  const defaultProjectId = 'test-project' as ProjectId;
+
   // File system
   const fileStorage = createLocalStorage({
-    baseDir: './test-storage',
+    basePath: './test-storage',
   });
   const fileService = createFileService({
     storage: fileStorage,
     repository: fileRepository,
+    logger,
   });
 
   // Agent system
   const agentRegistry = createAgentRegistry({
-    repository: agentRepository,
-    cacheTTLMs: 60000,
+    agentRepository,
+    logger,
   });
-  const agentComms = createAgentComms();
+  const agentComms = createAgentComms({ logger });
 
   // Inbound processor (for channels)
   const inboundProcessor = createInboundProcessor({
-    projectRepository,
-    sessionRepository,
+    channelRouter,
     contactRepository,
+    sessionRepository,
     logger,
-    runAgent: async () => {
+    defaultProjectId,
+    runAgent: () => {
       // Placeholder for tests
-      return { response: 'Test agent response.' };
+      return Promise.resolve({ response: 'Test agent response.' });
     },
   });
 
   // Webhook processor
   const webhookProcessor = createWebhookProcessor({
-    repository: webhookRepository,
+    webhookRepository,
     sessionRepository,
     logger,
-    runAgent: async () => {
+    runAgent: () => {
       // Placeholder for tests
-      return { response: 'Test webhook response.' };
+      return Promise.resolve({ response: 'Test webhook response.' });
     },
   });
 

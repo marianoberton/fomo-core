@@ -4,7 +4,8 @@
  */
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { nanoid } from 'nanoid';
-import type { ProjectId, SessionId, TraceId, AgentConfig, Message } from '@/core/types.js';
+import type { ProjectId, SessionId, TraceId, AgentConfig } from '@/core/types.js';
+import { createTestAgentConfig } from './context.js';
 
 /**
  * Create a test project in the database.
@@ -26,7 +27,7 @@ export async function createTestProject(
   }>,
 ) {
   const projectId = (overrides?.id || nanoid()) as ProjectId;
-  const config = overrides?.config || defaultAgentConfig(projectId);
+  const config = overrides?.config || createTestAgentConfig({ projectId });
 
   const project = await prisma.project.create({
     data: {
@@ -34,7 +35,7 @@ export async function createTestProject(
       name: overrides?.name || 'Test Project',
       owner: overrides?.owner || 'test-user',
       tags: overrides?.tags || ['test'],
-      configJson: config as Prisma.InputJsonValue,
+      configJson: config as unknown as Prisma.InputJsonValue,
       status: overrides?.status || 'active',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -46,7 +47,6 @@ export async function createTestProject(
 
 /**
  * Create a test session in the database.
- * Optionally creates messages.
  *
  * @param prisma - Prisma client.
  * @param projectId - Project ID.
@@ -58,7 +58,6 @@ export async function createTestSession(
   projectId: ProjectId,
   overrides?: Partial<{
     id: SessionId;
-    messages: Message[];
     metadata: Record<string, unknown>;
   }>,
 ) {
@@ -68,7 +67,6 @@ export async function createTestSession(
     data: {
       id: sessionId,
       projectId,
-      messagesJson: (overrides?.messages || []) as Prisma.InputJsonValue,
       metadata: (overrides?.metadata || {}) as Prisma.InputJsonValue,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -153,53 +151,19 @@ export async function createTestTrace(
       id: traceId,
       projectId,
       sessionId,
+      promptSnapshot: {} as Prisma.InputJsonValue,
       events: (overrides?.events || []) as Prisma.InputJsonValue,
-      startedAt: new Date(),
+      totalDurationMs: 0,
+      totalTokensUsed: 0,
+      totalCostUsd: 0,
+      turnCount: 0,
       status: overrides?.status || 'completed',
+      createdAt: new Date(),
       completedAt: overrides?.status === 'completed' ? new Date() : null,
     },
   });
 
   return trace;
-}
-
-/**
- * Default agent config for tests.
- * Minimal valid configuration.
- *
- * @param projectId - Project ID.
- * @returns Default agent config.
- */
-function defaultAgentConfig(projectId: ProjectId): AgentConfig {
-  return {
-    projectId,
-    provider: {
-      provider: 'anthropic',
-      apiKey: 'test-key',
-      model: 'claude-sonnet-4-5',
-    },
-    maxTurnsPerSession: 10,
-    allowedTools: ['calculator', 'date-time', 'json-transform'],
-    memoryConfig: {
-      contextWindow: 200_000,
-      pruneStrategy: 'turn-based',
-      pruneThreshold: 50,
-      enableCompaction: false,
-      enableLongTerm: false,
-      categories: [],
-    },
-    costConfig: {
-      dailyBudgetUSD: 100,
-      monthlyBudgetUSD: 1000,
-      alertThresholdPercent: 80,
-    },
-    securityConfig: {
-      enableApprovalGate: false,
-      enableInputSanitization: true,
-      highRiskToolsRequireApproval: [],
-    },
-    failoverProvider: undefined,
-  };
 }
 
 /**

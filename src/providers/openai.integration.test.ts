@@ -9,12 +9,12 @@ import { describe, it, expect } from 'vitest';
 import { createOpenAIProvider } from './openai.js';
 import type { ChatEvent } from './types.js';
 
-const hasApiKey = !!process.env.OPENAI_API_KEY;
+const hasApiKey = !!process.env['OPENAI_API_KEY'];
 
 describe.skipIf(!hasApiKey)('OpenAI Provider Integration', () => {
   it('makes real API call and streams text response', async () => {
     const provider = createOpenAIProvider({
-      apiKey: process.env.OPENAI_API_KEY!,
+      apiKey: process.env['OPENAI_API_KEY'] ?? '',
       model: 'gpt-4o-mini',
     });
 
@@ -22,6 +22,8 @@ describe.skipIf(!hasApiKey)('OpenAI Provider Integration', () => {
     for await (const event of provider.chat({
       systemPrompt: 'You are a helpful assistant. Be very brief.',
       messages: [{ role: 'user', content: 'Say hello in exactly 3 words.' }],
+      maxTokens: 100,
+      temperature: 0,
     })) {
       events.push(event);
     }
@@ -45,7 +47,7 @@ describe.skipIf(!hasApiKey)('OpenAI Provider Integration', () => {
 
   it('handles tool use with function calling', async () => {
     const provider = createOpenAIProvider({
-      apiKey: process.env.OPENAI_API_KEY!,
+      apiKey: process.env['OPENAI_API_KEY'] ?? '',
       model: 'gpt-4o-mini',
     });
 
@@ -67,7 +69,9 @@ describe.skipIf(!hasApiKey)('OpenAI Provider Integration', () => {
     for await (const event of provider.chat({
       systemPrompt: 'You are a math assistant. Always use the calculator tool for math.',
       messages: [{ role: 'user', content: 'What is 127 times 834?' }],
-      tools: tools as ChatEvent[],
+      tools,
+      maxTokens: 500,
+      temperature: 0,
     })) {
       events.push(event);
     }
@@ -94,7 +98,7 @@ describe.skipIf(!hasApiKey)('OpenAI Provider Integration', () => {
 
   it('reports token usage accurately', async () => {
     const provider = createOpenAIProvider({
-      apiKey: process.env.OPENAI_API_KEY!,
+      apiKey: process.env['OPENAI_API_KEY'] ?? '',
       model: 'gpt-4o-mini',
     });
 
@@ -102,6 +106,8 @@ describe.skipIf(!hasApiKey)('OpenAI Provider Integration', () => {
     for await (const event of provider.chat({
       systemPrompt: 'Reply with exactly one word.',
       messages: [{ role: 'user', content: 'Hi' }],
+      maxTokens: 50,
+      temperature: 0,
     })) {
       events.push(event);
     }
@@ -122,7 +128,7 @@ describe.skipIf(!hasApiKey)('OpenAI Provider Integration', () => {
 
   it('counts tokens via rough estimate', async () => {
     const provider = createOpenAIProvider({
-      apiKey: process.env.OPENAI_API_KEY!,
+      apiKey: process.env['OPENAI_API_KEY'] ?? '',
       model: 'gpt-4o-mini',
     });
 
@@ -137,7 +143,7 @@ describe.skipIf(!hasApiKey)('OpenAI Provider Integration', () => {
 
   it('returns correct context window size', () => {
     const provider = createOpenAIProvider({
-      apiKey: process.env.OPENAI_API_KEY!,
+      apiKey: process.env['OPENAI_API_KEY'] ?? '',
       model: 'gpt-4o-mini',
     });
 
