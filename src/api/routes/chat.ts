@@ -46,6 +46,7 @@ export function chatRoutes(
       promptSnapshot,
       conversationHistory,
       provider,
+      fallbackProvider,
       memoryManager,
       costGuard,
     } = setupResult.value;
@@ -61,6 +62,7 @@ export function chatRoutes(
     // 4. Create agent runner and execute
     const agentRunner = createAgentRunner({
       provider,
+      fallbackProvider,
       toolRegistry: deps.toolRegistry,
       memoryManager,
       costGuard,
@@ -83,7 +85,10 @@ export function chatRoutes(
 
     const trace = result.value;
 
-    // 5. Persist messages
+    // 5. Persist execution trace
+    await deps.executionTraceRepository.save(trace);
+
+    // 6. Persist messages
     await deps.sessionRepository.addMessage(sessionId, {
       role: 'user',
       content: sanitizedMessage,
@@ -97,7 +102,7 @@ export function chatRoutes(
       content: assistantText,
     }, trace.id);
 
-    // 6. Return response
+    // 7. Return response
     return sendSuccess(reply, {
       sessionId,
       traceId: trace.id,

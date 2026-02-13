@@ -54,6 +54,7 @@ export async function handleChatStreamMessage(
   // 2. Create agent runner and execute with streaming callback
   const agentRunner = createAgentRunner({
     provider: setup.provider,
+    fallbackProvider: setup.fallbackProvider,
     toolRegistry: deps.toolRegistry,
     memoryManager: setup.memoryManager,
     costGuard: setup.costGuard,
@@ -80,8 +81,10 @@ export async function handleChatStreamMessage(
     return;
   }
 
-  // 3. Persist messages
+  // 3. Persist execution trace and messages
   const trace = result.value;
+
+  await deps.executionTraceRepository.save(trace);
 
   await deps.sessionRepository.addMessage(
     setup.sessionId,

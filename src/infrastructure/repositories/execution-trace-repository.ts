@@ -34,6 +34,8 @@ export interface TraceUpdateInput {
 
 export interface ExecutionTraceRepository {
   create(input: TraceCreateInput): Promise<ExecutionTrace>;
+  /** Persist a completed trace (with its existing ID, events, and totals). */
+  save(trace: ExecutionTrace): Promise<void>;
   findById(id: TraceId): Promise<ExecutionTrace | null>;
   update(id: TraceId, input: TraceUpdateInput): Promise<boolean>;
   /** Append events to an existing trace's event array. */
@@ -93,6 +95,35 @@ export function createExecutionTraceRepository(prisma: PrismaClient): ExecutionT
         },
       });
       return toAppModel(record);
+    },
+
+    async save(trace: ExecutionTrace): Promise<void> {
+      await prisma.executionTrace.upsert({
+        where: { id: trace.id },
+        create: {
+          id: trace.id,
+          projectId: trace.projectId,
+          sessionId: trace.sessionId,
+          promptSnapshot: trace.promptSnapshot as unknown as Prisma.InputJsonValue,
+          events: trace.events as unknown as Prisma.InputJsonValue,
+          totalDurationMs: trace.totalDurationMs,
+          totalTokensUsed: trace.totalTokensUsed,
+          totalCostUsd: trace.totalCostUSD,
+          turnCount: trace.turnCount,
+          status: trace.status,
+          createdAt: trace.createdAt,
+          completedAt: trace.completedAt ?? null,
+        },
+        update: {
+          events: trace.events as unknown as Prisma.InputJsonValue,
+          totalDurationMs: trace.totalDurationMs,
+          totalTokensUsed: trace.totalTokensUsed,
+          totalCostUsd: trace.totalCostUSD,
+          turnCount: trace.turnCount,
+          status: trace.status,
+          completedAt: trace.completedAt ?? null,
+        },
+      });
     },
 
     async findById(id: TraceId): Promise<ExecutionTrace | null> {

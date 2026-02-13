@@ -14,6 +14,7 @@ import {
   createMockProjectRepository,
   createMockSessionRepository,
   createMockPromptLayerRepository,
+  createMockExecutionTraceRepository,
   createMockToolRegistry,
   createMockMCPManager,
   createMockLogger,
@@ -23,6 +24,7 @@ import {
 import { createTestAgentConfig } from '@/testing/fixtures/context.js';
 import { createSampleScheduledTask } from '@/testing/fixtures/routes.js';
 import type { ChatSetupResult } from '@/api/routes/chat-setup.js';
+import type { TaskExecutorOptions } from './task-executor.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────
 
@@ -74,16 +76,20 @@ function createExecutorDeps(): {
   projectRepository: ReturnType<typeof createMockProjectRepository>;
   sessionRepository: ReturnType<typeof createMockSessionRepository>;
   promptLayerRepository: ReturnType<typeof createMockPromptLayerRepository>;
+  executionTraceRepository: ReturnType<typeof createMockExecutionTraceRepository>;
   toolRegistry: ReturnType<typeof createMockToolRegistry>;
   mcpManager: ReturnType<typeof createMockMCPManager>;
+  prisma: TaskExecutorOptions['prisma'];
   logger: ReturnType<typeof createMockLogger>;
 } {
   return {
     projectRepository: createMockProjectRepository(),
     sessionRepository: createMockSessionRepository(),
     promptLayerRepository: createMockPromptLayerRepository(),
+    executionTraceRepository: createMockExecutionTraceRepository(),
     toolRegistry: createMockToolRegistry(),
     mcpManager: createMockMCPManager(),
+    prisma: {} as TaskExecutorOptions['prisma'],
     logger: createMockLogger(),
   };
 }

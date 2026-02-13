@@ -217,7 +217,36 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
           const systemPrompt = preBuiltSystemPrompt;
 
           // Fit conversation to context window (apply pruning if needed)
-          const fittedMessages = await memoryManager.fitToContextWindow(conversation);
+          let fittedMessages = await memoryManager.fitToContextWindow(conversation);
+
+          // If pruning dropped messages and compaction is enabled, compact for better context
+          if (
+            fittedMessages.length < conversation.length &&
+            agentConfig.memoryConfig.contextWindow.compaction.enabled
+          ) {
+            try {
+              const { messages: compactedMessages, entry } = await memoryManager.compact(
+                conversation,
+                sessionId,
+              );
+              if (compactedMessages.length > 0) {
+                fittedMessages = compactedMessages;
+                addTraceEvent(trace, {
+                  type: 'compaction',
+                  data: {
+                    messagesCompacted: entry.messagesCompacted,
+                    tokensRecovered: entry.tokensRecovered,
+                  },
+                });
+              }
+            } catch {
+              // Compaction failed — proceed with pruned messages
+              runLogger.warn('Compaction failed, using pruned messages', {
+                component: 'agent-runner',
+                traceId,
+              });
+            }
+          }
 
           // Format tools for provider
           const genericTools = toolRegistry.formatForProvider(context);

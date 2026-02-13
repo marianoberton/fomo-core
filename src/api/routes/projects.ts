@@ -4,8 +4,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { AgentConfig, ProjectId } from '@/core/types.js';
+import { loadProjectConfig } from '@/config/loader.js';
 import type { RouteDependencies } from '../types.js';
-import { sendSuccess, sendNotFound } from '../error-handler.js';
+import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
 
 // ─── Zod Schemas ────────────────────────────────────────────────
@@ -32,6 +33,10 @@ const projectFiltersSchema = z.object({
   owner: z.string().optional(),
   status: z.string().optional(),
   tags: z.string().optional(),
+});
+
+const importProjectSchema = z.object({
+  filePath: z.string().min(1),
 });
 
 // ─── Route Plugin ───────────────────────────────────────────────
@@ -110,5 +115,27 @@ export function projectRoutes(
     });
     if (!project) return sendNotFound(reply, 'Project', request.params.id);
     return sendSuccess(reply, project);
+  });
+
+  // POST /projects/import — create a project from a JSON config file
+  fastify.post('/projects/import', async (request, reply) => {
+    const { filePath } = importProjectSchema.parse(request.body);
+    const configResult = await loadProjectConfig(filePath);
+
+    if (!configResult.ok) {
+      return sendError(reply, 'CONFIG_ERROR', configResult.error.message, 400);
+    }
+
+    const configFile = configResult.value;
+    const project = await projectRepository.create({
+      name: configFile.name,
+      description: configFile.description,
+      environment: configFile.environment,
+      owner: configFile.owner,
+      tags: configFile.tags,
+      config: configFile.agentConfig as unknown as AgentConfig,
+    });
+
+    return sendSuccess(reply, project, 201);
   });
 }

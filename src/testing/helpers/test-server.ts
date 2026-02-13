@@ -160,7 +160,9 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     fileService,
     agentRegistry,
     agentComms,
+    proactiveMessenger: null,
     longTermMemoryStore: null,
+    prisma,
     logger,
   };
 

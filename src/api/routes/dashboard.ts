@@ -33,13 +33,33 @@ export function dashboardRoutes(
 
     const pendingApprovals = approvals.filter((a) => a.status === 'pending');
 
+    // Calculate costs from usage records
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    // Query usage records using Prisma
+    const { prisma } = deps;
+    const [todayUsage, weekUsage] = await Promise.all([
+      prisma.usageRecord.aggregate({
+        where: { timestamp: { gte: today } },
+        _sum: { costUsd: true },
+      }),
+      prisma.usageRecord.aggregate({
+        where: { timestamp: { gte: weekAgo } },
+        _sum: { costUsd: true },
+      }),
+    ]);
+
     return sendSuccess(reply, {
       projectsCount: projects.length,
       activeAgentsCount: agents.filter((a) => a.status === 'active').length,
       activeSessionsCount,
       pendingApprovalsCount: pendingApprovals.length,
-      todayCostUsd: 0, // TODO: wire UsageStore aggregate
-      weekCostUsd: 0, // TODO: wire UsageStore aggregate
+      todayCostUsd: todayUsage._sum?.costUsd ?? 0,
+      weekCostUsd: weekUsage._sum?.costUsd ?? 0,
     });
   });
 }

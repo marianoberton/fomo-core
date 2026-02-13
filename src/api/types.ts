@@ -1,3 +1,4 @@
+import type { PrismaClient } from '@prisma/client';
 import type { ProjectRepository } from '@/infrastructure/repositories/project-repository.js';
 import type { SessionRepository } from '@/infrastructure/repositories/session-repository.js';
 import type { PromptLayerRepository } from '@/infrastructure/repositories/prompt-layer-repository.js';
@@ -17,6 +18,7 @@ import type { FileRepository } from '@/files/types.js';
 import type { FileService } from '@/files/file-service.js';
 import type { AgentRepository, AgentRegistry, AgentComms } from '@/agents/types.js';
 import type { LongTermMemoryStore } from '@/memory/memory-manager.js';
+import type { ProactiveMessenger } from '@/channels/proactive.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -95,7 +97,11 @@ export interface RouteDependencies {
   fileService: FileService;
   agentRegistry: AgentRegistry;
   agentComms: AgentComms;
+  /** Proactive messenger for scheduled outbound messages (null if Redis not configured). */
+  proactiveMessenger: ProactiveMessenger | null;
   /** Long-term memory store for pgvector semantic search (null if embeddings not configured). */
   longTermMemoryStore: LongTermMemoryStore | null;
+  /** Prisma client for direct queries (dashboard aggregations). */
+  prisma: PrismaClient;
   logger: Logger;
 }

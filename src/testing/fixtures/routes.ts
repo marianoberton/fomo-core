@@ -83,6 +83,7 @@ export function createMockExecutionTraceRepository(): {
 } {
   return {
     create: vi.fn(),
+    save: vi.fn(),
     findById: vi.fn(),
     update: vi.fn(),
     addEvents: vi.fn(),
@@ -351,7 +352,9 @@ export function createMockDeps(): RouteDependencies & {
     fileService: createMockFileService(),
     agentRegistry: createMockAgentRegistry(),
     agentComms: createMockAgentComms(),
+    proactiveMessenger: null,
     longTermMemoryStore: null,
+    prisma: {} as RouteDependencies['prisma'],
     logger: createMockLogger(),
   };
 }

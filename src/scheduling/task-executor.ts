@@ -11,7 +11,9 @@ import { createAgentRunner } from '@/core/agent-runner.js';
 import type { ProjectRepository } from '@/infrastructure/repositories/project-repository.js';
 import type { SessionRepository } from '@/infrastructure/repositories/session-repository.js';
 import type { PromptLayerRepository } from '@/infrastructure/repositories/prompt-layer-repository.js';
+import type { ExecutionTraceRepository } from '@/infrastructure/repositories/execution-trace-repository.js';
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
+import type { PrismaClient } from '@prisma/client';
 import type { MCPManager } from '@/mcp/mcp-manager.js';
 import type { Logger } from '@/observability/logger.js';
 import {
@@ -28,8 +30,10 @@ export interface TaskExecutorOptions {
   projectRepository: ProjectRepository;
   sessionRepository: SessionRepository;
   promptLayerRepository: PromptLayerRepository;
+  executionTraceRepository: ExecutionTraceRepository;
   toolRegistry: ToolRegistry;
   mcpManager: MCPManager;
+  prisma: PrismaClient;
   logger: Logger;
 }
 
@@ -49,8 +53,10 @@ export function createTaskExecutor(
     projectRepository,
     sessionRepository,
     promptLayerRepository,
+    executionTraceRepository,
     toolRegistry,
     mcpManager,
+    prisma,
     logger,
   } = options;
 
@@ -61,6 +67,7 @@ export function createTaskExecutor(
     toolRegistry,
     mcpManager,
     longTermMemoryStore: null as null,
+    prisma,
     logger,
   };
 
@@ -100,6 +107,7 @@ export function createTaskExecutor(
     // 2. Create agent runner
     const agentRunner = createAgentRunner({
       provider: setup.provider,
+      fallbackProvider: setup.fallbackProvider,
       toolRegistry,
       memoryManager: setup.memoryManager,
       costGuard: setup.costGuard,
@@ -139,7 +147,10 @@ export function createTaskExecutor(
 
       const trace = result.value;
 
-      // 4. Persist messages to the session
+      // 4. Persist execution trace
+      await executionTraceRepository.save(trace);
+
+      // 5. Persist messages to the session
       await sessionRepository.addMessage(
         setup.sessionId,
         { role: 'user', content: setup.sanitizedMessage },

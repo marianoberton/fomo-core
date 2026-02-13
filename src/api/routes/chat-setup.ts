@@ -13,7 +13,9 @@ import type { MemoryManager } from '@/memory/memory-manager.js';
 import type { CostGuard } from '@/cost/cost-guard.js';
 import { createProvider } from '@/providers/factory.js';
 import { createMemoryManager } from '@/memory/memory-manager.js';
-import { createCostGuard, createInMemoryUsageStore } from '@/cost/cost-guard.js';
+import type { CompactionSummarizer } from '@/memory/memory-manager.js';
+import { createCostGuard } from '@/cost/cost-guard.js';
+import { createPrismaUsageStore } from '@/cost/prisma-usage-store.js';
 import { validateUserInput } from '@/security/input-sanitizer.js';
 import {
   buildPrompt,
@@ -54,6 +56,8 @@ export interface ChatSetupResult {
   conversationHistory: Message[];
   /** The resolved LLM provider instance. */
   provider: LLMProvider;
+  /** Fallback LLM provider for failover (optional). */
+  fallbackProvider?: LLMProvider;
   /** Per-request memory manager. */
   memoryManager: MemoryManager;
   /** Per-request cost guard. */
@@ -75,7 +79,7 @@ export interface ChatSetupError {
 /** Subset of RouteDependencies required by prepareChatRun. */
 type ChatSetupDeps = Pick<
   RouteDependencies,
-  'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'longTermMemoryStore' | 'logger'
+  'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'longTermMemoryStore' | 'prisma' | 'logger'
 >;
 
 // ─── Setup Function ─────────────────────────────────────────────
@@ -151,13 +155,36 @@ export async function prepareChatRun(
     content: m.content,
   }));
 
-  // 6. Resolve LLM provider
+  // 6. Resolve LLM providers (primary + optional fallback)
   const provider = createProvider(agentConfig.provider);
+  const fallbackProvider = agentConfig.fallbackProvider
+    ? createProvider(agentConfig.fallbackProvider)
+    : undefined;
 
   // 7. Create per-request services (with optional long-term memory)
   const longTermStore = agentConfig.memoryConfig.longTerm.enabled
     ? deps.longTermMemoryStore ?? undefined
     : undefined;
+
+  // Compaction summarizer — uses the LLM to summarize pruned conversations
+  const compactionSummarizer: CompactionSummarizer = async (messages) => {
+    const summaryMessages: Message[] = [
+      ...messages,
+      {
+        role: 'user' as const,
+        content: 'Summarize this conversation concisely. Preserve key facts, decisions, action items, and context needed for continuity. Return only the summary.',
+      },
+    ];
+    let text = '';
+    for await (const event of provider.chat({
+      messages: summaryMessages,
+      maxTokens: 2000,
+      temperature: 0.3,
+    })) {
+      if (event.type === 'content_delta') text += event.text;
+    }
+    return text;
+  };
 
   const memoryManager = createMemoryManager({
     memoryConfig: agentConfig.memoryConfig,
@@ -173,12 +200,13 @@ export async function prepareChatRun(
       }
       return Promise.resolve(total);
     },
+    compactionSummarizer,
     longTermStore,
   });
 
   const costGuard = createCostGuard({
     costConfig: agentConfig.costConfig,
-    usageStore: createInMemoryUsageStore(),
+    usageStore: createPrismaUsageStore(deps.prisma),
   });
 
   // 8. Connect MCP servers and register their tools (if configured)
@@ -254,6 +282,7 @@ export async function prepareChatRun(
     promptSnapshot,
     conversationHistory,
     provider,
+    fallbackProvider,
     memoryManager,
     costGuard,
   });

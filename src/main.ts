@@ -18,12 +18,16 @@ import {
   createAgentRepository,
 } from '@/infrastructure/repositories/index.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
+import { createPrismaApprovalStore } from '@/security/prisma-approval-store.js';
 import { createToolRegistry } from '@/tools/registry/tool-registry.js';
 import {
   createCalculatorTool,
   createDateTimeTool,
   createJsonTransformTool,
   createKnowledgeSearchTool,
+  createHttpRequestTool,
+  createSendNotificationTool,
+  createProposeScheduledTaskTool,
 } from '@/tools/definitions/index.js';
 import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
 import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
@@ -32,7 +36,13 @@ import { createTaskManager } from '@/scheduling/task-manager.js';
 import { createTaskRunner } from '@/scheduling/task-runner.js';
 import { createTaskExecutor } from '@/scheduling/task-executor.js';
 import { createMCPManager } from '@/mcp/mcp-manager.js';
+import { Queue } from 'bullmq';
 import { createChannelRouter } from '@/channels/channel-router.js';
+import { createProactiveMessenger, PROACTIVE_MESSAGE_QUEUE } from '@/channels/proactive.js';
+import type { ProactiveMessenger } from '@/channels/proactive.js';
+import { createTelegramAdapter } from '@/channels/adapters/telegram.js';
+import { createWhatsAppAdapter } from '@/channels/adapters/whatsapp.js';
+import { createSlackAdapter } from '@/channels/adapters/slack.js';
 import { createInboundProcessor } from '@/channels/inbound-processor.js';
 import { createWebhookProcessor } from '@/webhooks/webhook-processor.js';
 import { createFileService } from '@/files/file-service.js';
@@ -42,6 +52,11 @@ import { createAgentComms } from '@/agents/agent-comms.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import type { RouteDependencies } from '@/api/types.js';
+import { createAgentRunner } from '@/core/agent-runner.js';
+import {
+  prepareChatRun,
+  extractAssistantResponse,
+} from '@/api/routes/chat-setup.js';
 import type { ProjectId } from '@/core/types.js';
 
 const logger = createLogger();
@@ -79,12 +94,15 @@ async function start(): Promise<void> {
     const agentRepository = createAgentRepository(prisma);
 
     // Create shared services
-    const approvalGate = createApprovalGate();
+    const approvalGate = createApprovalGate({ store: createPrismaApprovalStore(prisma) });
     const toolRegistry = createToolRegistry();
     toolRegistry.register(createCalculatorTool());
     toolRegistry.register(createDateTimeTool());
     toolRegistry.register(createJsonTransformTool());
+    toolRegistry.register(createHttpRequestTool());
+    toolRegistry.register(createSendNotificationTool());
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
+    toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));
     const mcpManager = createMCPManager();
 
     // Long-term memory (pgvector embeddings) — enabled when OPENAI_API_KEY is set
@@ -101,17 +119,133 @@ async function start(): Promise<void> {
     // Channel system
     const channelRouter = createChannelRouter({ logger });
 
-    // Placeholder runAgent — full agent loop integration is wired via the chat route
-    const runAgent = (params: {
+    // Register channel adapters (conditional on env vars)
+    if (process.env['TELEGRAM_BOT_TOKEN']) {
+      channelRouter.registerAdapter(createTelegramAdapter({
+        botTokenEnvVar: 'TELEGRAM_BOT_TOKEN',
+      }));
+      logger.info('Telegram adapter registered', { component: 'main' });
+    }
+
+    if (process.env['WHATSAPP_ACCESS_TOKEN']) {
+      channelRouter.registerAdapter(createWhatsAppAdapter({
+        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
+        phoneNumberId: process.env['WHATSAPP_PHONE_NUMBER_ID'] ?? '',
+      }));
+      logger.info('WhatsApp adapter registered', { component: 'main' });
+    }
+
+    if (process.env['SLACK_BOT_TOKEN']) {
+      channelRouter.registerAdapter(createSlackAdapter({
+        botTokenEnvVar: 'SLACK_BOT_TOKEN',
+        signingSecretEnvVar: 'SLACK_SIGNING_SECRET',
+      }));
+      logger.info('Slack adapter registered', { component: 'main' });
+    }
+
+    // Shared deps for prepareChatRun (same subset used by chat routes and task-executor)
+    const chatSetupDeps = {
+      projectRepository,
+      sessionRepository,
+      promptLayerRepository,
+      toolRegistry,
+      mcpManager,
+      longTermMemoryStore,
+      prisma,
+      logger,
+    };
+
+    // Real runAgent — runs the full agent loop for inbound channels and webhooks
+    const runAgent = async (params: {
       projectId: ProjectId;
       sessionId: string;
       userMessage: string;
     }): Promise<{ response: string }> => {
-      void params;
-      logger.warn('runAgent placeholder called — wire full agent loop for production', {
-        component: 'main',
+      const setupResult = await prepareChatRun(
+        { projectId: params.projectId, sessionId: params.sessionId, message: params.userMessage },
+        chatSetupDeps,
+      );
+
+      if (!setupResult.ok) {
+        logger.error('runAgent setup failed', {
+          component: 'main',
+          projectId: params.projectId,
+          sessionId: params.sessionId,
+          error: setupResult.error.message,
+          code: setupResult.error.code,
+        });
+        return { response: `Setup error: ${setupResult.error.message}` };
+      }
+
+      const setup = setupResult.value;
+
+      const agentRunner = createAgentRunner({
+        provider: setup.provider,
+        fallbackProvider: setup.fallbackProvider,
+        toolRegistry,
+        memoryManager: setup.memoryManager,
+        costGuard: setup.costGuard,
+        logger,
       });
-      return Promise.resolve({ response: 'Agent loop not yet wired for inbound processing.' });
+
+      const abortController = new AbortController();
+      const timeoutMs = 60_000;
+      const timeoutId = setTimeout(() => { abortController.abort(); }, timeoutMs);
+
+      try {
+        const result = await agentRunner.run({
+          message: setup.sanitizedMessage,
+          agentConfig: setup.agentConfig,
+          sessionId: setup.sessionId,
+          systemPrompt: setup.systemPrompt,
+          promptSnapshot: setup.promptSnapshot,
+          conversationHistory: setup.conversationHistory,
+          abortSignal: abortController.signal,
+        });
+
+        if (!result.ok) {
+          logger.error('runAgent execution failed', {
+            component: 'main',
+            projectId: params.projectId,
+            sessionId: params.sessionId,
+            error: result.error.message,
+            code: result.error.code,
+          });
+          return { response: `Agent error: ${result.error.message}` };
+        }
+
+        const trace = result.value;
+
+        // Persist execution trace
+        await executionTraceRepository.save(trace);
+
+        // Persist messages to session
+        await sessionRepository.addMessage(
+          setup.sessionId,
+          { role: 'user', content: setup.sanitizedMessage },
+          trace.id,
+        );
+
+        const assistantText = extractAssistantResponse(trace.events);
+
+        await sessionRepository.addMessage(
+          setup.sessionId,
+          { role: 'assistant', content: assistantText },
+          trace.id,
+        );
+
+        logger.info('runAgent completed', {
+          component: 'main',
+          projectId: params.projectId,
+          sessionId: params.sessionId,
+          traceId: trace.id,
+          tokensUsed: trace.totalTokensUsed,
+        });
+
+        return { response: assistantText };
+      } finally {
+        clearTimeout(timeoutId);
+      }
     };
 
     const defaultProjectId = (process.env['DEFAULT_PROJECT_ID'] ?? 'default') as ProjectId;
@@ -158,6 +292,48 @@ async function start(): Promise<void> {
     // Register global error handler
     registerErrorHandler(server);
 
+    // Conditionally start Redis-dependent services (task runner + proactive messaging)
+    let taskRunner: ReturnType<typeof createTaskRunner> | null = null;
+    let proactiveMessenger: ProactiveMessenger | null = null;
+    const redisUrl = process.env['REDIS_URL'];
+    if (redisUrl) {
+      const parsedRedis = new URL(redisUrl);
+      const redisConnection = {
+        host: parsedRedis.hostname,
+        port: parsedRedis.port ? Number(parsedRedis.port) : 6379,
+        password: parsedRedis.password || undefined,
+      };
+
+      const onExecuteTask = createTaskExecutor({
+        projectRepository,
+        sessionRepository,
+        promptLayerRepository,
+        executionTraceRepository,
+        toolRegistry,
+        mcpManager,
+        prisma,
+        logger,
+      });
+
+      taskRunner = createTaskRunner({
+        repository: scheduledTaskRepository,
+        logger,
+        redisUrl,
+        onExecuteTask,
+      });
+      await taskRunner.start();
+      logger.info('Task runner started (Redis connected)', { component: 'main' });
+
+      // Proactive messaging (scheduled outbound messages via BullMQ)
+      const proactiveQueue = new Queue(PROACTIVE_MESSAGE_QUEUE, { connection: redisConnection });
+      proactiveMessenger = createProactiveMessenger({
+        channelRouter,
+        queue: proactiveQueue,
+        logger,
+      });
+      logger.info('Proactive messenger enabled (Redis connected)', { component: 'main' });
+    }
+
     // Assemble route dependencies
     const deps: RouteDependencies = {
       projectRepository,
@@ -179,7 +355,9 @@ async function start(): Promise<void> {
       fileService,
       agentRegistry,
       agentComms,
+      proactiveMessenger,
       longTermMemoryStore,
+      prisma,
       logger,
     };
 
@@ -190,29 +368,6 @@ async function start(): Promise<void> {
       },
       { prefix: '/api/v1' },
     );
-
-    // Conditionally start task runner if Redis is configured
-    let taskRunner: ReturnType<typeof createTaskRunner> | null = null;
-    const redisUrl = process.env['REDIS_URL'];
-    if (redisUrl) {
-      const onExecuteTask = createTaskExecutor({
-        projectRepository,
-        sessionRepository,
-        promptLayerRepository,
-        toolRegistry,
-        mcpManager,
-        logger,
-      });
-
-      taskRunner = createTaskRunner({
-        repository: scheduledTaskRepository,
-        logger,
-        redisUrl,
-        onExecuteTask,
-      });
-      await taskRunner.start();
-      logger.info('Task runner started (Redis connected)', { component: 'main' });
-    }
 
     // Graceful shutdown
     const shutdown = async (): Promise<void> => {

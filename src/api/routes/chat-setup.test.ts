@@ -39,7 +39,10 @@ vi.mock('@/cost/cost-guard.js', () => ({
     precheck: vi.fn(),
     recordUsage: vi.fn(),
   }),
-  createInMemoryUsageStore: vi.fn().mockReturnValue({}),
+}));
+
+vi.mock('@/cost/prisma-usage-store.js', () => ({
+  createPrismaUsageStore: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock('@/security/input-sanitizer.js', () => ({
