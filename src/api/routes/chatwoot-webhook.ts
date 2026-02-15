@@ -13,18 +13,22 @@
  * - If customer message contains escalation keywords, escalate immediately
  */
 import crypto from 'node:crypto';
+import { nanoid } from 'nanoid';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from '../types.js';
 import type { ChannelResolver } from '@/channels/channel-resolver.js';
 import type { HandoffManager } from '@/channels/handoff.js';
 import type { ChatwootWebhookEvent } from '@/channels/adapters/chatwoot.js';
 import type { ProjectId } from '@/core/types.js';
+import type { WebhookQueue } from '@/channels/webhook-queue.js';
 
 // ─── Extended Dependencies ──────────────────────────────────────
 
 export interface ChatwootWebhookDeps extends RouteDependencies {
   channelResolver: ChannelResolver;
   handoffManager: HandoffManager;
+  /** Optional webhook queue for async processing. If not provided, webhooks are processed inline. */
+  webhookQueue?: WebhookQueue;
   runAgent: (params: {
     projectId: ProjectId;
     sessionId: string;
@@ -38,7 +42,7 @@ export function chatwootWebhookRoutes(
   fastify: FastifyInstance,
   deps: ChatwootWebhookDeps,
 ): void {
-  const { channelResolver, handoffManager, inboundProcessor, logger } = deps;
+  const { channelResolver, handoffManager, webhookQueue, logger } = deps;
 
   /**
    * POST /webhooks/chatwoot — receives Agent Bot webhook events from Chatwoot.
@@ -117,7 +121,31 @@ export function chatwootWebhookRoutes(
       return reply.status(200).send({ ok: true, ignored: true });
     }
 
-    // Resolve the Chatwoot adapter for this project
+    // ─── Process via Queue (if available) or Inline ──────────────────
+
+    if (webhookQueue) {
+      // Async processing: enqueue job and respond 200 OK immediately
+      const webhookId = nanoid();
+
+      await webhookQueue.enqueue({
+        webhookId,
+        projectId,
+        event,
+        receivedAt: new Date().toISOString(),
+        conversationId,
+      });
+
+      logger.debug('Webhook enqueued for async processing', {
+        component: 'chatwoot-webhook',
+        webhookId,
+        projectId,
+        conversationId,
+      });
+
+      return reply.status(200).send({ ok: true, webhookId, queued: true });
+    }
+
+    // Fallback: Inline processing (legacy behavior, no queue configured)
     const adapter = await channelResolver.resolveAdapter(projectId);
     if (!adapter) {
       logger.error('No Chatwoot adapter for project', {

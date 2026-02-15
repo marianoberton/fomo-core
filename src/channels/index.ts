@@ -30,6 +30,11 @@ export type {
   ProactiveMessageJobData,
 } from './proactive.js';
 
+// Webhook Queue
+export { createWebhookQueue } from './webhook-queue.js';
+export type { WebhookQueue, WebhookQueueOptions } from './webhook-queue.js';
+export type { WebhookJobData, WebhookJobResult } from './webhook-queue-types.js';
+
 // Adapters
 export {
   createTelegramAdapter,

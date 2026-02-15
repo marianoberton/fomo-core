@@ -55,6 +55,8 @@ import { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from '@/channels/handoff
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import { chatwootWebhookRoutes } from '@/api/routes/chatwoot-webhook.js';
+import { createWebhookQueue } from '@/channels/webhook-queue.js';
+import type { WebhookQueue } from '@/channels/webhook-queue.js';
 import { onboardingRoutes } from '@/api/routes/onboarding.js';
 import type { RouteDependencies } from '@/api/types.js';
 import { createAgentRunner } from '@/core/agent-runner.js';
@@ -309,9 +311,10 @@ async function start(): Promise<void> {
     // Register global error handler
     registerErrorHandler(server);
 
-    // Conditionally start Redis-dependent services (task runner + proactive messaging)
+    // Conditionally start Redis-dependent services (task runner + proactive messaging + webhook queue)
     let taskRunner: ReturnType<typeof createTaskRunner> | null = null;
     let proactiveMessenger: ProactiveMessenger | null = null;
+    let webhookQueue: WebhookQueue | null = null;
     const redisUrl = process.env['REDIS_URL'];
     if (redisUrl) {
       const parsedRedis = new URL(redisUrl);
@@ -349,6 +352,18 @@ async function start(): Promise<void> {
         logger,
       });
       logger.info('Proactive messenger enabled (Redis connected)', { component: 'main' });
+
+      // Webhook queue (async webhook processing with retry)
+      webhookQueue = createWebhookQueue({
+        logger,
+        redisUrl,
+        resolveAdapter: async (projectId) => await channelResolver.resolveAdapter(projectId),
+        inboundProcessor,
+        handoffManager,
+        runAgent,
+      });
+      await webhookQueue.start();
+      logger.info('Webhook queue started (Redis connected)', { component: 'main' });
     }
 
     // Assemble route dependencies
@@ -388,6 +403,7 @@ async function start(): Promise<void> {
           ...deps,
           channelResolver,
           handoffManager,
+          webhookQueue: webhookQueue ?? undefined, // Pass queue if Redis is available
           runAgent,
         });
 
@@ -406,6 +422,9 @@ async function start(): Promise<void> {
       await mcpManager.disconnectAll();
       if (taskRunner) {
         await taskRunner.stop();
+      }
+      if (webhookQueue) {
+        await webhookQueue.stop();
       }
       await server.close();
       await db.disconnect();

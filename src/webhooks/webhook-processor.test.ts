@@ -52,6 +52,7 @@ function createMockSessionRepository(): SessionRepository {
       updatedAt: new Date(),
     }),
     findById: vi.fn(),
+    findByContactId: vi.fn(),
     updateStatus: vi.fn(),
     listByProject: vi.fn(),
     addMessage: vi.fn(),
