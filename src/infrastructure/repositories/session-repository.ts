@@ -39,6 +39,7 @@ export interface StoredMessage {
 export interface SessionRepository {
   create(input: SessionCreateInput): Promise<Session>;
   findById(id: SessionId): Promise<Session | null>;
+  findByContactId(projectId: ProjectId, contactId: string): Promise<Session | null>;
   updateStatus(id: SessionId, status: string): Promise<boolean>;
   listByProject(projectId: ProjectId, status?: string): Promise<Session[]>;
   addMessage(sessionId: SessionId, message: { role: string; content: string; toolCalls?: unknown; usage?: unknown }, traceId?: string): Promise<StoredMessage>;
@@ -86,6 +87,22 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
 
     async findById(id: SessionId): Promise<Session | null> {
       const record = await prisma.session.findUnique({ where: { id } });
+      if (!record) return null;
+      return toSessionModel(record);
+    },
+
+    async findByContactId(projectId: ProjectId, contactId: string): Promise<Session | null> {
+      const record = await prisma.session.findFirst({
+        where: {
+          projectId,
+          status: 'active',
+          metadata: {
+            path: ['contactId'],
+            equals: contactId,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
       if (!record) return null;
       return toSessionModel(record);
     },

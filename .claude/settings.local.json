@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest run:*)",
+      "Bash(pnpm test:unit)",
+      "Bash(pnpm test:e2e)",
+      "Bash(git -C \"c:\\\\Users\\\\Mariano\\\\Documents\\\\fomo-core\" diff --stat)",
+      "Bash(git -C \"c:\\\\Users\\\\Mariano\\\\Documents\\\\fomo-core\" log --oneline -5)"
+    ]
+  }
+}

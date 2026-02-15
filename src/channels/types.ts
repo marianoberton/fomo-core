@@ -2,7 +2,7 @@ import type { ProjectId } from '@/core/types.js';
 
 // ─── Channel Types ──────────────────────────────────────────────
 
-export type ChannelType = 'whatsapp' | 'telegram' | 'slack' | 'email';
+export type ChannelType = 'whatsapp' | 'telegram' | 'slack' | 'email' | 'chatwoot';
 
 // ─── Inbound Message ────────────────────────────────────────────
 
@@ -78,4 +78,53 @@ export interface ChannelConfig {
   /** WhatsApp specific */
   phoneNumberId?: string;
   apiVersion?: string;
+}
+
+// ─── Channel Integration ───────────────────────────────────────
+
+export type ChannelIntegrationId = string;
+export type IntegrationProvider = 'chatwoot';
+
+/** Chatwoot-specific integration config stored in the JSON column. */
+export interface ChatwootIntegrationConfig {
+  baseUrl: string;
+  accountId: number;
+  inboxId: number;
+  agentBotId: number;
+  /** Env var name for the Chatwoot API token (NOT the token itself). */
+  apiTokenEnvVar: string;
+}
+
+/** Channel integration record — maps a project to an external channel provider. */
+export interface ChannelIntegration {
+  id: ChannelIntegrationId;
+  projectId: ProjectId;
+  provider: IntegrationProvider;
+  config: ChatwootIntegrationConfig;
+  status: 'active' | 'paused';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateChannelIntegrationInput {
+  projectId: ProjectId;
+  provider: IntegrationProvider;
+  config: ChatwootIntegrationConfig;
+  status?: 'active' | 'paused';
+}
+
+export interface UpdateChannelIntegrationInput {
+  config?: ChatwootIntegrationConfig;
+  status?: 'active' | 'paused';
+}
+
+/** Repository for channel integrations. */
+export interface ChannelIntegrationRepository {
+  create(input: CreateChannelIntegrationInput): Promise<ChannelIntegration>;
+  findById(id: ChannelIntegrationId): Promise<ChannelIntegration | null>;
+  findByProject(projectId: ProjectId): Promise<ChannelIntegration | null>;
+  findByProviderAccount(provider: IntegrationProvider, accountId: number): Promise<ChannelIntegration | null>;
+  update(id: ChannelIntegrationId, input: UpdateChannelIntegrationInput): Promise<ChannelIntegration>;
+  delete(id: ChannelIntegrationId): Promise<void>;
+  listActive(): Promise<ChannelIntegration[]>;
 }
