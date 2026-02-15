@@ -1,0 +1,106 @@
+sku,name,description,category,price,stock,unit
+TOR-001,Tornillo Phillips #8 x 1 pulgada,Tornillo cabeza phillips acero zincado 1 pulgada,tornillería,0.15,5000,unidad
+TOR-002,Tornillo Phillips #10 x 2 pulgadas,Tornillo cabeza phillips acero zincado 2 pulgadas,tornillería,0.25,3500,unidad
+TOR-003,Tornillo Hexagonal 1/4 x 1.5 pulgadas,Tornillo cabeza hexagonal acero galvanizado,tornillería,0.35,2800,unidad
+TOR-004,Tornillo Autoperforante #8 x 3/4 pulgada,Tornillo autoperforante punta broca para metal,tornillería,0.18,4200,unidad
+TOR-005,Tornillo Madera 3 pulgadas x 8,Tornillo para madera cabeza plana zincado,tornillería,0.22,3100,unidad
+TOR-006,Arandela Plana 1/4 pulgada,Arandela plana acero zincado diámetro 1/4 pulgada,tornillería,0.05,8000,unidad
+TOR-007,Arandela Presión 1/4 pulgada,Arandela de presión grower acero zincado,tornillería,0.07,6500,unidad
+TOR-008,Tuerca Hexagonal 1/4 pulgada,Tuerca hexagonal acero zincado rosca métrica,tornillería,0.10,7200,unidad
+TOR-009,Clavo 2 pulgadas Común,Clavo de acero común para carpintería 2 pulgadas,tornillería,0.08,15000,unidad
+TOR-010,Clavo 3 pulgadas Común,Clavo de acero común para carpintería 3 pulgadas,tornillería,0.12,12000,unidad
+TOR-011,Remache Pop 1/8 pulgadas x 1/4 pulgada,Remache aluminio cabeza ancha para metal,tornillería,0.20,3500,unidad
+TOR-012,Tirafondo 1/4 pulgada x 3 pulgadas,Tirafondo hexagonal acero zincado para madera,tornillería,0.45,2100,unidad
+HER-001,Martillo Carpintero 16oz,Martillo cabeza de acero mango fibra de vidrio,herramientas,18.50,45,unidad
+HER-002,Destornillador Phillips #2,Destornillador phillips punta magnética mango ergonómico,herramientas,5.80,120,unidad
+HER-003,Destornillador Plano 1/4 pulgada,Destornillador plano acero cromado mango aislado,herramientas,4.90,95,unidad
+HER-004,Pinza Universal 8 pulgadas,Pinza universal corte lateral mango aislado,herramientas,12.50,68,unidad
+HER-005,Alicate Corte Diagonal 6 pulgadas,Alicate corte diagonal acero al carbono,herramientas,9.75,54,unidad
+HER-006,Llave Francesa 12 pulgadas,Llave ajustable francesa apertura máxima 12 pulgadas,herramientas,16.80,38,unidad
+HER-007,Llave Allen Juego 9pz,Juego llaves allen hexagonales métricas,herramientas,8.20,72,set
+HER-008,Sierra Manual Arco Metal,Sierra manual para metal con marco ajustable,herramientas,14.50,42,unidad
+HER-009,Hoja Sierra Metal 12 pulgadas 24TPI,Hoja repuesto sierra metal bimetal 24 dientes,herramientas,2.10,280,unidad
+HER-010,Nivel Aluminio 24",Nivel de burbuja aluminio 3 burbujas 24 pulgadas,herramientas,21.50,35,unidad
+HER-011,Flexómetro 5m,Cinta métrica 5 metros freno automático,herramientas,6.90,150,unidad
+HER-012,Flexómetro 8m,Cinta métrica 8 metros freno automático carcasa reforzada,herramientas,11.20,88,unidad
+HER-013,Escuadra Carpintero 12 pulgadas,Escuadra combinada acero inoxidable con nivel,herramientas,13.40,52,unidad
+HER-014,Cortafrío 3/4 pulgada,Cortafrío acero templado para metal y mampostería,herramientas,7.60,64,unidad
+HER-015,Cincel Madera 1/2 pulgadas,Cincel plano para madera acero cromado,herramientas,5.50,76,unidad
+HER-016,Serrucho Carpintero 20",Serrucho universal para madera mango ergonómico,herramientas,15.80,44,unidad
+HER-017,Taladro Manual Pecho,Taladro manual de pecho para perforaciones pequeñas,herramientas,28.50,18,unidad
+HER-018,Brocas Metal HSS Set 13pz,Juego brocas helicoidales acero rápido 1-13mm,herramientas,16.90,48,set
+HER-019,Brocas Mampostería 6mm,Broca widia para concreto y mampostería 6mm,herramientas,3.20,165,unidad
+HER-020,Brocas Mampostería 8mm,Broca widia para concreto y mampostería 8mm,herramientas,4.10,142,unidad
+HER-021,Pistola Calor 1500W,Pistola de calor 1500W regulable temperatura,herramientas,35.00,22,unidad
+HER-022,Remachadora Manual,Remachadora manual para remaches pop hasta 1/4,herramientas,18.75,36,unidad
+HER-023,Arco Sierra Regulable,Arco sierra regulable hasta 12 pulgadas,herramientas,9.50,58,unidad
+PIN-001,Pintura Látex Blanco 1L,Pintura látex interior blanco mate lavable 1 litro,pinturas,8.50,180,litro
+PIN-002,Pintura Látex Blanco 4L,Pintura látex interior blanco mate lavable 4 litros,pinturas,28.00,95,litro
+PIN-003,Pintura Látex Blanco 20L,Pintura látex interior blanco mate lavable 20 litros,pinturas,125.00,42,litro
+PIN-004,Esmalte Sintético Blanco 1L,Esmalte sintético brillante interior/exterior 1 litro,pinturas,12.50,160,litro
+PIN-005,Esmalte Sintético Negro 1L,Esmalte sintético brillante negro 1 litro,pinturas,12.50,145,litro
+PIN-006,Esmalte Sintético Rojo 1L,Esmalte sintético brillante rojo 1 litro,pinturas,13.20,88,litro
+PIN-007,Convertidor Óxido 500ml,Convertidor de óxido neutralizador para metales,pinturas,9.80,76,litro
+PIN-008,Antióxido Sintético 1L,Antióxido sintético base solvente color naranja,pinturas,10.50,112,litro
+PIN-009,Fondo Universal Blanco 1L,Fondo sellador universal para interiores blanco,pinturas,7.80,98,litro
+PIN-010,Barniz Marino 1L,Barniz marino protector UV alto brillo 1 litro,pinturas,18.50,64,litro
+PIN-011,Barniz Sintético 1L,Barniz sintético para madera transparente brillante,pinturas,11.20,85,litro
+PIN-012,Enduido Exterior 25kg,Enduido plástico exterior impermeable blanco 25kg,pinturas,32.00,55,bolsa
+PIN-013,Enduido Interior 10kg,Enduido interior fino para alisar paredes 10kg,pinturas,15.50,88,bolsa
+PIN-014,Aguarrás Mineral 1L,Aguarrás mineral solvente para dilución,pinturas,4.20,220,litro
+PIN-015,Diluyente Sintético 1L,Diluyente sintético para esmaltes y antióxidos,pinturas,4.50,195,litro
+PIN-016,Removedor Pintura 1L,Removedor de pintura decapante gel,pinturas,14.80,42,litro
+PIN-017,Brocha 1 pulgada Cerda Natural,Brocha cerda natural virola aluminio 1 pulgada,pinturas,3.20,185,unidad
+PIN-018,Brocha 2 pulgadas Cerda Natural,Brocha cerda natural virola aluminio 2 pulgadas,pinturas,4.80,156,unidad
+PIN-019,Brocha 3 pulgadas Cerda Natural,Brocha cerda natural virola aluminio 3 pulgadas,pinturas,6.50,124,unidad
+PIN-020,Rodillo Esponja 18 cm,Rodillo espuma densidad media con mango 18 cm,pinturas,5.40,168,unidad
+PIN-021,Rodillo Lana 23 cm,Rodillo lana sintética alta absorción 23 cm con mango,pinturas,7.80,142,unidad
+PIN-022,Bandeja Pintura 9 pulgadas,Bandeja plástica para rodillo de 9 pulgadas,pinturas,2.80,215,unidad
+PLO-001,Canilla Lavatorio Cromada,Canilla monocomando lavatorio cromada cerámica,plomería,45.00,28,unidad
+PLO-002,Canilla Cocina Móvil,Canilla monocomando cocina pico móvil cromada,plomería,58.00,24,unidad
+PLO-003,Duchador Telefonico,Duchador telefónico 5 posiciones cromado,plomería,18.50,46,unidad
+PLO-004,Flexible Duchador 1.5m,Flexible para duchador acero inoxidable 1.5 metros,plomería,8.20,85,unidad
+PLO-005,Inodoro Corto Blanco,Inodoro corto deposito externo blanco incluye asiento,plomería,125.00,16,unidad
+PLO-006,Asiento Inodoro Universal,Asiento inodoro plástico blanco universal,plomería,18.50,42,unidad
+PLO-007,Mochila 9 Litros,Mochila depósito inodoro 9 litros doble descarga,plomería,38.00,32,unidad
+PLO-008,Pileta Bacha Redonda,Pileta bacha redonda loza blanca sobre mesada,plomería,42.00,22,unidad
+PLO-009,Sifón Botella Cromado,Sifón tipo botella universal cromado 1-1/4 pulgada,plomería,12.50,68,unidad
+PLO-010,Caño PVC 110mm x 3m,Caño PVC desagüe cloacal 110mm x 3 metros,plomería,15.80,95,caño
+PLO-011,Caño PVC 63mm x 3m,Caño PVC desagüe pluvial 63mm x 3 metros,plomería,9.50,128,caño
+PLO-012,Caño PVC 40mm x 3m,Caño PVC desagüe secundario 40mm x 3 metros,plomería,6.20,165,caño
+PLO-013,Codo PVC 110mm 90°,Codo PVC desagüe 110mm ángulo 90 grados,plomería,3.80,245,unidad
+PLO-014,Codo PVC 63mm 90°,Codo PVC desagüe 63mm ángulo 90 grados,plomería,2.20,312,unidad
+PLO-015,Codo PVC 40mm 90°,Codo PVC desagüe 40mm ángulo 90 grados,plomería,1.50,425,unidad
+PLO-016,Adhesivo PVC 250ml,Adhesivo para PVC cloacal y pluvial 250ml,plomería,8.50,88,unidad
+PLO-017,Cinta Teflón 12mm x 10m,Cinta teflón para roscas 12mm ancho x 10 metros,plomería,1.20,520,unidad
+PLO-018,Cinta Teflón Gas 12mm,Cinta teflón amarilla especial gas 12mm,plomería,2.80,185,unidad
+PLO-019,Llave Paso 1/2 pulgadas Esférica,Llave de paso esférica bronce 1/2 pulgada,plomería,14.50,52,unidad
+PLO-020,Llave Paso 3/4 pulgada Esférica,Llave de paso esférica bronce 3/4 pulgada,plomería,18.20,38,unidad
+PLO-021,Junta Tanque Inodoro,Junta goma para conexión tanque inodoro universal,plomería,3.50,142,unidad
+PLO-022,Válvula Esclusa Lavatorio,Válvula de esclusa universal para lavatorio cromada,plomería,6.80,94,unidad
+PLO-023,Destapador Manual,Destapador manual con ventosa para inodoro y pileta,plomería,4.50,118,unidad
+PLO-024,Espiral Destapador 5m,Espiral acero flexible para destapar cañerías 5m,plomería,22.00,28,unidad
+ELE-001,Cable Unipolar 1.5mm Rojo,Cable unipolar 1.5mm2 rojo para instalaciones,electricidad,1.20,1800,metro
+ELE-002,Cable Unipolar 2.5mm Azul,Cable unipolar 2.5mm2 azul para instalaciones,electricidad,1.85,1450,metro
+ELE-003,Cable Unipolar 4mm Negro,Cable unipolar 4mm2 negro para instalaciones,electricidad,2.90,980,metro
+ELE-004,Cable Taller 2x1.5mm,Cable taller portátil 2x1.5mm negro para electrodomésticos,electricidad,2.40,820,metro
+ELE-005,Cable Taller 3x2.5mm,Cable taller portátil 3x2.5mm con tierra,electricidad,4.20,520,metro
+ELE-006,Llave Térmica 1P 10A,Llave termomagnética unipolar 10 amperes,electricidad,12.50,65,unidad
+ELE-007,Llave Térmica 1P 16A,Llave termomagnética unipolar 16 amperes,electricidad,14.20,58,unidad
+ELE-008,Llave Térmica 2P 25A,Llave termomagnética bipolar 25 amperes,electricidad,22.50,42,unidad
+ELE-009,Disyuntor 2P 25A,Disyuntor diferencial bipolar 25A sensibilidad 30mA,electricidad,38.00,32,unidad
+ELE-010,Disyuntor 4P 40A,Disyuntor diferencial tetrapolar 40A sensibilidad 30mA,electricidad,85.00,18,unidad
+ELE-011,Toma Corriente 10A Blanco,Tomacorriente 10A con toma a tierra blanco,electricidad,3.80,245,unidad
+ELE-012,Interruptor Simple Blanco,Interruptor simple 10A blanco,electricidad,2.50,328,unidad
+ELE-013,Interruptor Doble Blanco,Interruptor doble 10A blanco,electricidad,4.20,195,unidad
+ELE-014,Caja Embutir Cuadrada,Caja de embutir cuadrada plástico para llave,electricidad,1.80,412,unidad
+ELE-015,Caja Embutir Rectangular,Caja de embutir rectangular para toma,electricidad,1.60,485,unidad
+ELE-016,Tablero Embutir 12 Módulos,Tablero embutir chapa 12 módulos con puerta,electricidad,32.00,28,unidad
+ELE-017,Tablero Embutir 24 Módulos,Tablero embutir chapa 24 módulos con puerta,electricidad,52.00,22,unidad
+ELE-018,Bornera 10mm 12 Polos,Bornera riel din 10mm 12 polos plástico,electricidad,8.50,76,unidad
+ELE-019,Lámpara LED 9W E27,Lámpara LED 9W luz fría rosca E27,electricidad,4.20,185,unidad
+ELE-020,Lámpara LED 12W E27,Lámpara LED 12W luz fría rosca E27,electricidad,5.80,156,unidad
+ELE-021,Lámpara LED 18W E27,Lámpara LED 18W luz fría rosca E27,electricidad,8.50,124,unidad
+ELE-022,Tubo LED 18W 120cm,Tubo LED 18W luz fría 120cm con soportes,electricidad,12.50,88,unidad
+ELE-023,Reflector LED 50W,Reflector LED 50W luz fría exterior IP65,electricidad,28.00,42,unidad
+ELE-024,Cinta LED 5m RGB,Cinta LED RGB 5 metros con control remoto,electricidad,18.50,36,unidad

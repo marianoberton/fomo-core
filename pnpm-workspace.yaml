@@ -1,0 +1,9 @@
+packages:
+  - "dashboard"
+
+onlyBuiltDependencies:
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "prisma"
+  - "esbuild"
+  - "msgpackr-extract"

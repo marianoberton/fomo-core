@@ -20,6 +20,8 @@ import { agentRoutes } from './agents.js';
 import { dashboardRoutes } from './dashboard.js';
 import { usageRoutes } from './usage.js';
 import { wsDashboardRoutes } from './ws-dashboard.js';
+import { catalogRoutes } from './catalog.js';
+import { templateRoutes } from './templates.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -43,4 +45,6 @@ export async function registerRoutes(
   await fastify.register(dashboardRoutes, deps);
   await fastify.register(usageRoutes, deps);
   await fastify.register(wsDashboardRoutes, deps);
+  await fastify.register(catalogRoutes, deps);
+  await fastify.register(templateRoutes, deps);
 }
