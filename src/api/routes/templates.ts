@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { TemplateManager } from '@/templates/index.js';
 import type { RouteDependencies } from '../types.js';
+import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { createLogger } from '@/observability/logger.js';
 
 const logger = createLogger({ name: 'api:templates' });
@@ -13,7 +14,6 @@ const logger = createLogger({ name: 'api:templates' });
 // ─── Schemas ───────────────────────────────────────────────────
 
 const createFromTemplateSchema = z.object({
-  templateId: z.string().min(1, 'Template ID is required'),
   projectName: z.string().min(1).max(100, 'Project name must be 1-100 characters'),
   projectDescription: z.string().max(500).optional(),
   environment: z.enum(['production', 'staging', 'development']).default('development'),
@@ -40,32 +40,18 @@ export function templateRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const templateManager = new TemplateManager(fastify.prisma);
+  const templateManager = new TemplateManager(deps.prisma);
 
   /**
    * GET /templates
    * List all available vertical templates
    */
-  fastify.get('/templates', {
-    schema: {
-      description: 'List all available vertical templates',
-      tags: ['templates'],
-      response: {
-        200: z.object({
-          templates: z.array(z.object({
-            id: z.string(),
-            name: z.string(),
-            description: z.string(),
-          })),
-        }),
-      },
-    },
-  }, async (request, reply) => {
-    logger.info('Listing available templates');
+  fastify.get('/templates', async (_request, reply) => {
+    logger.debug('Listing available templates', { component: 'api:templates' });
 
     const templates = templateManager.listTemplates();
 
-    return reply.send({ templates });
+    return sendSuccess(reply, { templates });
   });
 
   /**
@@ -74,38 +60,21 @@ export function templateRoutes(
    */
   fastify.get<{
     Params: { templateId: string };
-  }>('/templates/:templateId', {
-    schema: {
-      description: 'Get a specific template details',
-      tags: ['templates'],
-      params: z.object({
-        templateId: z.string(),
-      }),
-      response: {
-        200: z.object({
-          id: z.string(),
-          name: z.string(),
-          description: z.string(),
-          allowedTools: z.array(z.string()),
-          agentRole: z.string().optional(),
-        }),
-        404: z.object({
-          error: z.string(),
-        }),
-      },
-    },
-  }, async (request, reply) => {
+  }>('/templates/:templateId', async (request, reply) => {
     const { templateId } = request.params;
 
-    logger.info({ templateId }, 'Getting template details');
+    logger.debug('Getting template details', {
+      component: 'api:templates',
+      templateId,
+    });
 
     const template = templateManager.getTemplate(templateId);
     
     if (!template) {
-      return reply.code(404).send({ error: 'Template not found' });
+      return sendNotFound(reply, 'Template', templateId);
     }
 
-    return reply.send({
+    return sendSuccess(reply, {
       id: template.id,
       name: template.name,
       description: template.description,
@@ -120,38 +89,16 @@ export function templateRoutes(
    */
   fastify.post<{
     Params: { templateId: string };
-    Body: z.infer<typeof createFromTemplateSchema>;
-  }>('/templates/:templateId/create-project', {
-    schema: {
-      description: 'Create a new project from a vertical template',
-      tags: ['templates'],
-      params: z.object({
-        templateId: z.string(),
-      }),
-      body: createFromTemplateSchema,
-      response: {
-        201: z.object({
-          projectId: z.string(),
-          message: z.string(),
-          sampleData: z.unknown().optional(),
-        }),
-        400: z.object({
-          error: z.string(),
-        }),
-        404: z.object({
-          error: z.string(),
-        }),
-      },
-    },
-  }, async (request, reply) => {
+  }>('/templates/:templateId/create-project', async (request, reply) => {
     const { templateId } = request.params;
     const body = createFromTemplateSchema.parse(request.body);
 
-    logger.info({
+    logger.info('Creating project from template', {
+      component: 'api:templates',
       templateId,
       projectName: body.projectName,
       owner: body.owner,
-    }, 'Creating project from template');
+    });
 
     try {
       const result = await templateManager.createProjectFromTemplate({
@@ -159,23 +106,28 @@ export function templateRoutes(
         ...body,
       });
 
-      logger.info({
+      logger.info('Project created successfully', {
+        component: 'api:templates',
         projectId: result.projectId,
         templateId,
-      }, 'Project created successfully');
+      });
 
-      return reply.code(201).send({
+      return sendSuccess(reply, {
         projectId: result.projectId,
         message: `Project created successfully from template ${templateId}`,
         sampleData: result.sampleData,
-      });
+      }, 201);
     } catch (error: any) {
       if (error.message?.includes('not found')) {
-        return reply.code(404).send({ error: error.message });
+        return sendNotFound(reply, 'Template', templateId);
       }
       
-      logger.error({ error, templateId }, 'Failed to create project from template');
-      return reply.code(400).send({ error: error.message || 'Failed to create project' });
+      logger.error('Failed to create project from template', {
+        component: 'api:templates',
+        error,
+        templateId,
+      });
+      return sendError(reply, 'PROJECT_CREATION_FAILED', error.message || 'Failed to create project', 400);
     }
   });
 
@@ -185,68 +137,53 @@ export function templateRoutes(
    */
   fastify.post<{
     Params: { projectId: string };
-    Body: z.infer<typeof updatePromptsFromTemplateSchema>;
-  }>('/projects/:projectId/update-prompts-from-template', {
-    schema: {
-      description: 'Update project prompts from a template (creates new versions)',
-      tags: ['templates', 'projects'],
-      params: z.object({
-        projectId: z.string(),
-      }),
-      body: updatePromptsFromTemplateSchema,
-      response: {
-        200: z.object({
-          message: z.string(),
-        }),
-        400: z.object({
-          error: z.string(),
-        }),
-        404: z.object({
-          error: z.string(),
-        }),
-      },
-    },
-  }, async (request, reply) => {
+  }>('/projects/:projectId/update-prompts-from-template', async (request, reply) => {
     const { projectId } = request.params;
     const body = updatePromptsFromTemplateSchema.parse(request.body);
 
-    logger.info({
+    logger.info('Updating project prompts from template', {
+      component: 'api:templates',
       projectId,
       templateId: body.templateId,
       updatedBy: body.updatedBy,
-    }, 'Updating project prompts from template');
+    });
 
     try {
       // Verify project exists
-      const project = await fastify.prisma.project.findUnique({
+      const project = await deps.prisma.project.findUnique({
         where: { id: projectId },
       });
 
       if (!project) {
-        return reply.code(404).send({ error: 'Project not found' });
+        return sendNotFound(reply, 'Project', projectId);
       }
 
       await templateManager.updateProjectPrompts({
-        projectId,
+        projectId: projectId as any,
         templateId: body.templateId,
         updatedBy: body.updatedBy,
       });
 
-      logger.info({
+      logger.info('Project prompts updated successfully', {
+        component: 'api:templates',
         projectId,
         templateId: body.templateId,
-      }, 'Project prompts updated successfully');
+      });
 
-      return reply.send({
+      return sendSuccess(reply, {
         message: `Project prompts updated from template ${body.templateId}`,
       });
     } catch (error: any) {
       if (error.message?.includes('not found')) {
-        return reply.code(404).send({ error: error.message });
+        return sendNotFound(reply, 'Template', body.templateId);
       }
       
-      logger.error({ error, projectId }, 'Failed to update prompts from template');
-      return reply.code(400).send({ error: error.message || 'Failed to update prompts' });
+      logger.error('Failed to update prompts from template', {
+        component: 'api:templates',
+        error,
+        projectId,
+      });
+      return sendError(reply, 'PROMPT_UPDATE_FAILED', error.message || 'Failed to update prompts', 400);
     }
   });
 }
