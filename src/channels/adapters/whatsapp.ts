@@ -49,6 +49,12 @@ interface WhatsAppWebhookPayload {
           timestamp: string;
           type: string;
           text?: { body: string };
+          image?: {
+            id: string;
+            mime_type?: string;
+            sha256?: string;
+            caption?: string;
+          };
           context?: {
             from: string;
             id: string;
@@ -137,21 +143,45 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
       const message = value.messages[0];
       const contact = value.contacts?.[0];
 
-      // Only handle text messages for now
-      if (message?.type !== 'text' || !message.text?.body) return Promise.resolve(null);
+      if (!message) return Promise.resolve(null);
 
-      return Promise.resolve({
-        id: `wa-${message.id}`,
-        channel: 'whatsapp' as const,
-        channelMessageId: message.id,
-        projectId: '' as ProjectId, // Will be resolved by inbound processor
-        senderIdentifier: message.from,
-        senderName: contact?.profile.name,
-        content: message.text.body,
-        replyToChannelMessageId: message.context?.id,
-        rawPayload: payload,
-        receivedAt: new Date(Number(message.timestamp) * 1000),
-      });
+      // Handle text messages
+      if (message.type === 'text' && message.text?.body) {
+        return Promise.resolve({
+          id: `wa-${message.id}`,
+          channel: 'whatsapp' as const,
+          channelMessageId: message.id,
+          projectId: '' as ProjectId, // Will be resolved by inbound processor
+          senderIdentifier: message.from,
+          senderName: contact?.profile.name,
+          content: message.text.body,
+          replyToChannelMessageId: message.context?.id,
+          rawPayload: payload,
+          receivedAt: new Date(Number(message.timestamp) * 1000),
+        });
+      }
+
+      // Handle image messages
+      if (message.type === 'image' && message.image?.id) {
+        const caption = message.image.caption ?? '[Image received]';
+        // Store the media ID in rawPayload for later retrieval
+        return Promise.resolve({
+          id: `wa-${message.id}`,
+          channel: 'whatsapp' as const,
+          channelMessageId: message.id,
+          projectId: '' as ProjectId,
+          senderIdentifier: message.from,
+          senderName: contact?.profile.name,
+          content: caption,
+          mediaUrls: [message.image.id], // Store media ID, will be converted to URL later
+          replyToChannelMessageId: message.context?.id,
+          rawPayload: payload,
+          receivedAt: new Date(Number(message.timestamp) * 1000),
+        });
+      }
+
+      // Ignore other message types for now (audio, video, document, sticker, etc.)
+      return Promise.resolve(null);
     },
 
     async isHealthy(): Promise<boolean> {
