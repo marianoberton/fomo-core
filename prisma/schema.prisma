@@ -32,7 +32,8 @@ model Project {
   contacts         Contact[]
   webhooks         Webhook[]
   files            File[]
-  agents           Agent[]
+  agents               Agent[]
+  channelIntegrations  ChannelIntegration[]
 
   @@map("projects")
 }
@@ -371,6 +372,24 @@ model Agent {
   @@unique([projectId, name])
   @@index([projectId, status])
   @@map("agents")
+}
+
+// ─── Channel Integrations ───────────────────────────────────
+
+model ChannelIntegration {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  provider  String   // 'chatwoot'
+  config    Json     // Provider-specific config (e.g. Chatwoot: baseUrl, accountId, inboxId, agentBotId, apiTokenEnvVar)
+  status    String   @default("active") // active | paused
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, provider])
+  @@index([provider, status])
+  @@map("channel_integrations")
 }
 
 // ─── Files ──────────────────────────────────────────────────────

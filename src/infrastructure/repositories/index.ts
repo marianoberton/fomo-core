@@ -25,3 +25,6 @@ export type { FileRepository } from '@/files/types.js';
 
 export { createAgentRepository } from './agent-repository.js';
 export type { AgentRepository } from '@/agents/types.js';
+
+export { createChannelIntegrationRepository } from './channel-integration-repository.js';
+export type { ChannelIntegrationRepository } from '@/channels/types.js';

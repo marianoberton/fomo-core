@@ -5,9 +5,17 @@ export * from './types.js';
 export { createChannelRouter } from './channel-router.js';
 export type { ChannelRouter, ChannelRouterDeps } from './channel-router.js';
 
+// Channel Resolver
+export { createChannelResolver } from './channel-resolver.js';
+export type { ChannelResolver, ChannelResolverDeps } from './channel-resolver.js';
+
 // Inbound Processor
 export { createInboundProcessor } from './inbound-processor.js';
 export type { InboundProcessor, InboundProcessorDeps } from './inbound-processor.js';
+
+// Handoff
+export { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from './handoff.js';
+export type { HandoffManager, HandoffManagerDeps, HandoffConfig } from './handoff.js';
 
 // Proactive Messenger
 export {
@@ -28,9 +36,13 @@ export {
   createWhatsAppAdapter,
   createSlackAdapter,
   getSlackUrlChallenge,
+  createChatwootAdapter,
 } from './adapters/index.js';
 export type {
   TelegramAdapterConfig,
   WhatsAppAdapterConfig,
   SlackAdapterConfig,
+  ChatwootAdapterConfig,
+  ChatwootAdapter,
+  ChatwootWebhookEvent,
 } from './adapters/index.js';

@@ -21,7 +21,7 @@ export interface InboundProcessorDeps {
   contactRepository: ContactRepository;
   sessionRepository: SessionRepository;
   logger: Logger;
-  /** Default project ID for new contacts/sessions */
+  /** Default project ID for new contacts/sessions (fallback when message has no projectId) */
   defaultProjectId: ProjectId;
   /** Function to run the agent and get a response */
   runAgent: (params: {
@@ -48,6 +48,9 @@ function channelToIdentifier(channel: ChannelType, value: string): ChannelIdenti
       return { type: 'slackId', value };
     case 'email':
       return { type: 'email', value };
+    case 'chatwoot':
+      // Chatwoot conversations are identified by conversation ID, stored as phone
+      return { type: 'phone', value };
   }
 }
 
@@ -78,13 +81,16 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
       });
 
       try {
+        // Use project ID from message if available, otherwise fall back to default
+        const projectId = (message.projectId || defaultProjectId) as ProjectId;
+
         // 1. Resolve or create contact
         const identifier = channelToIdentifier(message.channel, message.senderIdentifier);
-        let contact = await contactRepository.findByChannel(defaultProjectId, identifier);
+        let contact = await contactRepository.findByChannel(projectId, identifier);
 
         if (!contact) {
           contact = await contactRepository.create({
-            projectId: defaultProjectId,
+            projectId,
             name: message.senderName ?? message.senderIdentifier,
             [identifier.type]: identifier.value,
           });
@@ -98,7 +104,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
 
         // 2. Find or create session for this contact
         // For now, we create a new session per message (could be improved with session persistence)
-        const sessions = await sessionRepository.listByProject(defaultProjectId, 'active');
+        const sessions = await sessionRepository.listByProject(projectId, 'active');
         let session: Session | null = null;
 
         // Try to find an existing active session for this contact
@@ -114,7 +120,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
 
         if (!session) {
           session = await sessionRepository.create({
-            projectId: defaultProjectId,
+            projectId,
             metadata: {
               contactId: contact.id,
               channel: message.channel,
@@ -130,7 +136,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
 
         // 3. Run the agent
         const agentResult = await runAgent({
-          projectId: defaultProjectId,
+          projectId,
           sessionId: session.id,
           userMessage: message.content,
         });

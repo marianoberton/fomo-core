@@ -49,8 +49,13 @@ import { createFileService } from '@/files/file-service.js';
 import { createLocalStorage } from '@/files/storage-local.js';
 import { createAgentRegistry } from '@/agents/agent-registry.js';
 import { createAgentComms } from '@/agents/agent-comms.js';
+import { createChannelIntegrationRepository } from '@/infrastructure/repositories/channel-integration-repository.js';
+import { createChannelResolver } from '@/channels/channel-resolver.js';
+import { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from '@/channels/handoff.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
+import { chatwootWebhookRoutes } from '@/api/routes/chatwoot-webhook.js';
+import { onboardingRoutes } from '@/api/routes/onboarding.js';
 import type { RouteDependencies } from '@/api/types.js';
 import { createAgentRunner } from '@/core/agent-runner.js';
 import {
@@ -92,6 +97,7 @@ async function start(): Promise<void> {
     const webhookRepository = createWebhookRepository(prisma);
     const fileRepository = createFileRepository(prisma);
     const agentRepository = createAgentRepository(prisma);
+    const channelIntegrationRepository = createChannelIntegrationRepository(prisma);
 
     // Create shared services
     const approvalGate = createApprovalGate({ store: createPrismaApprovalStore(prisma) });
@@ -280,6 +286,17 @@ async function start(): Promise<void> {
     const agentRegistry = createAgentRegistry({ agentRepository, logger });
     const agentComms = createAgentComms({ logger });
 
+    // Chatwoot integration (channel resolver + handoff)
+    const channelResolver = createChannelResolver({
+      integrationRepository: channelIntegrationRepository,
+      logger,
+    });
+    const handoffManager = createHandoffManager({
+      config: DEFAULT_HANDOFF_CONFIG,
+      logger,
+    });
+    logger.info('Chatwoot integration initialized', { component: 'main' });
+
     // Register Fastify plugins
     const corsOrigin = process.env['CORS_ORIGIN'];
     await server.register(cors, {
@@ -365,6 +382,20 @@ async function start(): Promise<void> {
     await server.register(
       async (prefixed) => {
         await prefixed.register(registerRoutes, deps);
+
+        // Chatwoot webhook routes (separate from generic routes — needs extra deps)
+        chatwootWebhookRoutes(prefixed, {
+          ...deps,
+          channelResolver,
+          handoffManager,
+          runAgent,
+        });
+
+        // Onboarding routes
+        onboardingRoutes(prefixed, {
+          ...deps,
+          channelIntegrationRepository,
+        });
       },
       { prefix: '/api/v1' },
     );
