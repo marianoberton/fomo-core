@@ -1,31 +1,31 @@
 sku,name,description,category,price,stock,unit
-TOR-001,Tornillo Phillips #8 x 1",Tornillo cabeza phillips acero zincado 1 pulgada,tornillería,0.15,5000,unidad
-TOR-002,Tornillo Phillips #10 x 2",Tornillo cabeza phillips acero zincado 2 pulgadas,tornillería,0.25,3500,unidad
-TOR-003,Tornillo Hexagonal 1/4" x 1.5",Tornillo cabeza hexagonal acero galvanizado,tornillería,0.35,2800,unidad
-TOR-004,Tornillo Autoperforante #8 x 3/4",Tornillo autoperforante punta broca para metal,tornillería,0.18,4200,unidad
-TOR-005,Tornillo Madera 3" x 8,Tornillo para madera cabeza plana zincado,tornillería,0.22,3100,unidad
-TOR-006,Arandela Plana 1/4",Arandela plana acero zincado diámetro 1/4 pulgada,tornillería,0.05,8000,unidad
-TOR-007,Arandela Presión 1/4",Arandela de presión grower acero zincado,tornillería,0.07,6500,unidad
-TOR-008,Tuerca Hexagonal 1/4",Tuerca hexagonal acero zincado rosca métrica,tornillería,0.10,7200,unidad
-TOR-009,Clavo 2" Común,Clavo de acero común para carpintería 2 pulgadas,tornillería,0.08,15000,unidad
-TOR-010,Clavo 3" Común,Clavo de acero común para carpintería 3 pulgadas,tornillería,0.12,12000,unidad
-TOR-011,Remache Pop 1/8" x 1/4",Remache aluminio cabeza ancha para metal,tornillería,0.20,3500,unidad
-TOR-012,Tirafondo 1/4" x 3",Tirafondo hexagonal acero zincado para madera,tornillería,0.45,2100,unidad
+TOR-001,Tornillo Phillips #8 x 1 pulgada,Tornillo cabeza phillips acero zincado 1 pulgada,tornillería,0.15,5000,unidad
+TOR-002,Tornillo Phillips #10 x 2 pulgadas,Tornillo cabeza phillips acero zincado 2 pulgadas,tornillería,0.25,3500,unidad
+TOR-003,Tornillo Hexagonal 1/4 x 1.5 pulgadas,Tornillo cabeza hexagonal acero galvanizado,tornillería,0.35,2800,unidad
+TOR-004,Tornillo Autoperforante #8 x 3/4 pulgada,Tornillo autoperforante punta broca para metal,tornillería,0.18,4200,unidad
+TOR-005,Tornillo Madera 3 pulgadas x 8,Tornillo para madera cabeza plana zincado,tornillería,0.22,3100,unidad
+TOR-006,Arandela Plana 1/4 pulgada,Arandela plana acero zincado diámetro 1/4 pulgada,tornillería,0.05,8000,unidad
+TOR-007,Arandela Presión 1/4 pulgada,Arandela de presión grower acero zincado,tornillería,0.07,6500,unidad
+TOR-008,Tuerca Hexagonal 1/4 pulgada,Tuerca hexagonal acero zincado rosca métrica,tornillería,0.10,7200,unidad
+TOR-009,Clavo 2 pulgadas Común,Clavo de acero común para carpintería 2 pulgadas,tornillería,0.08,15000,unidad
+TOR-010,Clavo 3 pulgadas Común,Clavo de acero común para carpintería 3 pulgadas,tornillería,0.12,12000,unidad
+TOR-011,Remache Pop 1/8 pulgadas x 1/4 pulgada,Remache aluminio cabeza ancha para metal,tornillería,0.20,3500,unidad
+TOR-012,Tirafondo 1/4 pulgada x 3 pulgadas,Tirafondo hexagonal acero zincado para madera,tornillería,0.45,2100,unidad
 HER-001,Martillo Carpintero 16oz,Martillo cabeza de acero mango fibra de vidrio,herramientas,18.50,45,unidad
 HER-002,Destornillador Phillips #2,Destornillador phillips punta magnética mango ergonómico,herramientas,5.80,120,unidad
-HER-003,Destornillador Plano 1/4",Destornillador plano acero cromado mango aislado,herramientas,4.90,95,unidad
-HER-004,Pinza Universal 8",Pinza universal corte lateral mango aislado,herramientas,12.50,68,unidad
-HER-005,Alicate Corte Diagonal 6",Alicate corte diagonal acero al carbono,herramientas,9.75,54,unidad
-HER-006,Llave Francesa 12",Llave ajustable francesa apertura máxima 12 pulgadas,herramientas,16.80,38,unidad
+HER-003,Destornillador Plano 1/4 pulgada,Destornillador plano acero cromado mango aislado,herramientas,4.90,95,unidad
+HER-004,Pinza Universal 8 pulgadas,Pinza universal corte lateral mango aislado,herramientas,12.50,68,unidad
+HER-005,Alicate Corte Diagonal 6 pulgadas,Alicate corte diagonal acero al carbono,herramientas,9.75,54,unidad
+HER-006,Llave Francesa 12 pulgadas,Llave ajustable francesa apertura máxima 12 pulgadas,herramientas,16.80,38,unidad
 HER-007,Llave Allen Juego 9pz,Juego llaves allen hexagonales métricas,herramientas,8.20,72,set
 HER-008,Sierra Manual Arco Metal,Sierra manual para metal con marco ajustable,herramientas,14.50,42,unidad
-HER-009,Hoja Sierra Metal 12" 24TPI,Hoja repuesto sierra metal bimetal 24 dientes,herramientas,2.10,280,unidad
+HER-009,Hoja Sierra Metal 12 pulgadas 24TPI,Hoja repuesto sierra metal bimetal 24 dientes,herramientas,2.10,280,unidad
 HER-010,Nivel Aluminio 24",Nivel de burbuja aluminio 3 burbujas 24 pulgadas,herramientas,21.50,35,unidad
 HER-011,Flexómetro 5m,Cinta métrica 5 metros freno automático,herramientas,6.90,150,unidad
 HER-012,Flexómetro 8m,Cinta métrica 8 metros freno automático carcasa reforzada,herramientas,11.20,88,unidad
-HER-013,Escuadra Carpintero 12",Escuadra combinada acero inoxidable con nivel,herramientas,13.40,52,unidad
-HER-014,Cortafrío 3/4",Cortafrío acero templado para metal y mampostería,herramientas,7.60,64,unidad
-HER-015,Cincel Madera 1/2",Cincel plano para madera acero cromado,herramientas,5.50,76,unidad
+HER-013,Escuadra Carpintero 12 pulgadas,Escuadra combinada acero inoxidable con nivel,herramientas,13.40,52,unidad
+HER-014,Cortafrío 3/4 pulgada,Cortafrío acero templado para metal y mampostería,herramientas,7.60,64,unidad
+HER-015,Cincel Madera 1/2 pulgadas,Cincel plano para madera acero cromado,herramientas,5.50,76,unidad
 HER-016,Serrucho Carpintero 20",Serrucho universal para madera mango ergonómico,herramientas,15.80,44,unidad
 HER-017,Taladro Manual Pecho,Taladro manual de pecho para perforaciones pequeñas,herramientas,28.50,18,unidad
 HER-018,Brocas Metal HSS Set 13pz,Juego brocas helicoidales acero rápido 1-13mm,herramientas,16.90,48,set
@@ -50,12 +50,12 @@ PIN-013,Enduido Interior 10kg,Enduido interior fino para alisar paredes 10kg,pin
 PIN-014,Aguarrás Mineral 1L,Aguarrás mineral solvente para dilución,pinturas,4.20,220,litro
 PIN-015,Diluyente Sintético 1L,Diluyente sintético para esmaltes y antióxidos,pinturas,4.50,195,litro
 PIN-016,Removedor Pintura 1L,Removedor de pintura decapante gel,pinturas,14.80,42,litro
-PIN-017,Brocha 1" Cerda Natural,Brocha cerda natural virola aluminio 1 pulgada,pinturas,3.20,185,unidad
-PIN-018,Brocha 2" Cerda Natural,Brocha cerda natural virola aluminio 2 pulgadas,pinturas,4.80,156,unidad
-PIN-019,Brocha 3" Cerda Natural,Brocha cerda natural virola aluminio 3 pulgadas,pinturas,6.50,124,unidad
-PIN-020,Rodillo Esponja 18cm,Rodillo espuma densidad media con mango 18cm,pinturas,5.40,168,unidad
-PIN-021,Rodillo Lana 23cm,Rodillo lana sintética alta absorción 23cm con mango,pinturas,7.80,142,unidad
-PIN-022,Bandeja Pintura 9",Bandeja plástica para rodillo de 9 pulgadas,pinturas,2.80,215,unidad
+PIN-017,Brocha 1 pulgada Cerda Natural,Brocha cerda natural virola aluminio 1 pulgada,pinturas,3.20,185,unidad
+PIN-018,Brocha 2 pulgadas Cerda Natural,Brocha cerda natural virola aluminio 2 pulgadas,pinturas,4.80,156,unidad
+PIN-019,Brocha 3 pulgadas Cerda Natural,Brocha cerda natural virola aluminio 3 pulgadas,pinturas,6.50,124,unidad
+PIN-020,Rodillo Esponja 18 cm,Rodillo espuma densidad media con mango 18 cm,pinturas,5.40,168,unidad
+PIN-021,Rodillo Lana 23 cm,Rodillo lana sintética alta absorción 23 cm con mango,pinturas,7.80,142,unidad
+PIN-022,Bandeja Pintura 9 pulgadas,Bandeja plástica para rodillo de 9 pulgadas,pinturas,2.80,215,unidad
 PLO-001,Canilla Lavatorio Cromada,Canilla monocomando lavatorio cromada cerámica,plomería,45.00,28,unidad
 PLO-002,Canilla Cocina Móvil,Canilla monocomando cocina pico móvil cromada,plomería,58.00,24,unidad
 PLO-003,Duchador Telefonico,Duchador telefónico 5 posiciones cromado,plomería,18.50,46,unidad
@@ -64,7 +64,7 @@ PLO-005,Inodoro Corto Blanco,Inodoro corto deposito externo blanco incluye asien
 PLO-006,Asiento Inodoro Universal,Asiento inodoro plástico blanco universal,plomería,18.50,42,unidad
 PLO-007,Mochila 9 Litros,Mochila depósito inodoro 9 litros doble descarga,plomería,38.00,32,unidad
 PLO-008,Pileta Bacha Redonda,Pileta bacha redonda loza blanca sobre mesada,plomería,42.00,22,unidad
-PLO-009,Sifón Botella Cromado,Sifón tipo botella universal cromado 1 1/4,plomería,12.50,68,unidad
+PLO-009,Sifón Botella Cromado,Sifón tipo botella universal cromado 1-1/4 pulgada,plomería,12.50,68,unidad
 PLO-010,Caño PVC 110mm x 3m,Caño PVC desagüe cloacal 110mm x 3 metros,plomería,15.80,95,caño
 PLO-011,Caño PVC 63mm x 3m,Caño PVC desagüe pluvial 63mm x 3 metros,plomería,9.50,128,caño
 PLO-012,Caño PVC 40mm x 3m,Caño PVC desagüe secundario 40mm x 3 metros,plomería,6.20,165,caño
@@ -74,8 +74,8 @@ PLO-015,Codo PVC 40mm 90°,Codo PVC desagüe 40mm ángulo 90 grados,plomería,1.
 PLO-016,Adhesivo PVC 250ml,Adhesivo para PVC cloacal y pluvial 250ml,plomería,8.50,88,unidad
 PLO-017,Cinta Teflón 12mm x 10m,Cinta teflón para roscas 12mm ancho x 10 metros,plomería,1.20,520,unidad
 PLO-018,Cinta Teflón Gas 12mm,Cinta teflón amarilla especial gas 12mm,plomería,2.80,185,unidad
-PLO-019,Llave Paso 1/2" Esférica,Llave de paso esférica bronce 1/2 pulgada,plomería,14.50,52,unidad
-PLO-020,Llave Paso 3/4" Esférica,Llave de paso esférica bronce 3/4 pulgada,plomería,18.20,38,unidad
+PLO-019,Llave Paso 1/2 pulgadas Esférica,Llave de paso esférica bronce 1/2 pulgada,plomería,14.50,52,unidad
+PLO-020,Llave Paso 3/4 pulgada Esférica,Llave de paso esférica bronce 3/4 pulgada,plomería,18.20,38,unidad
 PLO-021,Junta Tanque Inodoro,Junta goma para conexión tanque inodoro universal,plomería,3.50,142,unidad
 PLO-022,Válvula Esclusa Lavatorio,Válvula de esclusa universal para lavatorio cromada,plomería,6.80,94,unidad
 PLO-023,Destapador Manual,Destapador manual con ventosa para inodoro y pileta,plomería,4.50,118,unidad

@@ -5,6 +5,7 @@
  *   pnpm tsx scripts/test-catalog.ts
  */
 
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { createCatalogSearchTool } from '../src/tools/definitions/catalog-search.js';
 import OpenAI from 'openai';
@@ -38,6 +39,8 @@ async function loadCatalog(): Promise<Product[]> {
     columns: true,
     skip_empty_lines: true,
     trim: true,
+    relax_quotes: true,
+    escape: '\\',
   }) as Array<Record<string, string>>;
 
   const products: Product[] = records.map((row) => ({

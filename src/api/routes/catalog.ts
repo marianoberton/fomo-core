@@ -208,6 +208,8 @@ function parseCsv(content: string): Product[] {
     columns: true,
     skip_empty_lines: true,
     trim: true,
+    relax_quotes: true,
+    escape: '\\',
   }) as Array<Record<string, string>>;
 
   return records.map((row) => {

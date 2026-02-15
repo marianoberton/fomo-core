@@ -133,13 +133,14 @@ export class TemplateManager {
       throw new Error(`Template not found: ${params.templateId}`);
     }
 
-    logger.info({
+    logger.info('Creating project from template', {
+      component: 'template-manager',
       templateId: params.templateId,
       projectName: params.projectName,
       owner: params.owner,
-    }, 'Creating project from template');
+    });
 
-    const projectId = nanoid();
+    const projectId = nanoid() as ProjectId;
 
     // Build full agent config from template + user overrides
     const agentConfig: AgentConfig = {
@@ -202,7 +203,10 @@ export class TemplateManager {
       },
     });
 
-    logger.info({ projectId }, 'Project created');
+    logger.info('Project created', {
+      component: 'template-manager',
+      projectId,
+    });
 
     // Create prompt layers (identity, instructions, safety)
     const layers = [
@@ -223,13 +227,15 @@ export class TemplateManager {
           createdAt: new Date(),
           createdBy: layer.createdBy,
           changeReason: layer.changeReason,
-          performanceNotes: null,
-          metadata: null,
         },
       });
     }
 
-    logger.info({ projectId, layers: layers.length }, 'Prompt layers created');
+    logger.info('Prompt layers created', {
+      component: 'template-manager',
+      projectId,
+      layers: layers.length,
+    });
 
     const result = {
       projectId,
@@ -237,7 +243,10 @@ export class TemplateManager {
       sampleData: params.includeSampleData ? template.sampleData : undefined,
     };
 
-    logger.info({ projectId }, 'Project setup complete');
+    logger.info('Project setup complete', {
+      component: 'template-manager',
+      projectId,
+    });
 
     return result;
   }
@@ -256,10 +265,11 @@ export class TemplateManager {
       throw new Error(`Template not found: ${params.templateId}`);
     }
 
-    logger.info({
+    logger.info('Updating project prompts from template', {
+      component: 'template-manager',
       projectId: params.projectId,
       templateId: params.templateId,
-    }, 'Updating project prompts from template');
+    });
 
     // Deactivate all existing layers
     await this.prisma.promptLayer.updateMany({
@@ -299,12 +309,14 @@ export class TemplateManager {
           createdAt: new Date(),
           createdBy: params.updatedBy,
           changeReason: `Updated from template: ${params.templateId}`,
-          performanceNotes: null,
           metadata: { templateId: params.templateId },
         },
       });
     }
 
-    logger.info({ projectId: params.projectId }, 'Prompt layers updated');
+    logger.info('Prompt layers updated', {
+      component: 'template-manager',
+      projectId: params.projectId,
+    });
   }
 }

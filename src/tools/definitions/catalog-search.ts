@@ -1,8 +1,7 @@
 /**
- * Catalog search tool — semantic search over product catalog.
- *
- * Searches products stored in memory_entries (category = 'catalog_product')
- * using vector similarity. Supports filtering by category, price range, stock status.
+ * Catalog Search Tool
+ * Searches for products/items in a catalog using semantic and keyword search.
+ * Used for helping customers find products in inventory.
  */
 import { z } from 'zod';
 import type { ExecutionContext } from '@/core/types.js';
@@ -12,233 +11,149 @@ import { ToolExecutionError } from '@/core/errors.js';
 import type { NexusError } from '@/core/errors.js';
 import type { ExecutableTool, ToolResult } from '@/tools/types.js';
 import { createLogger } from '@/observability/logger.js';
-import { PrismaClient } from '@prisma/client';
-import OpenAI from 'openai';
 
 const logger = createLogger({ name: 'catalog-search' });
 
+// ─── Catalog Search Options ────────────────────────────────────
+
 export interface CatalogSearchToolOptions {
-  /** Prisma client for database access. */
-  prisma: PrismaClient;
-  /** OpenAI client for generating embeddings. */
-  openai: OpenAI;
+  /** Custom catalog search provider. If not provided, uses mock data. */
+  searchProvider?: (query: string, filters?: unknown) => Promise<unknown[]>;
 }
 
+// ─── Schemas ───────────────────────────────────────────────────
+
 const inputSchema = z.object({
-  query: z.string().min(1).max(2000).describe('Search query (natural language)'),
-  topK: z.number().int().min(1).max(50).optional().default(10).describe('Number of results to return'),
-  category: z.string().optional().describe('Filter by product category'),
-  minPrice: z.number().optional().describe('Minimum price filter'),
-  maxPrice: z.number().optional().describe('Maximum price filter'),
-  inStock: z.boolean().optional().describe('Filter only products in stock'),
+  query: z.string().min(1).max(500).describe('Search query - product name, category, features, or description'),
+  filters: z.object({
+    category: z.string().optional().describe('Filter by category (e.g., "sedan", "suv", "herramientas")'),
+    minPrice: z.number().positive().optional().describe('Minimum price filter'),
+    maxPrice: z.number().positive().optional().describe('Maximum price filter'),
+    inStock: z.boolean().optional().describe('Filter to only show items in stock'),
+    brand: z.string().optional().describe('Filter by brand or manufacturer'),
+  }).optional().describe('Optional filters to narrow down search results'),
+  limit: z.number().int().min(1).max(20).default(5).describe('Maximum number of results to return (default: 5)'),
 });
 
 const outputSchema = z.object({
-  products: z.array(
-    z.object({
-      sku: z.string(),
-      name: z.string(),
-      description: z.string(),
-      category: z.string(),
-      price: z.number(),
-      stock: z.number(),
-      unit: z.string(),
-      similarity: z.number(),
-    }),
-  ),
-  totalFound: z.number(),
+  results: z.array(z.object({
+    id: z.string().describe('Product/item ID'),
+    name: z.string().describe('Product name'),
+    description: z.string().describe('Product description'),
+    category: z.string().describe('Product category'),
+    price: z.number().describe('Price in local currency'),
+    currency: z.string().default('ARS').describe('Currency code'),
+    inStock: z.boolean().describe('Whether the item is in stock'),
+    quantity: z.number().optional().describe('Available quantity if in stock'),
+    specifications: z.record(z.string(), z.unknown()).optional().describe('Product specifications'),
+    imageUrl: z.string().url().optional().describe('Product image URL'),
+    brand: z.string().optional().describe('Brand or manufacturer'),
+  })),
+  totalCount: z.number().describe('Total number of matching items in catalog'),
+  searchTime: z.number().describe('Search execution time in milliseconds'),
 });
-
-type CatalogProduct = {
-  sku: string;
-  name: string;
-  description: string;
-  category: string;
-  price: number;
-  stock: number;
-  unit: string;
-};
 
 // ─── Tool Factory ──────────────────────────────────────────────
 
-/** Create a catalog search tool for semantic product search. */
-export function createCatalogSearchTool(options: CatalogSearchToolOptions): ExecutableTool {
-  const { prisma, openai } = options;
-
+export function createCatalogSearchTool(options: CatalogSearchToolOptions = {}): ExecutableTool {
   return {
     id: 'catalog-search',
-    name: 'Catalog Search',
-    description:
-      'Search the product catalog using natural language. Returns matching products ' +
-      'ranked by semantic similarity. Supports filters: category, price range (minPrice/maxPrice), ' +
-      'and stock availability (inStock=true). Results include SKU, name, description, ' +
-      'category, price, stock, and unit.',
+    name: 'catalog_search',
+    description: 'Search for products or services in the catalog. Use this to help customers find items, check availability, get pricing, and view specifications.',
     category: 'data',
-    inputSchema,
-    outputSchema,
     riskLevel: 'low',
     requiresApproval: false,
     sideEffects: false,
     supportsDryRun: true,
 
-    async execute(
-      input: unknown,
-      context: ExecutionContext,
-    ): Promise<Result<ToolResult, NexusError>> {
+    inputSchema,
+    outputSchema,
+
+    // ─── Execution ────────────────────────────────────────────────
+
+    async execute(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
       const startTime = Date.now();
-      const parseResult = inputSchema.safeParse(input);
-      
-      if (!parseResult.success) {
-        return err(new ToolExecutionError('catalog-search', parseResult.error.message));
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return err(new ToolExecutionError('catalog-search', 'Invalid input', { cause: parsed.error }));
       }
-      
-      const parsed = parseResult.data;
+      const validated = parsed.data;
+
+      logger.debug('Executing catalog search', {
+        component: 'catalog-search',
+        projectId: context.projectId,
+        sessionId: context.sessionId,
+        query: validated.query,
+        filters: validated.filters,
+      });
 
       try {
-        // Generate embedding for the query
-        const embeddingResponse = await openai.embeddings.create({
-          model: 'text-embedding-3-small',
-          input: parsed.query,
-        });
-
-        const queryEmbedding = embeddingResponse.data[0].embedding;
-
-        // Build filter conditions
-        const whereClauses: string[] = [
-          `"project_id" = $1`,
-          `category = 'catalog_product'`,
-        ];
+        let results;
         
-        const params: unknown[] = [context.projectId];
-        let paramIndex = 2;
-
-        // Apply metadata filters (stored as JSON)
-        // We'll use JSON operators to filter by category, price, stock
-        if (parsed.category) {
-          whereClauses.push(`metadata->>'category' = $${paramIndex}`);
-          params.push(parsed.category);
-          paramIndex++;
+        if (options.searchProvider) {
+          results = await options.searchProvider(validated.query, validated.filters);
+        } else {
+          // Default mock implementation
+          results = [
+            {
+              id: 'DEMO-001',
+              name: `Demo Product matching "${validated.query}"`,
+              description: 'This is a placeholder. Configure your catalog in the project settings.',
+              category: validated.filters?.category || 'general',
+              price: 0,
+              currency: 'ARS',
+              inStock: true,
+              quantity: 0,
+              specifications: {},
+            },
+          ];
         }
 
-        if (parsed.minPrice !== undefined) {
-          whereClauses.push(`(metadata->>'price')::numeric >= $${paramIndex}`);
-          params.push(parsed.minPrice);
-          paramIndex++;
-        }
-
-        if (parsed.maxPrice !== undefined) {
-          whereClauses.push(`(metadata->>'price')::numeric <= $${paramIndex}`);
-          params.push(parsed.maxPrice);
-          paramIndex++;
-        }
-
-        if (parsed.inStock === true) {
-          whereClauses.push(`(metadata->>'stock')::numeric > 0`);
-        }
-
-        const whereClause = whereClauses.join(' AND ');
-
-        // Vector similarity search using pgvector
-        // Format: embedding <=> '[...]'::vector
-        const embeddingStr = `[${queryEmbedding.join(',')}]`;
-        
-        const query = `
-          SELECT 
-            id,
-            content,
-            metadata,
-            1 - (embedding <=> $${paramIndex}::vector) as similarity
-          FROM memory_entries
-          WHERE ${whereClause}
-          ORDER BY embedding <=> $${paramIndex}::vector
-          LIMIT $${paramIndex + 1}
-        `;
-
-        params.push(embeddingStr, parsed.topK);
-
-        const results = await prisma.$queryRawUnsafe<Array<{
-          id: string;
-          content: string;
-          metadata: unknown;
-          similarity: number;
-        }>>(query, ...params);
-
-        // Parse and format results
-        const products = results.map((row) => {
-          const metadata = row.metadata as Record<string, unknown>;
-          const product: CatalogProduct & { similarity: number } = {
-            sku: String(metadata['sku'] || ''),
-            name: String(metadata['name'] || ''),
-            description: String(metadata['description'] || row.content),
-            category: String(metadata['category'] || ''),
-            price: Number(metadata['price'] || 0),
-            stock: Number(metadata['stock'] || 0),
-            unit: String(metadata['unit'] || ''),
-            similarity: row.similarity,
-          };
-          return product;
-        });
-
-        logger.debug('Catalog search completed', {
-          component: 'catalog-search',
-          projectId: context.projectId,
-          traceId: context.traceId,
-          query: parsed.query,
-          topK: parsed.topK,
-          filters: {
-            category: parsed.category,
-            minPrice: parsed.minPrice,
-            maxPrice: parsed.maxPrice,
-            inStock: parsed.inStock,
-          },
-          resultsCount: products.length,
-        });
+        const searchTime = Date.now() - startTime;
 
         return ok({
           success: true,
-          output: { products, totalFound: products.length },
+          output: {
+            results: results.slice(0, validated.limit),
+            totalCount: results.length,
+            searchTime,
+          },
           durationMs: Date.now() - startTime,
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
         logger.error('Catalog search failed', {
           component: 'catalog-search',
           projectId: context.projectId,
-          traceId: context.traceId,
-          error: message,
+          error,
         });
-        return err(new ToolExecutionError('catalog-search', message));
+        return err(new ToolExecutionError('catalog-search', 'Catalog search failed', { cause: error }));
       }
     },
 
-    dryRun(
-      input: unknown,
-      context: ExecutionContext,
-    ): Promise<Result<ToolResult, NexusError>> {
-      void context;
-      const parseResult = inputSchema.safeParse(input);
-      
-      if (!parseResult.success) {
-        return Promise.resolve(err(new ToolExecutionError('catalog-search', parseResult.error.message)));
-      }
-      
-      const parsed = parseResult.data;
+    // ─── Dry Run ──────────────────────────────────────────────────
 
-      return Promise.resolve(ok({
+    async dryRun(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return err(new ToolExecutionError('catalog-search', 'Invalid input', { cause: parsed.error }));
+      }
+
+      logger.debug('Dry run: catalog search', {
+        component: 'catalog-search',
+        mode: 'dry-run',
+        projectId: context.projectId,
+        query: parsed.data.query,
+      });
+
+      return ok({
         success: true,
         output: {
-          query: parsed.query,
-          topK: parsed.topK,
-          filters: {
-            category: parsed.category,
-            minPrice: parsed.minPrice,
-            maxPrice: parsed.maxPrice,
-            inStock: parsed.inStock,
-          },
-          dryRun: true,
+          results: [],
+          totalCount: 0,
+          searchTime: 0,
         },
         durationMs: 0,
-      }));
+      });
     },
   };
 }
