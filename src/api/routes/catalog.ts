@@ -43,10 +43,15 @@ export function catalogRoutes(
 ): void {
   const { prisma, logger } = deps;
 
-  // Initialize OpenAI client
-  const openai = new OpenAI({
-    apiKey: process.env['OPENAI_API_KEY'],
-  });
+  // Initialize OpenAI client only if API key is available
+  const openaiKey = process.env['OPENAI_API_KEY'];
+  const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
+
+  if (!openai) {
+    logger.warn('Catalog routes registered but embeddings disabled (no OPENAI_API_KEY)', {
+      component: 'catalog-route',
+    });
+  }
 
   // ─── Upload Catalog ─────────────────────────────────────────────
 
@@ -69,6 +74,14 @@ export function catalogRoutes(
 
       if (!content || content.length === 0) {
         return reply.status(400).send({ error: 'Empty file body' });
+      }
+
+      // Check if OpenAI is available
+      if (!openai) {
+        return reply.status(503).send({
+          error: 'Catalog functionality disabled',
+          reason: 'OPENAI_API_KEY not configured',
+        });
       }
 
       try {
@@ -105,6 +118,10 @@ export function catalogRoutes(
         }
 
         // Generate embeddings and store in memory_entries
+        // Type guard: openai is guaranteed to be non-null due to check above
+        if (!openai) {
+          throw new Error('OpenAI client not initialized');
+        }
         const inserted = await ingestProducts(projectId as ProjectId, products, prisma, openai, logger);
 
         logger.info('Catalog uploaded successfully', {
