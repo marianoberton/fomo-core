@@ -22,6 +22,8 @@ export default defineConfig({
     exclude: ['node_modules', 'dist'],
     testTimeout: 30_000, // 30s for integration tests
     hookTimeout: 30_000, // 30s for setup/teardown hooks
+    // Run integration/e2e/perf tests sequentially (they share the same DB)
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

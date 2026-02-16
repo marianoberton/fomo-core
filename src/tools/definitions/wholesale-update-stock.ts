@@ -5,17 +5,23 @@
  */
 
 import { z } from 'zod';
-import type { ExecutableTool } from '../registry/types.js';
-import type { ExecutionContext } from '../../core/types.js';
-import { NexusError } from '../../core/errors.js';
-import { prisma } from '../../infrastructure/database.js';
+import type { ExecutionContext } from '@/core/types.js';
+import type { Result } from '@/core/result.js';
+import { ok, err } from '@/core/result.js';
+import { ToolExecutionError } from '@/core/errors.js';
+import type { NexusError } from '@/core/errors.js';
+import type { ExecutableTool, ToolResult } from '@/tools/types.js';
+import { createLogger } from '@/observability/logger.js';
+import { getDatabase } from '@/infrastructure/database.js';
 import {
   parseStockCSV,
   applyStockUpdates,
   ProductSchema,
-} from '../../verticals/wholesale/stock-manager.js';
+} from '@/verticals/wholesale/stock-manager.js';
 
-// ─── Tool Definition ────────────────────────────────────────────
+const logger = createLogger({ name: 'wholesale-update-stock' });
+
+// ─── Schemas ───────────────────────────────────────────────────
 
 const inputSchema = z.object({
   csvContent: z.string().describe('CSV content with columns: sku,stock,price (optional)'),
@@ -30,123 +36,147 @@ const outputSchema = z.object({
   message: z.string(),
 });
 
-type Input = z.infer<typeof inputSchema>;
-type Output = z.infer<typeof outputSchema>;
+// ─── Tool Factory ──────────────────────────────────────────────
 
-// ─── Tool Implementation ────────────────────────────────────────
+export function createWholesaleUpdateStockTool(): ExecutableTool {
+  return {
+    id: 'wholesale-update-stock',
+    name: 'Update Wholesale Stock',
+    description:
+      'Update inventory from CSV data. CSV must contain SKU and STOCK columns. Optional PRICE column to update prices.',
+    category: 'wholesale',
+    riskLevel: 'medium',
+    requiresApproval: false,
+    sideEffects: true,
+    supportsDryRun: true,
 
-async function execute(input: Input, context: ExecutionContext): Promise<Output> {
-  const { csvContent, projectId } = input;
+    inputSchema,
+    outputSchema,
 
-  // Validate project access
-  if (projectId !== context.projectId) {
-    throw new NexusError(
-      'TOOL_EXECUTION_ERROR',
-      'Cannot update stock for different project'
-    );
-  }
+    async execute(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
+      const startTime = Date.now();
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return err(new ToolExecutionError('wholesale-update-stock', 'Invalid input', parsed.error));
+      }
+      const { csvContent, projectId } = parsed.data;
 
-  // Parse CSV
-  let updates;
-  try {
-    updates = parseStockCSV(csvContent);
-  } catch (error) {
-    throw new NexusError(
-      'TOOL_EXECUTION_ERROR',
-      `Failed to parse CSV: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
-  }
+      try {
+        if (projectId !== context.projectId) {
+          return err(new ToolExecutionError('wholesale-update-stock', 'Cannot update stock for different project'));
+        }
 
-  if (updates.length === 0) {
-    return {
-      success: false,
-      updatedCount: 0,
-      notFoundCount: 0,
-      notFoundSkus: [],
-      message: 'No valid stock updates found in CSV',
-    };
-  }
+        let updates;
+        try {
+          updates = parseStockCSV(csvContent);
+        } catch (parseError) {
+          return err(new ToolExecutionError(
+            'wholesale-update-stock',
+            `Failed to parse CSV: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`
+          ));
+        }
 
-  // Get existing catalog from project metadata
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
+        if (updates.length === 0) {
+          return ok({
+            success: false,
+            output: {
+              success: false,
+              updatedCount: 0,
+              notFoundCount: 0,
+              notFoundSkus: [],
+              message: 'No valid stock updates found in CSV',
+            },
+            durationMs: Date.now() - startTime,
+          });
+        }
 
-  if (!project) {
-    throw new NexusError('TOOL_EXECUTION_ERROR', `Project ${projectId} not found`);
-  }
+        const project = await getDatabase().client.project.findUnique({
+          where: { id: projectId },
+        });
 
-  const config = project.configJson as Record<string, unknown>;
-  const catalog = (config.catalog as Record<string, unknown>) || {};
-  const existingProducts = ((catalog.products as unknown[]) || []).map((p) =>
-    ProductSchema.parse(p)
-  );
+        if (!project) {
+          return err(new ToolExecutionError('wholesale-update-stock', `Project ${projectId} not found`));
+        }
 
-  // Apply updates
-  const result = applyStockUpdates(existingProducts, updates);
+        const config = project.configJson as Record<string, unknown>;
+        const catalog = (config['catalog'] ?? {}) as Record<string, unknown>;
+        const existingProducts = ((catalog['products'] ?? []) as unknown[]).map((p) =>
+          ProductSchema.parse(p)
+        );
 
-  // Update all products in map
-  const updatedProductMap = new Map(existingProducts.map((p) => [p.sku, p]));
-  for (const updated of result.updated) {
-    updatedProductMap.set(updated.sku, updated);
-  }
+        const result = applyStockUpdates(existingProducts, updates);
 
-  const updatedProducts = Array.from(updatedProductMap.values());
+        const updatedProductMap = new Map(existingProducts.map((p) => [p.sku, p]));
+        for (const updated of result.updated) {
+          updatedProductMap.set(updated.sku, updated);
+        }
 
-  // Save back to project config
-  const updatedConfig = {
-    ...config,
-    catalog: {
-      ...catalog,
-      products: updatedProducts,
-      lastStockUpdate: new Date().toISOString(),
+        const updatedProducts = Array.from(updatedProductMap.values());
+
+        const updatedConfig = {
+          ...config,
+          catalog: {
+            ...catalog,
+            products: updatedProducts,
+            lastStockUpdate: new Date().toISOString(),
+          },
+        };
+
+        await getDatabase().client.project.update({
+          where: { id: projectId },
+          data: { configJson: updatedConfig },
+        });
+
+        logger.info('Stock updated from CSV', {
+          component: 'wholesale-update-stock',
+          projectId,
+          updatedCount: result.updated.length,
+          notFoundCount: result.notFound.length,
+        });
+
+        return ok({
+          success: true,
+          output: {
+            success: true,
+            updatedCount: result.updated.length,
+            notFoundCount: result.notFound.length,
+            notFoundSkus: result.notFound,
+            message: `Stock updated: ${result.updated.length} products updated${result.notFound.length > 0 ? `, ${result.notFound.length} SKUs not found` : ''}`,
+          },
+          durationMs: Date.now() - startTime,
+        });
+      } catch (error) {
+        logger.error('Stock update failed', {
+          component: 'wholesale-update-stock',
+          error,
+        });
+        return err(new ToolExecutionError(
+          'wholesale-update-stock',
+          'Stock update failed',
+          error instanceof Error ? error : undefined
+        ));
+      }
+    },
+
+    dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return Promise.resolve(err(new ToolExecutionError('wholesale-update-stock', 'Invalid input', parsed.error)));
+      }
+
+      const updates = parseStockCSV(parsed.data.csvContent);
+
+      return Promise.resolve(ok({
+        success: true,
+        output: {
+          success: true,
+          updatedCount: updates.length,
+          notFoundCount: 0,
+          notFoundSkus: [],
+          message: `Dry run: would update ${updates.length} products`,
+        },
+        durationMs: 0,
+      }));
     },
   };
-
-  await prisma.project.update({
-    where: { id: projectId },
-    data: { configJson: updatedConfig },
-  });
-
-  context.logger.info('Stock updated from CSV', {
-    projectId,
-    updatedCount: result.updated.length,
-    notFoundCount: result.notFound.length,
-  });
-
-  return {
-    success: true,
-    updatedCount: result.updated.length,
-    notFoundCount: result.notFound.length,
-    notFoundSkus: result.notFound,
-    message: `Stock updated: ${result.updated.length} products updated${result.notFound.length > 0 ? `, ${result.notFound.length} SKUs not found` : ''}`,
-  };
 }
-
-async function dryRun(input: Input): Promise<Output> {
-  const updates = parseStockCSV(input.csvContent);
-
-  return {
-    success: true,
-    updatedCount: updates.length,
-    notFoundCount: 0,
-    notFoundSkus: [],
-    message: `Dry run: would update ${updates.length} products`,
-  };
-}
-
-// ─── Tool Export ────────────────────────────────────────────────
-
-export const wholesaleUpdateStockTool: ExecutableTool = {
-  id: 'wholesale-update-stock',
-  name: 'Update Wholesale Stock',
-  description:
-    'Update inventory from CSV data. CSV must contain SKU and STOCK columns. Optional PRICE column to update prices.',
-  inputSchema,
-  outputSchema,
-  riskLevel: 'medium',
-  requiresApproval: false,
-  tags: ['wholesale', 'inventory', 'stock'],
-  execute,
-  dryRun,
-};

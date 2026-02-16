@@ -75,7 +75,7 @@ export function createCatalogOrderTool(options: CatalogOrderToolOptions = {}): E
       const startTime = Date.now();
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) {
-        return err(new ToolExecutionError('catalog-order', 'Invalid input', { cause: parsed.error }));
+        return err(new ToolExecutionError('catalog-order', 'Invalid input', parsed.error));
       }
       const validated = parsed.data;
 
@@ -115,7 +115,7 @@ export function createCatalogOrderTool(options: CatalogOrderToolOptions = {}): E
               orderId: result.orderId,
               status: result.status as 'draft' | 'pending_approval' | 'confirmed' | 'rejected',
               totalAmount,
-              currency: validated.items[0]?.currency || 'ARS',
+              currency: validated.items[0]?.currency ?? 'ARS',
               itemCount: validated.items.length,
               createdAt: new Date().toISOString(),
               approvalRequired: true,
@@ -130,7 +130,7 @@ export function createCatalogOrderTool(options: CatalogOrderToolOptions = {}): E
             projectId: context.projectId,
             orderId,
             totalAmount,
-            currency: validated.items[0]?.currency || 'ARS',
+            currency: validated.items[0]?.currency ?? 'ARS',
           });
 
           return ok({
@@ -139,11 +139,11 @@ export function createCatalogOrderTool(options: CatalogOrderToolOptions = {}): E
               orderId,
               status: 'draft' as const,
               totalAmount,
-              currency: validated.items[0]?.currency || 'ARS',
+              currency: validated.items[0]?.currency ?? 'ARS',
               itemCount: validated.items.length,
               createdAt: new Date().toISOString(),
               approvalRequired: true,
-              message: `Pedido ${orderId} creado como borrador. Total: ${totalAmount} ${validated.items[0]?.currency || 'ARS'}. Un representante se contactará para confirmar.`,
+              message: `Pedido ${orderId} creado como borrador. Total: ${totalAmount} ${validated.items[0]?.currency ?? 'ARS'}. Un representante se contactará para confirmar.`,
             },
             durationMs: Date.now() - startTime,
           });
@@ -154,16 +154,16 @@ export function createCatalogOrderTool(options: CatalogOrderToolOptions = {}): E
           projectId: context.projectId,
           error,
         });
-        return err(new ToolExecutionError('catalog-order', 'Order creation failed', { cause: error }));
+        return err(new ToolExecutionError('catalog-order', 'Order creation failed', error instanceof Error ? error : undefined));
       }
     },
 
     // ─── Dry Run ──────────────────────────────────────────────────
 
-    async dryRun(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
+    dryRun(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) {
-        return err(new ToolExecutionError('catalog-order', 'Invalid input', { cause: parsed.error }));
+        return Promise.resolve(err(new ToolExecutionError('catalog-order', 'Invalid input', parsed.error)));
       }
 
       logger.debug('Dry run: catalog order', {
@@ -177,20 +177,20 @@ export function createCatalogOrderTool(options: CatalogOrderToolOptions = {}): E
         return sum + (item.quantity * item.unitPrice);
       }, 0);
 
-      return ok({
+      return Promise.resolve(ok({
         success: true,
         output: {
           orderId: 'DRY-RUN-ORDER',
           status: 'draft' as const,
           totalAmount,
-          currency: parsed.data.items[0]?.currency || 'ARS',
+          currency: parsed.data.items[0]?.currency ?? 'ARS',
           itemCount: parsed.data.items.length,
           createdAt: new Date().toISOString(),
           approvalRequired: true,
           message: 'Dry run - no order created',
         },
         durationMs: 0,
-      });
+      }));
     },
   };
 }

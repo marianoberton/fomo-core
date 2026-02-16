@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import type { ProjectId } from '@/core/types.js';
-import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { sendSuccess } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
 
 // ─── Schemas ────────────────────────────────────────────────────

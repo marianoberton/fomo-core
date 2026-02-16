@@ -222,10 +222,11 @@ describe('PromptLayerRepository Integration', () => {
       await repo.activate(v2.id);
 
       // Rollback: activate v1 again
-      await repo.activate(v1!.id);
+      if (!v1) throw new Error('Expected v1 layer to exist');
+      await repo.activate(v1.id);
 
       const active = await repo.getActiveLayer(projectId, 'identity');
-      expect(active?.id).toBe(v1!.id);
+      expect(active?.id).toBe(v1.id);
       expect(active?.version).toBe(1);
     });
 
@@ -286,7 +287,10 @@ describe('PromptLayerRepository Integration', () => {
       });
 
       // Newest version first
-      expect(identityLayers[0]!.version).toBeGreaterThan(identityLayers[1]!.version);
+      const first = identityLayers[0];
+      const second = identityLayers[1];
+      if (!first || !second) throw new Error('Expected at least 2 identity layers');
+      expect(first.version).toBeGreaterThan(second.version);
     });
   });
 });

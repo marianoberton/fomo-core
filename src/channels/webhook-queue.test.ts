@@ -2,8 +2,7 @@
  * Tests for WebhookQueue — async webhook processing with BullMQ.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { Logger } from '@/observability/logger.js';
-import type { InboundProcessor } from './inbound-processor.js';
+import type { ProjectId } from '@/core/types.js';
 import type { ChannelAdapter } from './types.js';
 import type { HandoffManager } from './handoff.js';
 import type { ChatwootWebhookEvent } from './adapters/chatwoot.js';
@@ -11,16 +10,11 @@ import type { WebhookJobData } from './webhook-queue-types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-const mockLogger = {
-  debug: vi.fn(),
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn(),
-} as unknown as Logger;
-
 const mockAdapter: ChannelAdapter = {
+  channelType: 'chatwoot',
   send: vi.fn().mockResolvedValue(undefined),
   parseInbound: vi.fn(),
+  isHealthy: vi.fn().mockResolvedValue(true),
 };
 
 const mockHandoffManager: HandoffManager = {
@@ -31,11 +25,15 @@ const mockHandoffManager: HandoffManager = {
   resume: vi.fn().mockResolvedValue(undefined),
 };
 
-const mockResolveAdapter = vi.fn().mockResolvedValue(mockAdapter);
+const mockResolveAdapter = vi.fn<(projectId: string) => Promise<ChannelAdapter | null>>()
+  .mockResolvedValue(mockAdapter);
 
-const mockInboundProcessor = {} as InboundProcessor;
-
-const mockRunAgent = vi.fn().mockResolvedValue({ response: 'Hola! ¿En qué puedo ayudarte?' });
+const mockRunAgent = vi.fn<(params: {
+  projectId: string;
+  sessionId: string;
+  userMessage: string;
+}) => Promise<{ response: string }>>()
+  .mockResolvedValue({ response: 'Hola! ¿En qué puedo ayudarte?' });
 
 // ─── Tests ──────────────────────────────────────────────────────────
 
@@ -48,14 +46,14 @@ describe('WebhookQueue', () => {
     it('validates WebhookJobData structure', () => {
       const jobData: WebhookJobData = {
         webhookId: 'wh_123',
-        projectId: 'proj_abc' as Parameters<typeof mockResolveAdapter>[0],
+        projectId: 'proj_abc' as ProjectId,
         event: {
           event: 'message_created',
           message_type: 'incoming',
           content: 'Hola',
           account: { id: 1 },
           conversation: { id: 456 },
-          sender: { type: 'contact' },
+          sender: { id: 1, type: 'contact' },
         } as ChatwootWebhookEvent,
         receivedAt: new Date().toISOString(),
         conversationId: 456,
@@ -71,7 +69,7 @@ describe('WebhookQueue', () => {
     it('allows optional conversationId', () => {
       const jobData: WebhookJobData = {
         webhookId: 'wh_123',
-        projectId: 'proj_abc' as Parameters<typeof mockResolveAdapter>[0],
+        projectId: 'proj_abc' as ProjectId,
         event: { event: 'message_created' } as ChatwootWebhookEvent,
         receivedAt: new Date().toISOString(),
       };
@@ -89,37 +87,41 @@ describe('WebhookQueue', () => {
         content: 'Hola',
         account: { id: 1 },
         conversation: { id: 789 },
-        sender: { type: 'contact' },
+        sender: { id: 1, type: 'contact' },
       };
 
-      const projectId = 'proj_test' as Parameters<typeof mockResolveAdapter>[0];
+      const projectId = 'proj_test';
       const conversationId = 789;
 
       // Mock parseInbound to return a message
       vi.mocked(mockAdapter.parseInbound).mockResolvedValue({
+        id: 'msg-1',
         channel: 'chatwoot',
+        channelMessageId: 'cw-msg-1',
+        projectId: 'proj_test' as ProjectId,
         senderIdentifier: 'contact_123',
         content: 'Hola',
-        timestamp: new Date(),
+        rawPayload: {},
+        receivedAt: new Date(),
       });
 
       // Resolve adapter
-      const adapter = await mockResolveAdapter(projectId);
+      const adapter: ChannelAdapter | null = await mockResolveAdapter(projectId);
       expect(adapter).toBe(mockAdapter);
 
       // Check escalation keywords
-      const shouldEscalate = mockHandoffManager.shouldEscalateFromMessage(event.content);
+      const shouldEscalate = mockHandoffManager.shouldEscalateFromMessage(event.content ?? '');
       expect(shouldEscalate).toBe(false);
 
       // Parse message
-      const message = await adapter.parseInbound(event);
+      const message = adapter ? await adapter.parseInbound(event) : null;
       expect(message).toBeDefined();
       expect(message?.content).toBe('Hola');
 
       // Run agent
       const result = await mockRunAgent({
         projectId,
-        sessionId: `cw-${conversationId}`,
+        sessionId: `cw-${String(conversationId)}`,
         userMessage: message?.content ?? '',
       });
       expect(result.response).toBe('Hola! ¿En qué puedo ayudarte?');
@@ -129,11 +131,13 @@ describe('WebhookQueue', () => {
       expect(shouldHandoff).toBe(false);
 
       // Send response
-      await adapter.send({
-        channel: 'chatwoot',
-        recipientIdentifier: String(conversationId),
-        content: result.response,
-      });
+      if (adapter) {
+        await adapter.send({
+          channel: 'chatwoot',
+          recipientIdentifier: String(conversationId),
+          content: result.response,
+        });
+      }
 
       expect(mockAdapter.send).toHaveBeenCalledWith({
         channel: 'chatwoot',
@@ -149,7 +153,7 @@ describe('WebhookQueue', () => {
         content: 'quiero hablar con un humano',
         account: { id: 1 },
         conversation: { id: 999 },
-        sender: { type: 'contact' },
+        sender: { id: 2, type: 'contact' },
       };
 
       const conversationId = 999;
@@ -157,16 +161,18 @@ describe('WebhookQueue', () => {
       // Mock escalation detection
       vi.mocked(mockHandoffManager.shouldEscalateFromMessage).mockReturnValue(true);
 
-      const shouldEscalate = mockHandoffManager.shouldEscalateFromMessage(event.content);
+      const shouldEscalate = mockHandoffManager.shouldEscalateFromMessage(event.content ?? '');
       expect(shouldEscalate).toBe(true);
 
-      // Escalate directly
-      const adapter = await mockResolveAdapter('proj_test' as Parameters<typeof mockResolveAdapter>[0]);
-      await mockHandoffManager.escalate(
-        conversationId,
-        adapter,
-        'Cliente solicito agente humano',
-      );
+      // Escalate directly — cast to ChatwootAdapter for handoff
+      const adapter = await mockResolveAdapter('proj_test');
+      if (adapter) {
+        await mockHandoffManager.escalate(
+          conversationId,
+          adapter as unknown as import('./adapters/chatwoot.js').ChatwootAdapter,
+          'Cliente solicito agente humano',
+        );
+      }
 
       expect(mockHandoffManager.escalate).toHaveBeenCalledWith(
         conversationId,
@@ -176,15 +182,6 @@ describe('WebhookQueue', () => {
     });
 
     it('handles escalation from agent response', async () => {
-      const event: ChatwootWebhookEvent = {
-        event: 'message_created',
-        message_type: 'incoming',
-        content: 'necesito ayuda con un problema complejo',
-        account: { id: 1 },
-        conversation: { id: 888 },
-        sender: { type: 'contact' },
-      };
-
       const conversationId = 888;
 
       // Mock agent response with [HANDOFF] marker
@@ -199,18 +196,31 @@ describe('WebhookQueue', () => {
 
       // Parse message
       vi.mocked(mockAdapter.parseInbound).mockResolvedValue({
+        id: 'msg-2',
         channel: 'chatwoot',
+        channelMessageId: 'cw-msg-2',
+        projectId: 'proj_test' as ProjectId,
         senderIdentifier: 'contact_456',
         content: 'necesito ayuda con un problema complejo',
-        timestamp: new Date(),
+        rawPayload: {},
+        receivedAt: new Date(),
       });
+
+      const event: ChatwootWebhookEvent = {
+        event: 'message_created',
+        message_type: 'incoming',
+        content: 'necesito ayuda con un problema complejo',
+        account: { id: 1 },
+        conversation: { id: 888 },
+        sender: { id: 3, type: 'contact' },
+      };
 
       const message = await mockAdapter.parseInbound(event);
 
       // Run agent
       const result = await mockRunAgent({
-        projectId: 'proj_test' as Parameters<typeof mockResolveAdapter>[0],
-        sessionId: `cw-${conversationId}`,
+        projectId: 'proj_test',
+        sessionId: `cw-${String(conversationId)}`,
         userMessage: message?.content ?? '',
       });
 
@@ -223,19 +233,21 @@ describe('WebhookQueue', () => {
       expect(cleanResponse).toBe('Entiendo.  Voy a transferirte con un agente humano.');
 
       // Send response before escalating
-      const adapter = await mockResolveAdapter('proj_test' as Parameters<typeof mockResolveAdapter>[0]);
-      await adapter.send({
-        channel: 'chatwoot',
-        recipientIdentifier: String(conversationId),
-        content: cleanResponse,
-      });
+      const adapter = await mockResolveAdapter('proj_test');
+      if (adapter) {
+        await adapter.send({
+          channel: 'chatwoot',
+          recipientIdentifier: String(conversationId),
+          content: cleanResponse,
+        });
 
-      // Escalate
-      await mockHandoffManager.escalate(
-        conversationId,
-        adapter,
-        'El agente AI determino que se requiere asistencia humana',
-      );
+        // Escalate
+        await mockHandoffManager.escalate(
+          conversationId,
+          adapter as unknown as import('./adapters/chatwoot.js').ChatwootAdapter,
+          'El agente AI determino que se requiere asistencia humana',
+        );
+      }
 
       expect(mockAdapter.send).toHaveBeenCalled();
       expect(mockHandoffManager.escalate).toHaveBeenCalled();
@@ -247,7 +259,7 @@ describe('WebhookQueue', () => {
         message_type: 'outgoing', // Not incoming, so won't be parsed
         account: { id: 1 },
         conversation: { id: 777 },
-        sender: { type: 'agent_bot' },
+        sender: { id: 99, type: 'user' },
       };
 
       vi.mocked(mockAdapter.parseInbound).mockResolvedValue(null);

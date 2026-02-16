@@ -49,12 +49,16 @@ export function parseStockCSV(csvContent: string): StockUpdate[] {
     throw new Error('CSV must have at least a header and one data row');
   }
 
-  const header = lines[0].toLowerCase().split(',').map((h) => h.trim());
+  const headerLine = lines[0];
+  if (!headerLine) {
+    throw new Error('CSV must have a header row');
+  }
+  const header = headerLine.toLowerCase().split(',').map((h) => h.trim());
 
   // Validate required columns
   const skuIndex = header.indexOf('sku');
-  const stockIndex = header.indexOf('stock') >= 0 ? header.indexOf('stock') : header.indexOf('cantidad');
-  const priceIndex = header.indexOf('price') >= 0 ? header.indexOf('price') : header.indexOf('precio');
+  const stockIndex = header.includes('stock') ? header.indexOf('stock') : header.indexOf('cantidad');
+  const priceIndex = header.includes('price') ? header.indexOf('price') : header.indexOf('precio');
 
   if (skuIndex === -1 || stockIndex === -1) {
     throw new Error('CSV must contain at least SKU and STOCK/CANTIDAD columns');
@@ -63,18 +67,22 @@ export function parseStockCSV(csvContent: string): StockUpdate[] {
   const updates: StockUpdate[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+    const line = lines[i];
+    if (!line?.trim()) continue;
 
-    const values = line.split(',').map((v) => v.trim());
+    const values = line.trim().split(',').map((v) => v.trim());
+
+    const skuValue = values[skuIndex] ?? '';
+    const stockValue = values[stockIndex] ?? '';
 
     const update: StockUpdate = {
-      sku: values[skuIndex],
-      stock: parseInt(values[stockIndex], 10),
+      sku: skuValue,
+      stock: parseInt(stockValue, 10),
     };
 
-    if (priceIndex !== -1 && values[priceIndex]) {
-      update.price = parseFloat(values[priceIndex]);
+    const priceValue = priceIndex !== -1 ? values[priceIndex] : undefined;
+    if (priceValue) {
+      update.price = parseFloat(priceValue);
     }
 
     if (isNaN(update.stock)) {
@@ -175,7 +183,7 @@ export function searchProducts(products: Product[], query: string): Product[] {
     (p) =>
       p.sku.toLowerCase().includes(lowerQuery) ||
       p.name.toLowerCase().includes(lowerQuery) ||
-      (p.category && p.category.toLowerCase().includes(lowerQuery))
+      (p.category?.toLowerCase().includes(lowerQuery))
   );
 }
 

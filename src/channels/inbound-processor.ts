@@ -82,7 +82,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
 
       try {
         // Use project ID from message if available, otherwise fall back to default
-        const projectId = (message.projectId || defaultProjectId) as ProjectId;
+        const projectId = (message.projectId || defaultProjectId);
 
         // 1. Resolve or create contact
         const identifier = channelToIdentifier(message.channel, message.senderIdentifier);

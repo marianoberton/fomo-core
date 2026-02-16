@@ -65,10 +65,11 @@ describe('Lead Scoring', () => {
       const score = calculateLeadScore(leadData);
       const metadata = buildLeadMetadata({}, leadData, score);
 
-      expect(metadata.vertical).toBe('vehicles');
-      expect(metadata.leadScore).toBeDefined();
-      expect((metadata.leadScore as any).score).toBe(score.score);
-      expect((metadata.leadScore as any).tier).toBe(score.tier);
+      expect(metadata['vertical']).toBe('vehicles');
+      expect(metadata['leadScore']).toBeDefined();
+      const leadScore = metadata['leadScore'] as Record<string, unknown>;
+      expect(leadScore['score']).toBe(score.score);
+      expect(leadScore['tier']).toBe(score.tier);
     });
   });
 });

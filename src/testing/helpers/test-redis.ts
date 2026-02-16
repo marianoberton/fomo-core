@@ -23,7 +23,7 @@ export interface TestRedis {
  * @returns Test Redis instance.
  */
 export async function createTestRedis(): Promise<TestRedis> {
-  const testRedisUrl = process.env['TEST_REDIS_URL'] || 'redis://localhost:6380';
+  const testRedisUrl = process.env['TEST_REDIS_URL'] ?? 'redis://localhost:6380';
 
   const client = new Redis(testRedisUrl, {
     // Suppress Redis logs in tests

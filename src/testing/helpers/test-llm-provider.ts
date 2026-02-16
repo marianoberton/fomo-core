@@ -9,11 +9,11 @@ export interface MockLLMProviderConfig {
   /** Predefined text responses to return. */
   responses?: string[];
   /** Predefined tool calls to return. */
-  toolCalls?: Array<{
+  toolCalls?: {
     id: string;
     name: string;
     input: Record<string, unknown>;
-  }>;
+  }[];
   /** Usage tokens to report. */
   usage?: {
     inputTokens: number;
@@ -39,7 +39,7 @@ export function createMockLLMProvider(config?: MockLLMProviderConfig): LLMProvid
     usage = { inputTokens: 10, outputTokens: 20 },
     simulateDelay = false,
     delayMs = 10,
-  } = config || {};
+  } = config ?? {};
 
   return {
     id: 'mock:test-provider',
@@ -59,7 +59,7 @@ export function createMockLLMProvider(config?: MockLLMProviderConfig): LLMProvid
       };
 
       // Yield text response as chunks
-      const responseText = responses[0] || '';
+      const responseText = responses[0] ?? '';
       const words = responseText.split(' ');
 
       for (const word of words) {
@@ -100,14 +100,14 @@ export function createMockLLMProvider(config?: MockLLMProviderConfig): LLMProvid
      * Mock token counting.
      * Returns estimated count based on string length.
      */
-    countTokens: async (messages: Message[]): Promise<number> => {
+    countTokens: (messages: Message[]): Promise<number> => {
       const totalChars = messages.reduce((sum, msg) => {
         if (typeof msg.content === 'string') {
           return sum + msg.content.length;
         }
         return sum;
       }, 0);
-      return Math.ceil(totalChars / 4); // Rough estimate: 4 chars per token
+      return Promise.resolve(Math.ceil(totalChars / 4)); // Rough estimate: 4 chars per token
     },
 
     /**

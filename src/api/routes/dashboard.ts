@@ -58,8 +58,8 @@ export function dashboardRoutes(
       activeAgentsCount: agents.filter((a) => a.status === 'active').length,
       activeSessionsCount,
       pendingApprovalsCount: pendingApprovals.length,
-      todayCostUsd: todayUsage._sum?.costUsd ?? 0,
-      weekCostUsd: weekUsage._sum?.costUsd ?? 0,
+      todayCostUsd: todayUsage._sum.costUsd ?? 0,
+      weekCostUsd: weekUsage._sum.costUsd ?? 0,
     });
   });
 }

@@ -1,77 +1,105 @@
+/**
+ * Hotel Detect Language Tool Tests
+ */
 import { describe, it, expect } from 'vitest';
-import { hotelDetectLanguageTool } from './hotel-detect-language.js';
+import { createHotelDetectLanguageTool } from './hotel-detect-language.js';
+import type { ExecutionContext } from '@/core/types.js';
+import type { ProjectId, SessionId, TraceId } from '@/core/types.js';
 
-describe('Hotel Detect Language Tool', () => {
-  describe('Schema Validation', () => {
-    it('should validate valid input', () => {
-      const input = {
+describe('hotel-detect-language tool', () => {
+  const mockContext: ExecutionContext = {
+    projectId: 'test-project' as ProjectId,
+    sessionId: 'test-session' as SessionId,
+    traceId: 'test-trace' as TraceId,
+    agentConfig: {} as ExecutionContext['agentConfig'],
+    permissions: { allowedTools: new Set(['hotel-detect-language']) },
+    abortSignal: new AbortController().signal,
+  };
+
+  describe('schema validation', () => {
+    it('validates valid input', () => {
+      const tool = createHotelDetectLanguageTool();
+      const result = tool.inputSchema.safeParse({
         contactId: 'contact-123',
         text: 'Hello, I would like to book a room',
-      };
-
-      const result = hotelDetectLanguageTool.inputSchema.safeParse(input);
+      });
       expect(result.success).toBe(true);
     });
 
-    it('should accept forceLanguage', () => {
-      const input = {
+    it('accepts forceLanguage', () => {
+      const tool = createHotelDetectLanguageTool();
+      const result = tool.inputSchema.safeParse({
         contactId: 'contact-123',
         text: 'any text',
         forceLanguage: 'en',
-      };
-
-      const result = hotelDetectLanguageTool.inputSchema.safeParse(input);
+      });
       expect(result.success).toBe(true);
     });
   });
 
-  describe('Dry Run', () => {
-    it('should detect English', async () => {
-      const input = {
+  describe('dryRun', () => {
+    it('detects English', async () => {
+      const tool = createHotelDetectLanguageTool();
+      const result = await tool.dryRun({
         contactId: 'contact-123',
         text: 'Hello, I would like to book a room please',
-      };
+      }, mockContext);
 
-      const result = await hotelDetectLanguageTool.dryRun(input);
-
-      expect(result.success).toBe(true);
-      expect(result.language).toBe('en');
-      expect(result.instructions).toBeTruthy();
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['success']).toBe(true);
+        expect(output['language']).toBe('en');
+        expect(output['instructions']).toBeTruthy();
+      }
     });
 
-    it('should detect Spanish', async () => {
-      const input = {
+    it('detects Spanish', async () => {
+      const tool = createHotelDetectLanguageTool();
+      const result = await tool.dryRun({
         contactId: 'contact-123',
         text: 'Hola, quisiera reservar una habitación',
-      };
+      }, mockContext);
 
-      const result = await hotelDetectLanguageTool.dryRun(input);
-
-      expect(result.success).toBe(true);
-      expect(result.language).toBe('es');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['success']).toBe(true);
+        expect(output['language']).toBe('es');
+      }
     });
 
-    it('should use forced language', async () => {
-      const input = {
+    it('uses forced language', async () => {
+      const tool = createHotelDetectLanguageTool();
+      const result = await tool.dryRun({
         contactId: 'contact-123',
         text: 'any text',
-        forceLanguage: 'fr' as const,
-      };
+        forceLanguage: 'fr',
+      }, mockContext);
 
-      const result = await hotelDetectLanguageTool.dryRun(input);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['success']).toBe(true);
+        expect(output['language']).toBe('fr');
+        expect(output['confidence']).toBe('high');
+      }
+    });
 
-      expect(result.success).toBe(true);
-      expect(result.language).toBe('fr');
-      expect(result.confidence).toBe('high');
+    it('rejects invalid input', async () => {
+      const tool = createHotelDetectLanguageTool();
+      const result = await tool.dryRun({}, mockContext);
+
+      expect(result.ok).toBe(false);
     });
   });
 
-  describe('Tool Properties', () => {
-    it('should have correct metadata', () => {
-      expect(hotelDetectLanguageTool.id).toBe('hotel-detect-language');
-      expect(hotelDetectLanguageTool.riskLevel).toBe('low');
-      expect(hotelDetectLanguageTool.tags).toContain('hotels');
-      expect(hotelDetectLanguageTool.tags).toContain('language');
+  describe('tool properties', () => {
+    it('has correct metadata', () => {
+      const tool = createHotelDetectLanguageTool();
+      expect(tool.id).toBe('hotel-detect-language');
+      expect(tool.riskLevel).toBe('low');
+      expect(tool.category).toBe('hotels');
     });
   });
 });

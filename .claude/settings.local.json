@@ -5,7 +5,14 @@
       "Bash(pnpm test:unit)",
       "Bash(pnpm test:e2e)",
       "Bash(git -C \"c:\\\\Users\\\\Mariano\\\\Documents\\\\fomo-core\" diff --stat)",
-      "Bash(git -C \"c:\\\\Users\\\\Mariano\\\\Documents\\\\fomo-core\" log --oneline -5)"
+      "Bash(git -C \"c:\\\\Users\\\\Mariano\\\\Documents\\\\fomo-core\" log --oneline -5)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(npx next lint:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx prisma migrate dev:*)"
     ]
   }
 }

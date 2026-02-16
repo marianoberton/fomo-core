@@ -318,7 +318,7 @@ describe('WhatsAppAdapter', () => {
   describe('send', () => {
     it('sends text message successfully', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
-        json: async () => ({
+        json: () => Promise.resolve({
           messaging_product: 'whatsapp',
           messages: [{ id: 'sent_msg_123' }],
         }),
@@ -340,20 +340,24 @@ describe('WhatsAppAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(result.channelMessageId).toBe('sent_msg_123');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const expectedHeaders = expect.objectContaining({
+        'Authorization': 'Bearer test-token-123',
+      });
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/test-phone-id/messages'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-token-123',
-          }),
+          headers: expectedHeaders,
         }),
       );
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
     });
 
     it('handles API errors', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
-        json: async () => ({
+        json: () => Promise.resolve({
           error: {
             message: 'Invalid phone number',
             type: 'OAuthException',

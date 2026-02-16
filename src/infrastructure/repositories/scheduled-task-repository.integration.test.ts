@@ -341,7 +341,10 @@ describe('ScheduledTaskRepository Integration', () => {
       const runs = await repo.listRuns(task.id);
       expect(runs).toHaveLength(3);
       // Newest first
-      expect(runs[0]!.createdAt.getTime()).toBeGreaterThanOrEqual(runs[1]!.createdAt.getTime());
+      const first = runs[0];
+      const second = runs[1];
+      if (!first || !second) throw new Error('Expected at least 2 runs');
+      expect(first.createdAt.getTime()).toBeGreaterThanOrEqual(second.createdAt.getTime());
     });
 
     it('respects limit parameter', async () => {

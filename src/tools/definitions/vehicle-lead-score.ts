@@ -5,17 +5,24 @@
  */
 
 import { z } from 'zod';
-import type { ExecutableTool } from '../registry/types.js';
-import type { ExecutionContext } from '../../core/types.js';
-import { NexusError } from '../../core/errors.js';
-import { prisma } from '../../infrastructure/database.js';
+import type { ExecutionContext } from '@/core/types.js';
+import type { Result } from '@/core/result.js';
+import { ok, err } from '@/core/result.js';
+import { ToolExecutionError } from '@/core/errors.js';
+import type { NexusError } from '@/core/errors.js';
+import type { ExecutableTool, ToolResult } from '@/tools/types.js';
+import { Prisma } from '@prisma/client';
+import { createLogger } from '@/observability/logger.js';
+import { getDatabase } from '@/infrastructure/database.js';
 import {
   LeadDataSchema,
   calculateLeadScore,
   buildLeadMetadata,
-} from '../../verticals/vehicles/lead-scoring.js';
+} from '@/verticals/vehicles/lead-scoring.js';
 
-// ─── Tool Definition ────────────────────────────────────────────
+const logger = createLogger({ name: 'vehicle-lead-score' });
+
+// ─── Schemas ───────────────────────────────────────────────────
 
 const inputSchema = z.object({
   contactId: z.string().describe('Contact ID to score'),
@@ -48,86 +55,110 @@ const outputSchema = z.object({
   suggestedActions: z.array(z.string()),
 });
 
-type Input = z.infer<typeof inputSchema>;
-type Output = z.infer<typeof outputSchema>;
+// ─── Tool Factory ──────────────────────────────────────────────
 
-// ─── Tool Implementation ────────────────────────────────────────
-
-async function execute(input: Input, context: ExecutionContext): Promise<Output> {
-  const { projectId } = context;
-  const { contactId, ...leadData } = input;
-
-  // Validate contact exists and belongs to project
-  const contact = await prisma.contact.findUnique({
-    where: { id: contactId },
-  });
-
-  if (!contact) {
-    throw new NexusError('TOOL_EXECUTION_ERROR', `Contact ${contactId} not found`);
-  }
-
-  if (contact.projectId !== projectId) {
-    throw new NexusError(
-      'TOOL_EXECUTION_ERROR',
-      `Contact ${contactId} does not belong to project ${projectId}`
-    );
-  }
-
-  // Calculate lead score
-  const validatedLeadData = LeadDataSchema.parse(leadData);
-  const score = calculateLeadScore(validatedLeadData);
-
-  // Update contact metadata
-  const updatedMetadata = buildLeadMetadata(contact.metadata, validatedLeadData, score);
-
-  await prisma.contact.update({
-    where: { id: contactId },
-    data: { metadata: updatedMetadata },
-  });
-
-  context.logger.info('Lead score calculated and stored', {
-    contactId,
-    score: score.score,
-    tier: score.tier,
-  });
-
+export function createVehicleLeadScoreTool(): ExecutableTool {
   return {
-    success: true,
-    contactId,
-    score: score.score,
-    tier: score.tier,
-    reasoning: score.reasoning,
-    suggestedActions: score.suggestedActions,
+    id: 'vehicle-lead-score',
+    name: 'Score Vehicle Lead',
+    description:
+      'Calculate and store lead quality score for vehicle sales. Scores are based on budget, urgency, and vehicle preferences.',
+    category: 'vehicles',
+    riskLevel: 'low',
+    requiresApproval: false,
+    sideEffects: true,
+    supportsDryRun: true,
+
+    inputSchema,
+    outputSchema,
+
+    async execute(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
+      const startTime = Date.now();
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return err(new ToolExecutionError('vehicle-lead-score', 'Invalid input', parsed.error));
+      }
+      const { contactId, ...leadData } = parsed.data;
+
+      try {
+        const contact = await getDatabase().client.contact.findUnique({
+          where: { id: contactId },
+        });
+
+        if (!contact) {
+          return err(new ToolExecutionError('vehicle-lead-score', `Contact ${contactId} not found`));
+        }
+
+        if (contact.projectId !== context.projectId) {
+          return err(new ToolExecutionError(
+            'vehicle-lead-score',
+            `Contact ${contactId} does not belong to project ${context.projectId}`
+          ));
+        }
+
+        const validatedLeadData = LeadDataSchema.parse(leadData);
+        const score = calculateLeadScore(validatedLeadData);
+        const updatedMetadata = buildLeadMetadata(contact.metadata, validatedLeadData, score);
+
+        await getDatabase().client.contact.update({
+          where: { id: contactId },
+          data: { metadata: updatedMetadata as Prisma.InputJsonValue },
+        });
+
+        logger.info('Lead score calculated and stored', {
+          component: 'vehicle-lead-score',
+          contactId,
+          score: score.score,
+          tier: score.tier,
+        });
+
+        return ok({
+          success: true,
+          output: {
+            success: true,
+            contactId,
+            score: score.score,
+            tier: score.tier,
+            reasoning: score.reasoning,
+            suggestedActions: score.suggestedActions,
+          },
+          durationMs: Date.now() - startTime,
+        });
+      } catch (error) {
+        logger.error('Lead scoring failed', {
+          component: 'vehicle-lead-score',
+          contactId,
+          error,
+        });
+        return err(new ToolExecutionError(
+          'vehicle-lead-score',
+          'Lead scoring failed',
+          error instanceof Error ? error : undefined
+        ));
+      }
+    },
+
+    dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return Promise.resolve(err(new ToolExecutionError('vehicle-lead-score', 'Invalid input', parsed.error)));
+      }
+      const { contactId, ...leadData } = parsed.data;
+      const validatedLeadData = LeadDataSchema.parse(leadData);
+      const score = calculateLeadScore(validatedLeadData);
+
+      return Promise.resolve(ok({
+        success: true,
+        output: {
+          success: true,
+          contactId,
+          score: score.score,
+          tier: score.tier,
+          reasoning: score.reasoning,
+          suggestedActions: score.suggestedActions,
+        },
+        durationMs: 0,
+      }));
+    },
   };
 }
-
-async function dryRun(input: Input): Promise<Output> {
-  const { contactId, ...leadData } = input;
-  const validatedLeadData = LeadDataSchema.parse(leadData);
-  const score = calculateLeadScore(validatedLeadData);
-
-  return {
-    success: true,
-    contactId,
-    score: score.score,
-    tier: score.tier,
-    reasoning: score.reasoning,
-    suggestedActions: score.suggestedActions,
-  };
-}
-
-// ─── Tool Export ────────────────────────────────────────────────
-
-export const vehicleLeadScoreTool: ExecutableTool = {
-  id: 'vehicle-lead-score',
-  name: 'Score Vehicle Lead',
-  description:
-    'Calculate and store lead quality score for vehicle sales. Scores are based on budget, urgency, and vehicle preferences.',
-  inputSchema,
-  outputSchema,
-  riskLevel: 'low',
-  requiresApproval: false,
-  tags: ['vehicles', 'crm', 'scoring'],
-  execute,
-  dryRun,
-};

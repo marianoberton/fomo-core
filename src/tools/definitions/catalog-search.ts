@@ -75,7 +75,7 @@ export function createCatalogSearchTool(options: CatalogSearchToolOptions = {}):
       const startTime = Date.now();
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) {
-        return err(new ToolExecutionError('catalog-search', 'Invalid input', { cause: parsed.error }));
+        return err(new ToolExecutionError('catalog-search', 'Invalid input', parsed.error));
       }
       const validated = parsed.data;
 
@@ -99,7 +99,7 @@ export function createCatalogSearchTool(options: CatalogSearchToolOptions = {}):
               id: 'DEMO-001',
               name: `Demo Product matching "${validated.query}"`,
               description: 'This is a placeholder. Configure your catalog in the project settings.',
-              category: validated.filters?.category || 'general',
+              category: validated.filters?.category ?? 'general',
               price: 0,
               currency: 'ARS',
               inStock: true,
@@ -126,16 +126,16 @@ export function createCatalogSearchTool(options: CatalogSearchToolOptions = {}):
           projectId: context.projectId,
           error,
         });
-        return err(new ToolExecutionError('catalog-search', 'Catalog search failed', { cause: error }));
+        return err(new ToolExecutionError('catalog-search', 'Catalog search failed', error instanceof Error ? error : undefined));
       }
     },
 
     // ─── Dry Run ──────────────────────────────────────────────────
 
-    async dryRun(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
+    dryRun(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) {
-        return err(new ToolExecutionError('catalog-search', 'Invalid input', { cause: parsed.error }));
+        return Promise.resolve(err(new ToolExecutionError('catalog-search', 'Invalid input', parsed.error)));
       }
 
       logger.debug('Dry run: catalog search', {
@@ -145,7 +145,7 @@ export function createCatalogSearchTool(options: CatalogSearchToolOptions = {}):
         query: parsed.data.query,
       });
 
-      return ok({
+      return Promise.resolve(ok({
         success: true,
         output: {
           results: [],
@@ -153,7 +153,7 @@ export function createCatalogSearchTool(options: CatalogSearchToolOptions = {}):
           searchTime: 0,
         },
         durationMs: 0,
-      });
+      }));
     },
   };
 }

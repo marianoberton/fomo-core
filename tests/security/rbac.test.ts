@@ -218,7 +218,7 @@ describe('RBAC - E2E', () => {
 
     const response = await server.inject({
       method: 'POST',
-      url: '/chat',
+      url: '/api/v1/chat',
       payload: {
         projectId,
         message: 'What time is it?',
@@ -247,7 +247,7 @@ describe('RBAC - E2E', () => {
 
     const response = await server.inject({
       method: 'POST',
-      url: '/chat',
+      url: '/api/v1/chat',
       payload: {
         projectId,
         message: 'What is 5 times 3?',
@@ -275,7 +275,7 @@ describe('RBAC - E2E', () => {
 
     const response = await server.inject({
       method: 'POST',
-      url: '/chat',
+      url: '/api/v1/chat',
       payload: {
         projectId,
         message: 'Send an email to someone',
@@ -303,7 +303,7 @@ describe('RBAC - E2E', () => {
 
     const response = await server.inject({
       method: 'POST',
-      url: '/chat',
+      url: '/api/v1/chat',
       payload: {
         projectId,
         message: 'Calculate something',

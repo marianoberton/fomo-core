@@ -56,7 +56,7 @@ describe('ChatwootAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(result.channelMessageId).toBe('42');
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(fetch).toHaveBeenCalledWith(
         'https://chatwoot.test.io/api/v1/accounts/1/conversations/99/messages',
         expect.objectContaining({
@@ -220,7 +220,7 @@ describe('ChatwootAdapter', () => {
       await adapter.handoffToHuman(42, 'Cliente necesita ayuda humana');
 
       // Should call: assignments, toggle_status, messages (note)
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(fetch).toHaveBeenCalledTimes(3);
 
       const calls = vi.mocked(fetch).mock.calls;
@@ -249,7 +249,7 @@ describe('ChatwootAdapter', () => {
       await adapter.handoffToHuman(42);
 
       // Only 2 calls: assignment + toggle_status (no note)
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(fetch).toHaveBeenCalledTimes(2);
     });
   });
@@ -264,7 +264,7 @@ describe('ChatwootAdapter', () => {
       const adapter = createChatwootAdapter(config);
       await adapter.resumeBot(42);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(fetch).toHaveBeenCalledTimes(2);
 
       const calls = vi.mocked(fetch).mock.calls;

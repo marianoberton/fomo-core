@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from './handoff.js';
 import type { ChatwootAdapter } from './adapters/chatwoot.js';
 
-function createMockLogger() {
+function createMockLogger(): Record<string, ReturnType<typeof vi.fn>> {
   return {
     debug: vi.fn(),
     info: vi.fn(),
@@ -124,7 +124,7 @@ describe('HandoffManager', () => {
 
       await manager.escalate(42, adapter, 'Cliente solicito humano');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(adapter.handoffToHuman).toHaveBeenCalledWith(
         42,
         expect.stringContaining('Cliente solicito humano'),
@@ -142,7 +142,7 @@ describe('HandoffManager', () => {
 
       await manager.resume(42, adapter);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(adapter.resumeBot).toHaveBeenCalledWith(42);
     });
   });

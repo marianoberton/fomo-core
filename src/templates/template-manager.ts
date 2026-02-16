@@ -2,6 +2,7 @@
  * Template Manager
  * Service for creating projects from pre-configured vertical templates
  */
+import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type { AgentConfig, ProjectId } from '@/core/types.js';
 import type { PromptLayer } from '@/prompts/types.js';
@@ -105,7 +106,7 @@ export class TemplateManager {
   /**
    * List all available vertical templates
    */
-  listTemplates(): Array<{ id: string; name: string; description: string }> {
+  listTemplates(): { id: string; name: string; description: string }[] {
     return Object.values(VERTICAL_TEMPLATES).map((t) => ({
       id: t.id,
       name: t.name,
@@ -140,12 +141,13 @@ export class TemplateManager {
       owner: params.owner,
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
     const projectId = nanoid() as ProjectId;
 
     // Build full agent config from template + user overrides
     const agentConfig: AgentConfig = {
       projectId,
-      agentRole: template.agentConfig.agentRole || 'assistant',
+      agentRole: template.agentConfig.agentRole ?? 'assistant',
       provider: params.provider,
       failover: {
         onRateLimit: true,
@@ -154,8 +156,8 @@ export class TemplateManager {
         timeoutMs: 30000,
         maxRetries: 3,
       },
-      allowedTools: template.agentConfig.allowedTools || [],
-      memoryConfig: template.agentConfig.memoryConfig || {
+      allowedTools: template.agentConfig.allowedTools ?? [],
+      memoryConfig: template.agentConfig.memoryConfig ?? {
         longTerm: {
           enabled: true,
           maxEntries: 1000,
@@ -174,7 +176,7 @@ export class TemplateManager {
           },
         },
       },
-      costConfig: template.agentConfig.costConfig || {
+      costConfig: template.agentConfig.costConfig ?? {
         dailyBudgetUSD: 5.0,
         monthlyBudgetUSD: 100.0,
         maxTokensPerTurn: 4000,
@@ -185,8 +187,8 @@ export class TemplateManager {
         maxRequestsPerMinute: 20,
         maxRequestsPerHour: 200,
       },
-      maxTurnsPerSession: template.agentConfig.maxTurnsPerSession || 50,
-      maxConcurrentSessions: template.agentConfig.maxConcurrentSessions || 100,
+      maxTurnsPerSession: template.agentConfig.maxTurnsPerSession ?? 50,
+      maxConcurrentSessions: template.agentConfig.maxConcurrentSessions ?? 100,
     };
 
     // Create project in database
@@ -194,11 +196,11 @@ export class TemplateManager {
       data: {
         id: projectId,
         name: params.projectName,
-        description: params.projectDescription || template.description,
+        description: params.projectDescription ?? template.description,
         environment: params.environment,
         owner: params.owner,
-        tags: params.tags || [template.id, 'template-generated'],
-        configJson: agentConfig as any,
+        tags: params.tags ?? [template.id, 'template-generated'],
+        configJson: agentConfig as unknown as Prisma.InputJsonValue,
         status: 'active',
       },
     });
@@ -286,7 +288,7 @@ export class TemplateManager {
 
     const nextVersions: Record<string, number> = {};
     for (const group of existingLayers) {
-      nextVersions[group.layerType] = (group._max.version || 0) + 1;
+      nextVersions[group.layerType] = (group._max.version ?? 0) + 1;
     }
 
     // Create new active layers from template
@@ -297,7 +299,7 @@ export class TemplateManager {
     ];
 
     for (const layer of layers) {
-      const version = nextVersions[layer.layerType] || 1;
+      const version = nextVersions[layer.layerType] ?? 1;
       await this.prisma.promptLayer.create({
         data: {
           id: nanoid(),
@@ -309,7 +311,7 @@ export class TemplateManager {
           createdAt: new Date(),
           createdBy: params.updatedBy,
           changeReason: `Updated from template: ${params.templateId}`,
-          metadata: { templateId: params.templateId },
+          metadata: { templateId: params.templateId } as Prisma.InputJsonValue,
         },
       });
     }

@@ -167,8 +167,9 @@ function buildReasoning(
  */
 function getSuggestedActions(
   tier: LeadScore['tier'],
-  data: LeadData
+  _data: LeadData
 ): string[] {
+  void _data;
   switch (tier) {
     case 'urgent':
       return [
@@ -213,7 +214,7 @@ export function buildLeadMetadata(
   leadData: LeadData,
   score: LeadScore
 ): Record<string, unknown> {
-  const metadata = (existingMetadata as Record<string, unknown>) || {};
+  const metadata = (existingMetadata ?? {}) as Record<string, unknown>;
 
   return {
     ...metadata,

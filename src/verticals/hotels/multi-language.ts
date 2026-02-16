@@ -95,7 +95,11 @@ export function detectLanguage(text: string): LanguageDetection {
   }
 
   entries.sort((a, b) => b[1] - a[1]);
-  const [topLang, topScore] = entries[0];
+  const topEntry = entries[0];
+  if (!topEntry) {
+    return { language: 'es', confidence: 'low', fallback: true };
+  }
+  const [topLang, topScore] = topEntry;
 
   const confidence = topScore >= 2 ? 'high' : topScore === 1 ? 'medium' : 'low';
 
@@ -184,7 +188,7 @@ export function buildLanguageMetadata(
   language: SupportedLanguage,
   confidence: LanguageDetection['confidence']
 ): Record<string, unknown> {
-  const metadata = (existingMetadata as Record<string, unknown>) || {};
+  const metadata = (existingMetadata ?? {}) as Record<string, unknown>;
 
   return {
     ...metadata,

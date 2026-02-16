@@ -9,9 +9,10 @@
  * Conditional startup: only starts if REDIS_URL is set.
  */
 import { Queue, Worker } from 'bullmq';
+import type { ProjectId } from '@/core/types.js';
 import type { Logger } from '@/observability/logger.js';
 import type { InboundProcessor } from './inbound-processor.js';
-import type { ChannelAdapter } from './types.js';
+import type { ChatwootAdapter } from './adapters/chatwoot.js';
 import type { HandoffManager } from './handoff.js';
 import type { WebhookJobData, WebhookJobResult } from './webhook-queue-types.js';
 
@@ -22,14 +23,14 @@ export interface WebhookQueueOptions {
   /** Redis connection URL. */
   redisUrl: string;
   /** Callback to resolve Chatwoot adapter for a project. */
-  resolveAdapter: (projectId: string) => Promise<ChannelAdapter | null>;
+  resolveAdapter: (projectId: ProjectId | string) => Promise<ChatwootAdapter | null>;
   /** InboundProcessor for handling messages. */
   inboundProcessor: InboundProcessor;
   /** HandoffManager for escalations. */
   handoffManager: HandoffManager;
   /** Callback to run agent and get response. */
   runAgent: (params: {
-    projectId: string;
+    projectId: ProjectId | string;
     sessionId: string;
     userMessage: string;
   }) => Promise<{ response: string }>;
@@ -103,6 +104,7 @@ export function createWebhookQueue(options: WebhookQueueOptions): WebhookQueue {
       });
     },
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async start(): Promise<void> {
       queue = new Queue<WebhookJobData, WebhookJobResult>(QUEUE_NAME, { connection });
 

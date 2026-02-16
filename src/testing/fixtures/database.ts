@@ -2,7 +2,7 @@
  * Database fixtures for integration tests.
  * Provides helpers to create persisted test data.
  */
-import type { PrismaClient, Prisma } from '@prisma/client';
+import type { PrismaClient, Prisma, Project, Session, ExecutionTrace } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import type { ProjectId, SessionId, TraceId, AgentConfig } from '@/core/types.js';
 import { createTestAgentConfig } from './context.js';
@@ -25,18 +25,19 @@ export async function createTestProject(
     tags: string[];
     status: 'active' | 'archived';
   }>,
-) {
-  const projectId = (overrides?.id || nanoid()) as ProjectId;
-  const config = overrides?.config || createTestAgentConfig({ projectId });
+): Promise<Project> {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
+  const projectId = overrides?.id ?? nanoid() as ProjectId;
+  const config = overrides?.config ?? createTestAgentConfig({ projectId });
 
   const project = await prisma.project.create({
     data: {
       id: projectId,
-      name: overrides?.name || 'Test Project',
-      owner: overrides?.owner || 'test-user',
-      tags: overrides?.tags || ['test'],
+      name: overrides?.name ?? 'Test Project',
+      owner: overrides?.owner ?? 'test-user',
+      tags: overrides?.tags ?? ['test'],
       configJson: config as unknown as Prisma.InputJsonValue,
-      status: overrides?.status || 'active',
+      status: overrides?.status ?? 'active',
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -60,14 +61,14 @@ export async function createTestSession(
     id: SessionId;
     metadata: Record<string, unknown>;
   }>,
-) {
-  const sessionId = (overrides?.id || nanoid()) as SessionId;
+): Promise<Session> {
+  const sessionId = (overrides?.id ?? nanoid());
 
   const session = await prisma.session.create({
     data: {
       id: sessionId,
       projectId,
-      metadata: (overrides?.metadata || {}) as Prisma.InputJsonValue,
+      metadata: (overrides?.metadata ?? {}) as Prisma.InputJsonValue,
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -88,7 +89,7 @@ export async function createTestSession(
 export async function createTestMemoryEntries(
   prisma: PrismaClient,
   sessionId: SessionId,
-  count: number = 3,
+  count = 3,
 ): Promise<string[]> {
   const projectId = await prisma.session
     .findUnique({
@@ -143,8 +144,8 @@ export async function createTestTrace(
     status: 'running' | 'completed' | 'failed';
     events: unknown[];
   }>,
-) {
-  const traceId = (overrides?.id || nanoid()) as TraceId;
+): Promise<ExecutionTrace> {
+  const traceId = (overrides?.id ?? nanoid());
 
   const trace = await prisma.executionTrace.create({
     data: {
@@ -152,12 +153,12 @@ export async function createTestTrace(
       projectId,
       sessionId,
       promptSnapshot: {} as Prisma.InputJsonValue,
-      events: (overrides?.events || []) as Prisma.InputJsonValue,
+      events: (overrides?.events ?? []) as Prisma.InputJsonValue,
       totalDurationMs: 0,
       totalTokensUsed: 0,
       totalCostUsd: 0,
       turnCount: 0,
-      status: overrides?.status || 'completed',
+      status: overrides?.status ?? 'completed',
       createdAt: new Date(),
       completedAt: overrides?.status === 'completed' ? new Date() : null,
     },

@@ -3,12 +3,11 @@
  * Tests BullMQ queue + worker against real Redis.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
-import { nanoid } from 'nanoid';
-import type { ProjectId, ScheduledTaskId } from '@/core/types.js';
+import type { ProjectId } from '@/core/types.js';
 import { createTestDatabase, type TestDatabase } from '@/testing/helpers/test-database.js';
 import { createTestRedis, type TestRedis } from '@/testing/helpers/test-redis.js';
 import { createScheduledTaskRepository } from '@/infrastructure/repositories/scheduled-task-repository.js';
-import { createTaskRunner, type TaskRunner, type TaskExecutionResult } from './task-runner.js';
+import { createTaskRunner, type TaskRunner } from './task-runner.js';
 import { createLogger } from '@/observability/logger.js';
 
 const logger = createLogger({ name: 'task-runner-test' });
@@ -66,10 +65,10 @@ describe('TaskRunner Integration', () => {
       logger,
       redisUrl: testRedis.url,
       pollIntervalMs: 200, // Fast polling for test
-      onExecuteTask: async (executedTask) => {
+      onExecuteTask: (executedTask) => {
         executionCount++;
         executedTaskId = executedTask.id;
-        return { success: true, tokensUsed: 100, costUsd: 0.003 };
+        return Promise.resolve({ success: true, tokensUsed: 100, costUsd: 0.003 });
       },
     });
 
@@ -114,9 +113,9 @@ describe('TaskRunner Integration', () => {
       logger,
       redisUrl: testRedis.url,
       pollIntervalMs: 200,
-      onExecuteTask: async () => {
+      onExecuteTask: () => {
         executionCount++;
-        return { success: true };
+        return Promise.resolve({ success: true });
       },
     });
 
@@ -145,11 +144,11 @@ describe('TaskRunner Integration', () => {
       logger,
       redisUrl: testRedis.url,
       pollIntervalMs: 200,
-      onExecuteTask: async () => {
-        return {
+      onExecuteTask: () => {
+        return Promise.resolve({
           success: false,
           errorMessage: 'API rate limit exceeded',
-        };
+        });
       },
     });
 
@@ -182,8 +181,8 @@ describe('TaskRunner Integration', () => {
       logger,
       redisUrl: testRedis.url,
       pollIntervalMs: 200,
-      onExecuteTask: async () => {
-        return { success: true };
+      onExecuteTask: () => {
+        return Promise.resolve({ success: true });
       },
     });
 
@@ -218,8 +217,8 @@ describe('TaskRunner Integration', () => {
       logger,
       redisUrl: testRedis.url,
       pollIntervalMs: 200,
-      onExecuteTask: async () => {
-        return { success: true };
+      onExecuteTask: () => {
+        return Promise.resolve({ success: true });
       },
     });
 
@@ -238,7 +237,7 @@ describe('TaskRunner Integration', () => {
       logger,
       redisUrl: testRedis.url,
       pollIntervalMs: 5000,
-      onExecuteTask: async () => ({ success: true }),
+      onExecuteTask: () => Promise.resolve({ success: true }),
     });
 
     await taskRunner.start();

@@ -115,7 +115,7 @@ export async function prepareChatRun(
     });
   }
 
-  const agentConfig = project.config;
+  const agentConfig = { ...project.config, projectId: project.id };
 
   // 3. Load or create session
   let sessionId: SessionId;

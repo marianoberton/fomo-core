@@ -66,7 +66,7 @@ export function createTaskExecutor(
     promptLayerRepository,
     toolRegistry,
     mcpManager,
-    longTermMemoryStore: null as null,
+    longTermMemoryStore: null,
     prisma,
     logger,
   };

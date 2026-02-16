@@ -34,6 +34,7 @@ describe('ProjectRepository Integration', () => {
     it('creates project and persists to PostgreSQL', async () => {
       const repo = createProjectRepository(testDb.prisma);
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
       const projectId = nanoid() as ProjectId;
       const project = await repo.create({
         name: 'Integration Test Project',
@@ -55,6 +56,7 @@ describe('ProjectRepository Integration', () => {
     it('handles JSON column with complex AgentConfig', async () => {
       const repo = createProjectRepository(testDb.prisma);
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
       const projectId = nanoid() as ProjectId;
       const complexConfig = makeConfig(projectId, {
         allowedTools: ['calculator', 'date-time', 'json-transform'],
@@ -83,13 +85,14 @@ describe('ProjectRepository Integration', () => {
       const project1 = await repo.create({
         name: 'Project 1',
         owner: 'user1',
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
         config: makeConfig(nanoid() as ProjectId),
       });
 
       const project2 = await repo.create({
         name: 'Project 2',
         owner: 'user2',
-        config: makeConfig(nanoid() as ProjectId, {
+        config: makeConfig(nanoid(), {
           provider: { provider: 'openai', model: 'gpt-4o', apiKeyEnvVar: 'OPENAI_API_KEY' },
         }),
       });
@@ -154,12 +157,14 @@ describe('ProjectRepository Integration', () => {
       await repo.create({
         name: 'Owned by Alice',
         owner: 'alice',
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
         config: makeConfig(nanoid() as ProjectId),
       });
 
       await repo.create({
         name: 'Owned by Bob',
         owner: 'bob',
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
         config: makeConfig(nanoid() as ProjectId),
       });
 
@@ -176,7 +181,10 @@ describe('ProjectRepository Integration', () => {
 
       const projects = await repo.list();
       expect(projects).toHaveLength(2);
-      expect(projects[0]!.createdAt.getTime()).toBeGreaterThanOrEqual(projects[1]!.createdAt.getTime());
+      const first = projects[0];
+      const second = projects[1];
+      if (!first || !second) throw new Error('Expected at least 2 projects');
+      expect(first.createdAt.getTime()).toBeGreaterThanOrEqual(second.createdAt.getTime());
     });
   });
 
@@ -188,12 +196,12 @@ describe('ProjectRepository Integration', () => {
       const projectId = seed.projectId;
 
       const project = await repo.findById(projectId);
-      expect(project).not.toBeNull();
+      if (!project) throw new Error('Expected project to exist');
 
-      const originalProvider = project!.config.provider;
+      const originalProvider = project.config.provider;
 
       const updated = await repo.update(projectId, {
-        config: { ...project!.config, maxTurnsPerSession: 99 },
+        config: { ...project.config, maxTurnsPerSession: 99 },
       });
 
       expect(updated?.config.maxTurnsPerSession).toBe(99);
@@ -287,6 +295,7 @@ describe('ProjectRepository Integration', () => {
       const project = await repo.create({
         name: 'To Delete',
         owner: 'test-user',
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
         config: makeConfig(nanoid() as ProjectId),
       });
 

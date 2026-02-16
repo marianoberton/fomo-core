@@ -139,7 +139,10 @@ describe('SessionRepository Integration', () => {
       await repo.create({ projectId });
 
       const sessions = await repo.listByProject(projectId);
-      expect(sessions[0]!.createdAt.getTime()).toBeGreaterThanOrEqual(sessions[1]!.createdAt.getTime());
+      const first = sessions[0];
+      const second = sessions[1];
+      if (!first || !second) throw new Error('Expected at least 2 sessions');
+      expect(first.createdAt.getTime()).toBeGreaterThanOrEqual(second.createdAt.getTime());
     });
 
     it('returns empty array for project with no sessions', async () => {

@@ -5,8 +5,10 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
+import type { PrismaClient } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import type { ProjectId } from '@/core/types.js';
+import type { Logger } from '@/observability/logger.js';
 import { nanoid } from 'nanoid';
 import OpenAI from 'openai';
 
@@ -83,7 +85,7 @@ export function catalogRoutes(
         logger.info('Parsed catalog file', {
           component: 'catalog-route',
           projectId,
-          format: format || 'csv',
+          format: format ?? 'csv',
           productsCount: products.length,
         });
 
@@ -112,7 +114,7 @@ export function catalogRoutes(
           insertedCount: inserted,
         });
 
-        return reply.status(201).send({
+        return await reply.status(201).send({
           success: true,
           productsCount: products.length,
           insertedCount: inserted,
@@ -159,12 +161,15 @@ export function catalogRoutes(
       });
 
       const categories = new Set<string>();
-      entries.forEach((entry) => {
+      for (const entry of entries) {
         const metadata = entry.metadata as Record<string, unknown>;
-        if (metadata['category']) {
-          categories.add(String(metadata['category']));
+        const cat = metadata['category'];
+        if (typeof cat === 'string') {
+          categories.add(cat);
+        } else if (cat != null) {
+          categories.add(String(cat as string | number));
         }
-      });
+      }
 
       return reply.send({
         totalProducts,
@@ -204,47 +209,56 @@ export function catalogRoutes(
 // ─── Parsers ────────────────────────────────────────────────────
 
 function parseCsv(content: string): Product[] {
+   
   const records = parse(content, {
     columns: true,
     skip_empty_lines: true,
     trim: true,
     relax_quotes: true,
     escape: '\\',
-  }) as Array<Record<string, string>>;
+  });
 
-  return records.map((row) => {
+  return (records as Record<string, string>[]).map((row) => {
     const product = {
-      sku: row['sku'] || row['SKU'] || '',
-      name: row['name'] || row['nombre'] || row['Name'] || '',
-      description: row['description'] || row['descripcion'] || row['Description'] || '',
-      category: row['category'] || row['categoria'] || row['Category'] || '',
-      price: parseFloat(row['price'] || row['precio'] || row['Price'] || '0'),
-      stock: parseInt(row['stock'] || row['Stock'] || '0', 10),
-      unit: row['unit'] || row['unidad'] || row['Unit'] || 'unidad',
+      sku: row['sku'] ?? row['SKU'] ?? '',
+      name: row['name'] ?? row['nombre'] ?? row['Name'] ?? '',
+      description: row['description'] ?? row['descripcion'] ?? row['Description'] ?? '',
+      category: row['category'] ?? row['categoria'] ?? row['Category'] ?? '',
+      price: parseFloat(row['price'] ?? row['precio'] ?? row['Price'] ?? '0'),
+      stock: parseInt(row['stock'] ?? row['Stock'] ?? '0', 10),
+      unit: row['unit'] ?? row['unidad'] ?? row['Unit'] ?? 'unidad',
     };
     return productSchema.parse(product);
   });
 }
 
 function parseExcel(content: Buffer): Product[] {
+   
   const workbook = XLSX.read(content, { type: 'buffer' });
-  const firstSheetName = workbook.SheetNames[0];
+  const firstSheetName = workbook.SheetNames[0] as string | undefined;
   if (!firstSheetName) {
     throw new Error('Excel file has no sheets');
   }
   const firstSheet = workbook.Sheets[firstSheetName];
-  const rows = XLSX.utils.sheet_to_json<Record<string, string | number>>(firstSheet);
+  if (!firstSheet) {
+    throw new Error('Excel sheet not found');
+  }
+  const rows = XLSX.utils.sheet_to_json(firstSheet);
+   
 
-  return rows.map((row) => {
+  return (rows as Record<string, unknown>[]).map((row) => {
+    // Excel cell values are primitives (string | number | boolean | Date)
+    /* eslint-disable @typescript-eslint/no-base-to-string */
     const product = {
-      sku: String(row['sku'] || row['SKU'] || ''),
-      name: String(row['name'] || row['nombre'] || row['Name'] || ''),
-      description: String(row['description'] || row['descripcion'] || row['Description'] || ''),
-      category: String(row['category'] || row['categoria'] || row['Category'] || ''),
-      price: Number(row['price'] || row['precio'] || row['Price'] || 0),
-      stock: Number(row['stock'] || row['Stock'] || 0),
-      unit: String(row['unit'] || row['unidad'] || row['Unit'] || 'unidad'),
+      sku: String(row['sku'] ?? row['SKU'] ?? ''),
+      name: String(row['name'] ?? row['nombre'] ?? row['Name'] ?? ''),
+      description: String(row['description'] ?? row['descripcion'] ?? row['Description'] ?? ''),
+      category: String(row['category'] ?? row['categoria'] ?? row['Category'] ?? ''),
+      price: Number(row['price'] ?? row['precio'] ?? row['Price'] ?? 0),
+      stock: Number(row['stock'] ?? row['Stock'] ?? 0),
+      unit: String(row['unit'] ?? row['unidad'] ?? row['Unit'] ?? 'unidad'),
     };
+    /* eslint-enable @typescript-eslint/no-base-to-string */
     return productSchema.parse(product);
   });
 }
@@ -254,11 +268,9 @@ function parseExcel(content: Buffer): Product[] {
 async function ingestProducts(
   projectId: ProjectId,
   products: Product[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  prisma: any,
+  prisma: PrismaClient,
   openai: OpenAI,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  logger: any,
+  logger: Logger,
 ): Promise<number> {
   let inserted = 0;
 
@@ -280,7 +292,9 @@ async function ingestProducts(
     // Insert entries with embeddings
     for (let j = 0; j < batch.length; j++) {
       const product = batch[j];
-      const embedding = embeddingResponse.data[j].embedding;
+      const embeddingData = embeddingResponse.data[j];
+      if (!product || !embeddingData) continue;
+      const embedding = embeddingData.embedding;
 
       await prisma.$executeRaw`
         INSERT INTO memory_entries (

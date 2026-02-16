@@ -5,19 +5,24 @@
  */
 
 import { z } from 'zod';
-import type { ExecutableTool } from '../registry/types.js';
-import type { ExecutionContext } from '../../core/types.js';
-import { NexusError } from '../../core/errors.js';
-import { prisma } from '../../infrastructure/database.js';
+import type { ExecutionContext } from '@/core/types.js';
+import type { Result } from '@/core/result.js';
+import { ok, err } from '@/core/result.js';
+import { ToolExecutionError } from '@/core/errors.js';
+import type { NexusError } from '@/core/errors.js';
+import type { ExecutableTool, ToolResult } from '@/tools/types.js';
+import { createLogger } from '@/observability/logger.js';
+import { getDatabase } from '@/infrastructure/database.js';
 import {
   SeasonalPriceSchema,
   RoomTypeSchema,
   getSeasonForDate,
   calculateStayPrice,
-  getPricedRooms,
-} from '../../verticals/hotels/seasonal-pricing.js';
+} from '@/verticals/hotels/seasonal-pricing.js';
 
-// ─── Tool Definition ────────────────────────────────────────────
+const logger = createLogger({ name: 'hotel-seasonal-pricing' });
+
+// ─── Schemas ───────────────────────────────────────────────────
 
 const inputSchema = z.object({
   projectId: z.string().describe('Project ID (hotel)'),
@@ -44,154 +49,159 @@ const outputSchema = z.object({
   ),
 });
 
-type Input = z.infer<typeof inputSchema>;
-type Output = z.infer<typeof outputSchema>;
+// ─── Tool Factory ──────────────────────────────────────────────
 
-// ─── Tool Implementation ────────────────────────────────────────
-
-async function execute(input: Input, context: ExecutionContext): Promise<Output> {
-  const { projectId, checkIn, checkOut, roomTypeId } = input;
-
-  // Validate project access
-  if (projectId !== context.projectId) {
-    throw new NexusError(
-      'TOOL_EXECUTION_ERROR',
-      'Cannot get pricing for different project'
-    );
-  }
-
-  // Get project config
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
-
-  if (!project) {
-    throw new NexusError('TOOL_EXECUTION_ERROR', `Project ${projectId} not found`);
-  }
-
-  const config = project.configJson as Record<string, unknown>;
-  const hotelConfig = (config.hotel as Record<string, unknown>) || {};
-
-  // Get room types and prices
-  const roomTypes = ((hotelConfig.roomTypes as unknown[]) || []).map((r) =>
-    RoomTypeSchema.parse(r)
-  );
-  const prices = ((hotelConfig.seasonalPrices as unknown[]) || []).map((p) =>
-    SeasonalPriceSchema.parse(p)
-  );
-
-  if (roomTypes.length === 0) {
-    throw new NexusError(
-      'TOOL_EXECUTION_ERROR',
-      'No room types configured for this hotel'
-    );
-  }
-
-  // Calculate season and nights
-  const season = getSeasonForDate(new Date(checkIn));
-  const checkInDate = new Date(checkIn);
-  const checkOutDate = new Date(checkOut);
-  const nights = Math.ceil(
-    (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (nights <= 0) {
-    throw new NexusError(
-      'TOOL_EXECUTION_ERROR',
-      'Check-out must be after check-in'
-    );
-  }
-
-  // Filter room types if specific one requested
-  const relevantRooms = roomTypeId
-    ? roomTypes.filter((r) => r.id === roomTypeId)
-    : roomTypes;
-
-  if (relevantRooms.length === 0) {
-    throw new NexusError('TOOL_EXECUTION_ERROR', `Room type ${roomTypeId} not found`);
-  }
-
-  // Calculate pricing for each room
-  const rooms = relevantRooms.map((room) => {
-    const pricing = calculateStayPrice(prices, room.id, checkIn, checkOut);
-
-    if (!pricing) {
-      return {
-        roomTypeId: room.id,
-        roomName: room.name,
-        pricePerNight: 0,
-        totalPrice: 0,
-        minStay: 1,
-        meetsMinStay: false,
-      };
-    }
-
-    return {
-      roomTypeId: room.id,
-      roomName: room.name,
-      pricePerNight: pricing.pricePerNight,
-      totalPrice: pricing.total,
-      minStay: pricing.minStay,
-      meetsMinStay: pricing.meetsMinStay,
-    };
-  });
-
-  context.logger.info('Seasonal pricing calculated', {
-    projectId,
-    season,
-    nights,
-    roomCount: rooms.length,
-  });
-
+export function createHotelSeasonalPricingTool(): ExecutableTool {
   return {
-    success: true,
-    season,
-    checkIn,
-    checkOut,
-    nights,
-    rooms,
+    id: 'hotel-seasonal-pricing',
+    name: 'Calculate Hotel Seasonal Pricing',
+    description:
+      'Calculate room prices based on check-in/check-out dates and seasonal rates (low/medium/high season). Returns price per night and total for all or specific room types.',
+    category: 'hotels',
+    riskLevel: 'low',
+    requiresApproval: false,
+    sideEffects: false,
+    supportsDryRun: true,
+
+    inputSchema,
+    outputSchema,
+
+    async execute(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
+      const startTime = Date.now();
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return err(new ToolExecutionError('hotel-seasonal-pricing', 'Invalid input', parsed.error));
+      }
+      const { projectId, checkIn, checkOut, roomTypeId } = parsed.data;
+
+      try {
+        if (projectId !== context.projectId) {
+          return err(new ToolExecutionError('hotel-seasonal-pricing', 'Cannot get pricing for different project'));
+        }
+
+        const project = await getDatabase().client.project.findUnique({
+          where: { id: projectId },
+        });
+
+        if (!project) {
+          return err(new ToolExecutionError('hotel-seasonal-pricing', `Project ${projectId} not found`));
+        }
+
+        const config = project.configJson as Record<string, unknown>;
+        const hotelConfig = (config['hotel'] ?? {}) as Record<string, unknown>;
+
+        const roomTypes = ((hotelConfig['roomTypes'] ?? []) as unknown[]).map((r) =>
+          RoomTypeSchema.parse(r)
+        );
+        const prices = ((hotelConfig['seasonalPrices'] ?? []) as unknown[]).map((p) =>
+          SeasonalPriceSchema.parse(p)
+        );
+
+        if (roomTypes.length === 0) {
+          return err(new ToolExecutionError('hotel-seasonal-pricing', 'No room types configured for this hotel'));
+        }
+
+        const season = getSeasonForDate(new Date(checkIn));
+        const checkInDate = new Date(checkIn);
+        const checkOutDate = new Date(checkOut);
+        const nights = Math.ceil(
+          (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        if (nights <= 0) {
+          return err(new ToolExecutionError('hotel-seasonal-pricing', 'Check-out must be after check-in'));
+        }
+
+        const relevantRooms = roomTypeId
+          ? roomTypes.filter((r) => r.id === roomTypeId)
+          : roomTypes;
+
+        if (relevantRooms.length === 0) {
+          return err(new ToolExecutionError('hotel-seasonal-pricing', `Room type ${roomTypeId ?? 'unknown'} not found`));
+        }
+
+        const rooms = relevantRooms.map((room) => {
+          const pricing = calculateStayPrice(prices, room.id, checkIn, checkOut);
+
+          if (!pricing) {
+            return {
+              roomTypeId: room.id,
+              roomName: room.name,
+              pricePerNight: 0,
+              totalPrice: 0,
+              minStay: 1,
+              meetsMinStay: false,
+            };
+          }
+
+          return {
+            roomTypeId: room.id,
+            roomName: room.name,
+            pricePerNight: pricing.pricePerNight,
+            totalPrice: pricing.total,
+            minStay: pricing.minStay,
+            meetsMinStay: pricing.meetsMinStay,
+          };
+        });
+
+        logger.info('Seasonal pricing calculated', {
+          component: 'hotel-seasonal-pricing',
+          projectId,
+          season,
+          nights,
+          roomCount: rooms.length,
+        });
+
+        return ok({
+          success: true,
+          output: { success: true, season, checkIn, checkOut, nights, rooms },
+          durationMs: Date.now() - startTime,
+        });
+      } catch (error) {
+        logger.error('Seasonal pricing failed', {
+          component: 'hotel-seasonal-pricing',
+          error,
+        });
+        return err(new ToolExecutionError(
+          'hotel-seasonal-pricing',
+          'Pricing calculation failed',
+          error instanceof Error ? error : undefined
+        ));
+      }
+    },
+
+    dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return Promise.resolve(err(new ToolExecutionError('hotel-seasonal-pricing', 'Invalid input', parsed.error)));
+      }
+
+      const season = getSeasonForDate(new Date(parsed.data.checkIn));
+      const checkInDate = new Date(parsed.data.checkIn);
+      const checkOutDate = new Date(parsed.data.checkOut);
+      const nights = Math.ceil(
+        (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      return Promise.resolve(ok({
+        success: true,
+        output: {
+          success: true,
+          season,
+          checkIn: parsed.data.checkIn,
+          checkOut: parsed.data.checkOut,
+          nights,
+          rooms: [{
+            roomTypeId: 'standard',
+            roomName: 'Standard Room',
+            pricePerNight: 5000,
+            totalPrice: 5000 * nights,
+            minStay: 1,
+            meetsMinStay: true,
+          }],
+        },
+        durationMs: 0,
+      }));
+    },
   };
 }
-
-async function dryRun(input: Input): Promise<Output> {
-  const season = getSeasonForDate(new Date(input.checkIn));
-  const checkInDate = new Date(input.checkIn);
-  const checkOutDate = new Date(input.checkOut);
-  const nights = Math.ceil(
-    (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  return {
-    success: true,
-    season,
-    checkIn: input.checkIn,
-    checkOut: input.checkOut,
-    nights,
-    rooms: [
-      {
-        roomTypeId: 'standard',
-        roomName: 'Standard Room',
-        pricePerNight: 5000,
-        totalPrice: 5000 * nights,
-        minStay: 1,
-        meetsMinStay: true,
-      },
-    ],
-  };
-}
-
-// ─── Tool Export ────────────────────────────────────────────────
-
-export const hotelSeasonalPricingTool: ExecutableTool = {
-  id: 'hotel-seasonal-pricing',
-  name: 'Calculate Hotel Seasonal Pricing',
-  description:
-    'Calculate room prices based on check-in/check-out dates and seasonal rates (low/medium/high season). Returns price per night and total for all or specific room types.',
-  inputSchema,
-  outputSchema,
-  riskLevel: 'low',
-  requiresApproval: false,
-  tags: ['hotels', 'pricing', 'reservations'],
-  execute,
-  dryRun,
-};

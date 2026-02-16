@@ -5,6 +5,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { TemplateManager } from '@/templates/index.js';
+import type { ProjectId } from '@/core/types.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { createLogger } from '@/observability/logger.js';
@@ -78,7 +79,7 @@ export function templateRoutes(
       id: template.id,
       name: template.name,
       description: template.description,
-      allowedTools: template.agentConfig.allowedTools || [],
+      allowedTools: template.agentConfig.allowedTools ?? [],
       agentRole: template.agentConfig.agentRole,
     });
   });
@@ -112,22 +113,26 @@ export function templateRoutes(
         templateId,
       });
 
-      return sendSuccess(reply, {
+      await sendSuccess(reply, {
         projectId: result.projectId,
         message: `Project created successfully from template ${templateId}`,
         sampleData: result.sampleData,
       }, 201);
-    } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        return sendNotFound(reply, 'Template', templateId);
+      return;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to create project';
+      if (message.includes('not found')) {
+        await sendNotFound(reply, 'Template', templateId);
+        return;
       }
-      
+
       logger.error('Failed to create project from template', {
         component: 'api:templates',
-        error,
+        error: message,
         templateId,
       });
-      return sendError(reply, 'PROJECT_CREATION_FAILED', error.message || 'Failed to create project', 400);
+      await sendError(reply, 'PROJECT_CREATION_FAILED', message, 400);
+      return;
     }
   });
 
@@ -155,11 +160,12 @@ export function templateRoutes(
       });
 
       if (!project) {
-        return sendNotFound(reply, 'Project', projectId);
+        await sendNotFound(reply, 'Project', projectId);
+        return;
       }
 
       await templateManager.updateProjectPrompts({
-        projectId: projectId as any,
+        projectId: projectId as ProjectId,
         templateId: body.templateId,
         updatedBy: body.updatedBy,
       });
@@ -170,20 +176,23 @@ export function templateRoutes(
         templateId: body.templateId,
       });
 
-      return sendSuccess(reply, {
+      await sendSuccess(reply, {
         message: `Project prompts updated from template ${body.templateId}`,
       });
-    } catch (error: any) {
-      if (error.message?.includes('not found')) {
-        return sendNotFound(reply, 'Template', body.templateId);
+      return;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update prompts';
+      if (message.includes('not found')) {
+        await sendNotFound(reply, 'Template', body.templateId);
+        return;
       }
-      
+
       logger.error('Failed to update prompts from template', {
         component: 'api:templates',
-        error,
+        error: message,
         projectId,
       });
-      return sendError(reply, 'PROMPT_UPDATE_FAILED', error.message || 'Failed to update prompts', 400);
+      await sendError(reply, 'PROMPT_UPDATE_FAILED', message, 400);
     }
   });
 }

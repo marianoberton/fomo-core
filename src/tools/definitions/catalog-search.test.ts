@@ -4,13 +4,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createCatalogSearchTool } from './catalog-search.js';
 import type { ExecutionContext } from '@/core/types.js';
+import type { ProjectId, SessionId, TraceId } from '@/core/types.js';
 
 describe('catalog-search tool', () => {
   const mockContext: ExecutionContext = {
-    projectId: 'test-project' as any,
-    sessionId: 'test-session' as any,
-    traceId: 'test-trace' as any,
-    allowedTools: new Set(['catalog-search']),
+    projectId: 'test-project' as ProjectId,
+    sessionId: 'test-session' as SessionId,
+    traceId: 'test-trace' as TraceId,
+    agentConfig: {} as ExecutionContext['agentConfig'],
+    permissions: { allowedTools: new Set(['catalog-search']) },
+    abortSignal: new AbortController().signal,
   };
 
   describe('schema validation', () => {
@@ -96,9 +99,10 @@ describe('catalog-search tool', () => {
       expect(mockProvider).toHaveBeenCalledWith('custom search', undefined);
       expect(result.ok).toBe(true);
       if (result.ok) {
-        const output: any = result.value.output;
-        expect(output.results).toHaveLength(1);
-        expect(output.results[0].name).toBe('Custom Product');
+        const output = result.value.output as Record<string, unknown>;
+        const results = output['results'] as unknown[];
+        expect(results).toHaveLength(1);
+        expect((results[0] as Record<string, unknown>)['name']).toBe('Custom Product');
       }
     });
 
@@ -123,9 +127,9 @@ describe('catalog-search tool', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        const output: any = result.value.output;
-        expect(output.results).toHaveLength(5);
-        expect(output.totalCount).toBe(20);
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['results'] as unknown[]).toHaveLength(5);
+        expect(output['totalCount']).toBe(20);
       }
     });
   });
@@ -134,7 +138,7 @@ describe('catalog-search tool', () => {
     it('validates input without executing search', async () => {
       const mockProvider = vi.fn();
       const tool = createCatalogSearchTool({ searchProvider: mockProvider });
-      
+
       const result = await tool.dryRun({
         query: 'test',
       }, mockContext);
@@ -143,9 +147,9 @@ describe('catalog-search tool', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        const output: any = result.value.output;
-        expect(output.results).toEqual([]);
-        expect(output.totalCount).toBe(0);
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['results']).toEqual([]);
+        expect(output['totalCount']).toBe(0);
       }
     });
 

@@ -35,10 +35,10 @@ export type SeasonalPrice = z.infer<typeof SeasonalPriceSchema>;
 export interface SeasonConfig {
   season: Season;
   name: string;
-  dateRanges: Array<{
+  dateRanges: {
     start: string; // MM-DD format
     end: string; // MM-DD format
-  }>;
+  }[];
   description: string;
 }
 
@@ -119,9 +119,9 @@ function isDateInRange(mmdd: string, start: string, end: string): boolean {
 /**
  * Get season for a date range
  */
-export function getSeasonForRange(checkIn: Date | string, checkOut: Date | string): Season {
+export function getSeasonForRange(checkIn: Date | string, _checkOut: Date | string): Season {
   const start = typeof checkIn === 'string' ? new Date(checkIn) : checkIn;
-  const end = typeof checkOut === 'string' ? new Date(checkOut) : checkOut;
+  void _checkOut;
 
   // Use check-in date for season
   // In a more complex system, you might charge different rates per night
@@ -138,7 +138,7 @@ export function getRoomPrice(
   roomTypeId: string,
   season: Season
 ): SeasonalPrice | null {
-  return prices.find((p) => p.roomTypeId === roomTypeId && p.season === season) || null;
+  return prices.find((p) => p.roomTypeId === roomTypeId && p.season === season) ?? null;
 }
 
 /**
@@ -234,7 +234,7 @@ export function buildSeasonalMetadata(
   roomTypeId: string,
   season: Season
 ): Record<string, unknown> {
-  const metadata = (existingMetadata as Record<string, unknown>) || {};
+  const metadata = (existingMetadata ?? {}) as Record<string, unknown>;
 
   return {
     ...metadata,

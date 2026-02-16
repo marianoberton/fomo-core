@@ -84,7 +84,7 @@ export function calculateTierPrice(basePrice: number, tier: PricingTier): number
  * Apply tier pricing to products
  */
 export function applyTierPricing(
-  products: Array<{ sku: string; name: string; price: number }>,
+  products: { sku: string; name: string; price: number }[],
   tier: PricingTier
 ): PricedProduct[] {
   const config = TIER_CONFIG[tier];
@@ -140,6 +140,9 @@ export function getNextTierInfo(
   }
 
   const nextTier = tiers[currentIndex + 1];
+  if (!nextTier) {
+    return null;
+  }
   const nextConfig = TIER_CONFIG[nextTier];
   const remainingAmount = Math.max(0, nextConfig.minOrderValue - currentSpent);
 
@@ -159,7 +162,7 @@ export function getNextTierInfo(
  * Calculate order total with tier pricing
  */
 export function calculateOrderTotal(
-  items: Array<{ sku: string; quantity: number; basePrice: number }>,
+  items: { sku: string; quantity: number; basePrice: number }[],
   tier: PricingTier
 ): {
   subtotal: number;
@@ -191,7 +194,7 @@ export function buildPricingMetadata(
   totalSpent: number,
   orderCount: number
 ): Record<string, unknown> {
-  const metadata = (existingMetadata as Record<string, unknown>) || {};
+  const metadata = (existingMetadata ?? {}) as Record<string, unknown>;
 
   return {
     ...metadata,

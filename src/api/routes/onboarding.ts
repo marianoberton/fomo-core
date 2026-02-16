@@ -144,7 +144,7 @@ export function onboardingRoutes(
         config: projectConfig as unknown as AgentConfig,
       });
 
-      const projectId = project.id as ProjectId;
+      const projectId = project.id;
 
       // Update projectId in config (it was empty before creation)
       projectConfig.projectId = projectId;
@@ -217,13 +217,14 @@ export function onboardingRoutes(
         clientName: input.clientName,
       });
 
-      return sendSuccess(reply, {
+      await sendSuccess(reply, {
         projectId,
         agentId: agent.id,
         channelIntegrationId: integration.id,
         chatwootWebhookUrl: '/api/v1/webhooks/chatwoot',
         status: 'provisioned',
       }, 201);
+      return;
     } catch (error) {
       logger.error('Failed to provision client', {
         component: 'onboarding',

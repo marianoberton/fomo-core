@@ -72,11 +72,13 @@ describe('Seasonal Pricing', () => {
 
       const result = calculateStayPrice(prices, 'standard', checkIn, checkOut);
 
-      expect(result).toBeDefined();
-      expect(result!.season).toBe('high');
-      expect(result!.pricePerNight).toBe(10000);
-      expect(result!.nights).toBe(5);
-      expect(result!.total).toBe(50000);
+      if (!result) {
+        throw new Error('Expected pricing result');
+      }
+      expect(result.season).toBe('high');
+      expect(result.pricePerNight).toBe(10000);
+      expect(result.nights).toBe(5);
+      expect(result.total).toBe(50000);
     });
 
     it('should calculate total price for medium season', () => {
@@ -85,11 +87,13 @@ describe('Seasonal Pricing', () => {
 
       const result = calculateStayPrice(prices, 'standard', checkIn, checkOut);
 
-      expect(result).toBeDefined();
-      expect(result!.season).toBe('medium');
-      expect(result!.pricePerNight).toBe(7000);
-      expect(result!.nights).toBe(3);
-      expect(result!.total).toBe(21000);
+      if (!result) {
+        throw new Error('Expected pricing result');
+      }
+      expect(result.season).toBe('medium');
+      expect(result.pricePerNight).toBe(7000);
+      expect(result.nights).toBe(3);
+      expect(result.total).toBe(21000);
     });
 
     it('should calculate total price for low season', () => {
@@ -98,11 +102,13 @@ describe('Seasonal Pricing', () => {
 
       const result = calculateStayPrice(prices, 'standard', checkIn, checkOut);
 
-      expect(result).toBeDefined();
-      expect(result!.season).toBe('low');
-      expect(result!.pricePerNight).toBe(5000);
-      expect(result!.nights).toBe(2);
-      expect(result!.total).toBe(10000);
+      if (!result) {
+        throw new Error('Expected pricing result');
+      }
+      expect(result.season).toBe('low');
+      expect(result.pricePerNight).toBe(5000);
+      expect(result.nights).toBe(2);
+      expect(result.total).toBe(10000);
     });
 
     it('should check minimum stay requirement', () => {
@@ -113,8 +119,14 @@ describe('Seasonal Pricing', () => {
       const shortStay = calculateStayPrice(prices, 'standard', checkIn, checkOutShort);
       const longStay = calculateStayPrice(prices, 'standard', checkIn, checkOutLong);
 
-      expect(shortStay!.meetsMinStay).toBe(false); // minStay is 2
-      expect(longStay!.meetsMinStay).toBe(true);
+      if (!shortStay) {
+        throw new Error('Expected short stay result');
+      }
+      if (!longStay) {
+        throw new Error('Expected long stay result');
+      }
+      expect(shortStay.meetsMinStay).toBe(false); // minStay is 2
+      expect(longStay.meetsMinStay).toBe(true);
     });
 
     it('should return null for invalid dates', () => {

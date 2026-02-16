@@ -1,6 +1,6 @@
 /**
  * WhatsApp End-to-End Integration Test
- * 
+ *
  * Tests the complete flow:
  * 1. WhatsApp webhook receives message
  * 2. Adapter parses inbound message
@@ -10,9 +10,14 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Logger } from '@/observability/logger.js';
-import type { ProjectId } from '@/core/types.js';
-import type { ContactRepository, Contact } from '@/contacts/types.js';
-import type { SessionRepository, Session } from '@/infrastructure/repositories/session-repository.js';
+import type { ProjectId, SessionId } from '@/core/types.js';
+import type { ContactRepository, Contact, CreateContactInput, ChannelIdentifier } from '@/contacts/types.js';
+import type {
+  SessionRepository,
+  Session,
+  SessionCreateInput,
+  StoredMessage,
+} from '@/infrastructure/repositories/session-repository.js';
 import { createWhatsAppAdapter } from './adapters/whatsapp.js';
 import { createChannelRouter } from './channel-router.js';
 import { createInboundProcessor } from './inbound-processor.js';
@@ -35,34 +40,35 @@ function createMockContactRepository(): ContactRepository {
   let idCounter = 1;
 
   return {
-    findByChannel: vi.fn(async (_projectId: ProjectId, identifier) => {
+    findByChannel: vi.fn((_projectId: ProjectId, identifier: ChannelIdentifier): Promise<Contact | null> => {
       for (const contact of contacts.values()) {
         if (contact.phone === identifier.value) {
-          return contact;
+          return Promise.resolve(contact);
         }
       }
-      return null;
+      return Promise.resolve(null);
     }),
-    create: vi.fn(async (data) => {
+    create: vi.fn((data: CreateContactInput): Promise<Contact> => {
       const contact: Contact = {
-        id: `contact_${idCounter++}`,
+        id: `contact_${String(idCounter++)}`,
         projectId: data.projectId,
         name: data.name,
-        email: data.email ?? null,
-        phone: data.phone ?? null,
-        telegramId: data.telegramId ?? null,
-        slackId: data.slackId ?? null,
+        email: data.email ?? undefined,
+        phone: data.phone ?? undefined,
+        telegramId: data.telegramId ?? undefined,
+        slackId: data.slackId ?? undefined,
+        language: 'es',
         metadata: data.metadata ?? {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       contacts.set(contact.id, contact);
-      return contact;
+      return Promise.resolve(contact);
     }),
-    findById: vi.fn(async (id: string) => contacts.get(id) ?? null),
+    findById: vi.fn((id: string): Promise<Contact | null> => Promise.resolve(contacts.get(id) ?? null)),
     update: vi.fn(),
     delete: vi.fn(),
-    list: vi.fn(async () => Array.from(contacts.values())),
+    list: vi.fn((): Promise<Contact[]> => Promise.resolve(Array.from(contacts.values()))),
   };
 }
 
@@ -71,30 +77,34 @@ function createMockSessionRepository(): SessionRepository {
   let idCounter = 1;
 
   return {
-    create: vi.fn(async (data) => {
+    create: vi.fn((data: SessionCreateInput): Promise<Session> => {
       const session: Session = {
-        id: `session_${idCounter++}`,
+        id: `session_${String(idCounter++)}` as SessionId,
         projectId: data.projectId,
         status: 'active',
-        messages: [],
         metadata: data.metadata ?? {},
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       sessions.set(session.id, session);
-      return session;
+      return Promise.resolve(session);
     }),
-    findById: vi.fn(async (id: string) => sessions.get(id) ?? null),
-    listByProject: vi.fn(async () => Array.from(sessions.values())),
-    addMessage: vi.fn(async (sessionId, message) => {
+    findById: vi.fn((id: string): Promise<Session | null> => Promise.resolve(sessions.get(id) ?? null)),
+    findByContactId: vi.fn((): Promise<Session | null> => Promise.resolve(null)),
+    listByProject: vi.fn((): Promise<Session[]> => Promise.resolve(Array.from(sessions.values()))),
+    addMessage: vi.fn((sessionId: string, message: { role: string; content: string }): Promise<StoredMessage> => {
       const session = sessions.get(sessionId);
-      if (session) {
-        session.messages.push(message);
-      }
+      void session;
+      return Promise.resolve({
+        id: `msg_${String(idCounter++)}`,
+        sessionId: sessionId as SessionId,
+        role: message.role,
+        content: message.content,
+        createdAt: new Date(),
+      });
     }),
-    updateMetadata: vi.fn(),
+    getMessages: vi.fn((): Promise<StoredMessage[]> => Promise.resolve([])),
     updateStatus: vi.fn(),
-    delete: vi.fn(),
   };
 }
 
@@ -189,8 +199,12 @@ describe('WhatsApp End-to-End Integration', () => {
     const inboundMessage = await whatsappAdapter.parseInbound(webhookPayload);
     expect(inboundMessage).not.toBeNull();
 
+    if (!inboundMessage) {
+      throw new Error('Expected inbound message to be non-null');
+    }
+
     // Process message
-    const result = await inboundProcessor.process(inboundMessage!);
+    const result = await inboundProcessor.process(inboundMessage);
 
     // Assertions
     expect(result.success).toBe(true);
@@ -206,6 +220,7 @@ describe('WhatsApp End-to-End Integration', () => {
     // Verify session was created
     expect(sessionRepository.create).toHaveBeenCalledWith({
       projectId: 'test-project',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       metadata: expect.objectContaining({
         channel: 'whatsapp',
       }),
@@ -214,6 +229,7 @@ describe('WhatsApp End-to-End Integration', () => {
     // Verify agent was called
     expect(runAgent).toHaveBeenCalledWith({
       projectId: 'test-project',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       sessionId: expect.stringContaining('session_'),
       userMessage: 'Hello, are you there?',
     });
@@ -305,12 +321,17 @@ describe('WhatsApp End-to-End Integration', () => {
     expect(inboundMessage).not.toBeNull();
     expect(inboundMessage?.mediaUrls).toEqual(['media_abc123']);
 
-    const result = await inboundProcessor.process(inboundMessage!);
+    if (!inboundMessage) {
+      throw new Error('Expected inbound message to be non-null');
+    }
+
+    const result = await inboundProcessor.process(inboundMessage);
 
     // Assertions
     expect(result.success).toBe(true);
     expect(runAgent).toHaveBeenCalledWith({
       projectId: 'test-project',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       sessionId: expect.stringContaining('session_'),
       userMessage: 'What is this?',
     });
@@ -342,7 +363,7 @@ describe('WhatsApp End-to-End Integration', () => {
       runAgent,
     });
 
-    const createPayload = (messageId: string, text: string) => ({
+    const createPayload = (messageId: string, text: string): Record<string, unknown> => ({
       object: 'whatsapp_business_account',
       entry: [
         {
@@ -380,11 +401,17 @@ describe('WhatsApp End-to-End Integration', () => {
 
     // First message
     const msg1 = await whatsappAdapter.parseInbound(createPayload('msg_1', 'First message'));
-    await inboundProcessor.process(msg1!);
+    if (!msg1) {
+      throw new Error('Expected first message to be non-null');
+    }
+    await inboundProcessor.process(msg1);
 
     // Second message
     const msg2 = await whatsappAdapter.parseInbound(createPayload('msg_2', 'Second message'));
-    await inboundProcessor.process(msg2!);
+    if (!msg2) {
+      throw new Error('Expected second message to be non-null');
+    }
+    await inboundProcessor.process(msg2);
 
     // Contact should only be created once
     expect(contactRepository.create).toHaveBeenCalledTimes(1);
@@ -455,7 +482,10 @@ describe('WhatsApp End-to-End Integration', () => {
     };
 
     const inboundMessage = await whatsappAdapter.parseInbound(webhookPayload);
-    const result = await inboundProcessor.process(inboundMessage!);
+    if (!inboundMessage) {
+      throw new Error('Expected inbound message to be non-null');
+    }
+    const result = await inboundProcessor.process(inboundMessage);
 
     // Should fail gracefully
     expect(result.success).toBe(false);

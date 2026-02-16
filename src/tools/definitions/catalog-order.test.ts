@@ -4,13 +4,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createCatalogOrderTool } from './catalog-order.js';
 import type { ExecutionContext } from '@/core/types.js';
+import type { ProjectId, SessionId, TraceId } from '@/core/types.js';
 
 describe('catalog-order tool', () => {
   const mockContext: ExecutionContext = {
-    projectId: 'test-project' as any,
-    sessionId: 'test-session' as any,
-    traceId: 'test-trace' as any,
-    allowedTools: new Set(['catalog-order']),
+    projectId: 'test-project' as ProjectId,
+    sessionId: 'test-session' as SessionId,
+    traceId: 'test-trace' as TraceId,
+    agentConfig: {} as ExecutionContext['agentConfig'],
+    permissions: { allowedTools: new Set(['catalog-order']) },
+    abortSignal: new AbortController().signal,
   };
 
   describe('schema validation', () => {
@@ -100,13 +103,13 @@ describe('catalog-order tool', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        const output: any = result.value.output;
-        expect(output.orderId).toMatch(/^ORD-/);
-        expect(output.status).toBe('draft');
-        expect(output.totalAmount).toBe(100);
-        expect(output.currency).toBe('USD');
-        expect(output.itemCount).toBe(1);
-        expect(output.approvalRequired).toBe(true);
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['orderId']).toMatch(/^ORD-/);
+        expect(output['status']).toBe('draft');
+        expect(output['totalAmount']).toBe(100);
+        expect(output['currency']).toBe('USD');
+        expect(output['itemCount']).toBe(1);
+        expect(output['approvalRequired']).toBe(true);
       }
     });
 
@@ -128,9 +131,9 @@ describe('catalog-order tool', () => {
       expect(mockCreator).toHaveBeenCalled();
       expect(result.ok).toBe(true);
       if (result.ok) {
-        const output: any = result.value.output;
-        expect(output.orderId).toBe('CUSTOM-ORD-123');
-        expect(output.status).toBe('pending_approval');
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['orderId']).toBe('CUSTOM-ORD-123');
+        expect(output['status']).toBe('pending_approval');
       }
     });
 
@@ -148,9 +151,9 @@ describe('catalog-order tool', () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        const output: any = result.value.output;
-        expect(output.totalAmount).toBe(950); // (3*100) + (2*250) + (1*150)
-        expect(output.itemCount).toBe(3);
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['totalAmount']).toBe(950); // (3*100) + (2*250) + (1*150)
+        expect(output['itemCount']).toBe(3);
       }
     });
   });
@@ -159,7 +162,7 @@ describe('catalog-order tool', () => {
     it('validates input without creating order', async () => {
       const mockCreator = vi.fn();
       const tool = createCatalogOrderTool({ orderCreator: mockCreator });
-      
+
       const result = await tool.dryRun({
         customerName: 'Test User',
         customerContact: { phone: '123' },
@@ -172,9 +175,9 @@ describe('catalog-order tool', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.success).toBe(true);
-        const output: any = result.value.output;
-        expect(output.orderId).toBe('DRY-RUN-ORDER');
-        expect(output.totalAmount).toBe(50);
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['orderId']).toBe('DRY-RUN-ORDER');
+        expect(output['totalAmount']).toBe(50);
       }
     });
 

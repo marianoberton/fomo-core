@@ -16,9 +16,9 @@ export { createCatalogOrderTool } from './catalog-order.js';
 export type { CatalogOrderToolOptions } from './catalog-order.js';
 
 // Vertical-specific tools
-export { vehicleLeadScoreTool } from './vehicle-lead-score.js';
-export { vehicleCheckFollowupTool } from './vehicle-check-followup.js';
-export { wholesaleUpdateStockTool } from './wholesale-update-stock.js';
-export { wholesaleOrderHistoryTool } from './wholesale-order-history.js';
-export { hotelDetectLanguageTool } from './hotel-detect-language.js';
-export { hotelSeasonalPricingTool } from './hotel-seasonal-pricing.js';
+export { createVehicleLeadScoreTool } from './vehicle-lead-score.js';
+export { createVehicleCheckFollowupTool } from './vehicle-check-followup.js';
+export { createWholesaleUpdateStockTool } from './wholesale-update-stock.js';
+export { createWholesaleOrderHistoryTool } from './wholesale-order-history.js';
+export { createHotelDetectLanguageTool } from './hotel-detect-language.js';
+export { createHotelSeasonalPricingTool } from './hotel-seasonal-pricing.js';

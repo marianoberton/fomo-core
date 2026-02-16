@@ -39,7 +39,7 @@ import { createMCPManager } from '@/mcp/mcp-manager.js';
 import { Queue } from 'bullmq';
 import { createChannelRouter } from '@/channels/channel-router.js';
 import { createProactiveMessenger, PROACTIVE_MESSAGE_QUEUE } from '@/channels/proactive.js';
-import type { ProactiveMessenger } from '@/channels/proactive.js';
+import type { ProactiveMessenger, ProactiveMessageJobData } from '@/channels/proactive.js';
 import { createTelegramAdapter } from '@/channels/adapters/telegram.js';
 import { createWhatsAppAdapter } from '@/channels/adapters/whatsapp.js';
 import { createSlackAdapter } from '@/channels/adapters/slack.js';
@@ -345,7 +345,7 @@ async function start(): Promise<void> {
       logger.info('Task runner started (Redis connected)', { component: 'main' });
 
       // Proactive messaging (scheduled outbound messages via BullMQ)
-      const proactiveQueue = new Queue(PROACTIVE_MESSAGE_QUEUE, { connection: redisConnection });
+      const proactiveQueue = new Queue<ProactiveMessageJobData>(PROACTIVE_MESSAGE_QUEUE, { connection: redisConnection });
       proactiveMessenger = createProactiveMessenger({
         channelRouter,
         queue: proactiveQueue,
@@ -357,10 +357,10 @@ async function start(): Promise<void> {
       webhookQueue = createWebhookQueue({
         logger,
         redisUrl,
-        resolveAdapter: async (projectId) => await channelResolver.resolveAdapter(projectId),
+        resolveAdapter: async (projectId) => await channelResolver.resolveAdapter(projectId as ProjectId),
         inboundProcessor,
         handoffManager,
-        runAgent,
+        runAgent: async (params) => await runAgent({ ...params, projectId: params.projectId as ProjectId }),
       });
       await webhookQueue.start();
       logger.info('Webhook queue started (Redis connected)', { component: 'main' });

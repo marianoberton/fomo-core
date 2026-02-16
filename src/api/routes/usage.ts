@@ -22,6 +22,8 @@ export function usageRoutes(
   fastify: FastifyInstance,
   _deps: RouteDependencies,
 ): void {
+  void _deps;
+
   // GET /projects/:projectId/usage — usage summary for a project
   fastify.get<{ Params: { projectId: string } }>(
     '/projects/:projectId/usage',

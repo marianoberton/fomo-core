@@ -1,99 +1,108 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { vehicleLeadScoreTool } from './vehicle-lead-score.js';
-import type { ExecutionContext } from '../../core/types.js';
+/**
+ * Vehicle Lead Score Tool Tests
+ */
+import { describe, it, expect } from 'vitest';
+import { createVehicleLeadScoreTool } from './vehicle-lead-score.js';
+import type { ExecutionContext } from '@/core/types.js';
+import type { ProjectId, SessionId, TraceId } from '@/core/types.js';
 
-describe('Vehicle Lead Score Tool', () => {
-  let mockContext: ExecutionContext;
+describe('vehicle-lead-score tool', () => {
+  const mockContext: ExecutionContext = {
+    projectId: 'test-project' as ProjectId,
+    sessionId: 'test-session' as SessionId,
+    traceId: 'test-trace' as TraceId,
+    agentConfig: {} as ExecutionContext['agentConfig'],
+    permissions: { allowedTools: new Set(['vehicle-lead-score']) },
+    abortSignal: new AbortController().signal,
+  };
 
-  beforeEach(() => {
-    mockContext = {
-      projectId: 'test-project',
-      sessionId: 'test-session',
-      userId: 'test-user',
-      logger: {
-        info: vi.fn(),
-        error: vi.fn(),
-        warn: vi.fn(),
-        debug: vi.fn(),
-      },
-    } as unknown as ExecutionContext;
-  });
-
-  describe('Schema Validation', () => {
-    it('should validate valid input', () => {
-      const input = {
+  describe('schema validation', () => {
+    it('validates valid input', () => {
+      const tool = createVehicleLeadScoreTool();
+      const result = tool.inputSchema.safeParse({
         contactId: 'contact-123',
         urgency: 'urgent',
         budgetRange: 'high',
         vehicleType: 'sedan',
-      };
-
-      const result = vehicleLeadScoreTool.inputSchema.safeParse(input);
+      });
       expect(result.success).toBe(true);
     });
 
-    it('should reject invalid urgency', () => {
-      const input = {
+    it('rejects invalid urgency', () => {
+      const tool = createVehicleLeadScoreTool();
+      const result = tool.inputSchema.safeParse({
         contactId: 'contact-123',
         urgency: 'invalid',
-      };
-
-      const result = vehicleLeadScoreTool.inputSchema.safeParse(input);
+      });
       expect(result.success).toBe(false);
     });
 
-    it('should require contactId', () => {
-      const input = {
+    it('requires contactId', () => {
+      const tool = createVehicleLeadScoreTool();
+      const result = tool.inputSchema.safeParse({
         urgency: 'urgent',
-      };
-
-      const result = vehicleLeadScoreTool.inputSchema.safeParse(input);
+      });
       expect(result.success).toBe(false);
     });
   });
 
-  describe('Dry Run', () => {
-    it('should calculate score without database access', async () => {
-      const input = {
+  describe('dryRun', () => {
+    it('calculates score without database access', async () => {
+      const tool = createVehicleLeadScoreTool();
+      const result = await tool.dryRun({
         contactId: 'contact-123',
         urgency: 'urgent',
         budgetRange: 'premium',
         vehicleType: 'sports',
-      };
+      }, mockContext);
 
-      const result = await vehicleLeadScoreTool.dryRun(input);
-
-      expect(result.success).toBe(true);
-      expect(result.score).toBeGreaterThan(0);
-      expect(result.tier).toBe('urgent');
-      expect(result.suggestedActions).toBeDefined();
-      expect(result.suggestedActions.length).toBeGreaterThan(0);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['success']).toBe(true);
+        expect(output['score']).toBeGreaterThan(0);
+        expect(output['tier']).toBe('urgent');
+        expect(output['suggestedActions']).toBeDefined();
+        expect((output['suggestedActions'] as string[]).length).toBeGreaterThan(0);
+      }
     });
 
-    it('should handle minimal input', async () => {
-      const input = {
+    it('handles minimal input', async () => {
+      const tool = createVehicleLeadScoreTool();
+      const result = await tool.dryRun({
         contactId: 'contact-123',
         urgency: 'browsing',
-      };
+      }, mockContext);
 
-      const result = await vehicleLeadScoreTool.dryRun(input);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const output = result.value.output as Record<string, unknown>;
+        expect(output['success']).toBe(true);
+        expect(output['tier']).toBe('cold');
+      }
+    });
 
-      expect(result.success).toBe(true);
-      expect(result.tier).toBe('cold');
+    it('rejects invalid input', async () => {
+      const tool = createVehicleLeadScoreTool();
+      const result = await tool.dryRun({}, mockContext);
+
+      expect(result.ok).toBe(false);
     });
   });
 
-  describe('Tool Properties', () => {
-    it('should have correct metadata', () => {
-      expect(vehicleLeadScoreTool.id).toBe('vehicle-lead-score');
-      expect(vehicleLeadScoreTool.riskLevel).toBe('low');
-      expect(vehicleLeadScoreTool.requiresApproval).toBe(false);
-      expect(vehicleLeadScoreTool.tags).toContain('vehicles');
+  describe('tool properties', () => {
+    it('has correct metadata', () => {
+      const tool = createVehicleLeadScoreTool();
+      expect(tool.id).toBe('vehicle-lead-score');
+      expect(tool.riskLevel).toBe('low');
+      expect(tool.requiresApproval).toBe(false);
+      expect(tool.category).toBe('vehicles');
     });
 
-    it('should have input and output schemas', () => {
-      expect(vehicleLeadScoreTool.inputSchema).toBeDefined();
-      expect(vehicleLeadScoreTool.outputSchema).toBeDefined();
+    it('has input and output schemas', () => {
+      const tool = createVehicleLeadScoreTool();
+      expect(tool.inputSchema).toBeDefined();
+      expect(tool.outputSchema).toBeDefined();
     });
   });
 });

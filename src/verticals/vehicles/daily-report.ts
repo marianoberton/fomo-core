@@ -49,7 +49,7 @@ export interface DailyReport {
  * Generate daily report from lead data
  */
 export function generateDailyReport(leads: LeadSummary[]): DailyReport {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0] ?? '';
 
   // Filter new leads (last 24 hours)
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);

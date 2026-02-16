@@ -153,7 +153,7 @@ export function agentRoutes(
       try {
         const agent = await agentRepository.create(input);
         logger.info('Agent created', { component: 'agents', agentId: agent.id, projectId });
-        return await sendSuccess(reply, agent, 201);
+        await sendSuccess(reply, agent, 201); return;
       } catch (error) {
         // Handle unique constraint violation
         if (error instanceof Error && error.message.includes('Unique constraint')) {
@@ -191,7 +191,7 @@ export function agentRoutes(
         agentRegistry.invalidate(agentId as AgentId);
 
         logger.info('Agent updated', { component: 'agents', agentId });
-        return await sendSuccess(reply, agent);
+        await sendSuccess(reply, agent); return;
       } catch {
         // Prisma throws if record not found
         return sendNotFound(reply, 'Agent', agentId);
@@ -295,7 +295,7 @@ export function agentRoutes(
         const agent = await agentRepository.update(agentId as AgentId, { status: 'paused' });
         agentRegistry.invalidate(agentId as AgentId);
         logger.info('Agent paused', { component: 'agents', agentId });
-        return await sendSuccess(reply, agent);
+        await sendSuccess(reply, agent); return;
       } catch {
         return sendNotFound(reply, 'Agent', agentId);
       }
@@ -313,7 +313,7 @@ export function agentRoutes(
         const agent = await agentRepository.update(agentId as AgentId, { status: 'active' });
         agentRegistry.invalidate(agentId as AgentId);
         logger.info('Agent resumed', { component: 'agents', agentId });
-        return await sendSuccess(reply, agent);
+        await sendSuccess(reply, agent); return;
       } catch {
         return sendNotFound(reply, 'Agent', agentId);
       }

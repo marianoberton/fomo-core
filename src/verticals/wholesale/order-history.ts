@@ -36,12 +36,12 @@ export interface OrderHistory {
   totalSpent: number;
   averageOrderValue: number;
   lastOrderDate: string | null;
-  topProducts: Array<{
+  topProducts: {
     sku: string;
     productName: string;
     totalQuantity: number;
     totalSpent: number;
-  }>;
+  }[];
   frequentCategories: string[];
 }
 
@@ -54,7 +54,7 @@ export function buildOrderHistory(orders: Order[]): Omit<OrderHistory, 'contactI
   const totalOrders = orders.length;
   const totalSpent = orders.reduce((sum, order) => sum + order.total, 0);
   const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
-  const lastOrderDate = orders.length > 0 ? orders[0].date : null;
+  const lastOrderDate = orders.length > 0 ? (orders[0]?.date ?? null) : null;
 
   // Aggregate products
   const productMap = new Map<
@@ -128,14 +128,14 @@ export function getProductFrequency(
 
   const totalQuantity = relevantOrders.reduce((sum, order) => {
     const item = order.items.find((i) => i.sku === sku);
-    return sum + (item?.quantity || 0);
+    return sum + (item?.quantity ?? 0);
   }, 0);
 
   const lastPurchased =
     relevantOrders.length > 0
-      ? relevantOrders.sort(
+      ? (relevantOrders.sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-        )[0].date
+        )[0]?.date ?? null)
       : null;
 
   return {
@@ -202,8 +202,21 @@ export function calculateLTV(orders: Order[]): {
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
-  const firstOrderDate = sorted[0].date;
-  const lastOrderDate = sorted[sorted.length - 1].date;
+  const firstOrder = sorted[0];
+  const lastOrder = sorted[sorted.length - 1];
+  if (!firstOrder || !lastOrder) {
+    return {
+      totalValue: 0,
+      averageOrderValue: 0,
+      orderCount: 0,
+      firstOrderDate: null,
+      lastOrderDate: null,
+      daysSinceFirstOrder: 0,
+      averageDaysBetweenOrders: 0,
+    };
+  }
+  const firstOrderDate = firstOrder.date;
+  const lastOrderDate = lastOrder.date;
   const totalValue = orders.reduce((sum, order) => sum + order.total, 0);
   const averageOrderValue = totalValue / orders.length;
 

@@ -31,7 +31,7 @@ PROD-001,100,5000`;
       const result = parseStockCSV(csv);
 
       expect(result).toHaveLength(1);
-      expect(result[0].stock).toBe(100);
+      expect(result[0]?.stock).toBe(100);
     });
 
     it('should throw on invalid CSV (missing headers)', () => {
@@ -80,9 +80,9 @@ PROD-001,invalid`;
       const result = applyStockUpdates(existingProducts, updates);
 
       expect(result.updated).toHaveLength(2);
-      expect(result.updated[0].stock).toBe(200);
-      expect(result.updated[1].stock).toBe(75);
-      expect(result.updated[1].price).toBe(3500);
+      expect(result.updated[0]?.stock).toBe(200);
+      expect(result.updated[1]?.stock).toBe(75);
+      expect(result.updated[1]?.price).toBe(3500);
     });
 
     it('should track not found SKUs', () => {
@@ -175,21 +175,21 @@ PROD-001,invalid`;
       const result = searchProducts(products, 'LAPTOP');
 
       expect(result).toHaveLength(1);
-      expect(result[0].sku).toBe('LAPTOP-001');
+      expect(result[0]?.sku).toBe('LAPTOP-001');
     });
 
     it('should search by name', () => {
       const result = searchProducts(products, 'Mouse');
 
       expect(result).toHaveLength(1);
-      expect(result[0].name).toContain('Mouse');
+      expect(result[0]?.name).toContain('Mouse');
     });
 
     it('should search by category', () => {
       const result = searchProducts(products, 'electronics');
 
       expect(result).toHaveLength(1);
-      expect(result[0].category).toBe('Electronics');
+      expect(result[0]?.category).toBe('Electronics');
     });
 
     it('should return empty array for no matches', () => {

@@ -87,7 +87,7 @@ export interface ChatwootAdapter extends ChannelAdapter {
  * Create a Chatwoot channel adapter that communicates via the Chatwoot API.
  */
 export function createChatwootAdapter(config: ChatwootAdapterConfig): ChatwootAdapter {
-  const { baseUrl, apiToken, accountId, agentBotId, projectId } = config;
+  const { baseUrl, apiToken, accountId, projectId } = config;
   const apiBase = `${baseUrl}/api/v1/accounts/${String(accountId)}`;
 
   async function apiCall<T>(

@@ -57,6 +57,7 @@ export function createMockSessionRepository(): {
   return {
     create: vi.fn(),
     findById: vi.fn(),
+    findByContactId: vi.fn(),
     updateStatus: vi.fn(),
     listByProject: vi.fn(),
     addMessage: vi.fn(),

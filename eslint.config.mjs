@@ -3,7 +3,17 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'prisma/**', 'eslint.config.mjs', 'vitest.config.ts'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'prisma/**',
+      'dashboard/**',
+      'tests/**',
+      'scripts/**',
+      'eslint.config.mjs',
+      'vitest.*.ts',
+      '*.mjs',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
@@ -12,7 +22,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['vitest.config.ts'],
+          allowDefaultProject: [],
         },
         tsconfigRootDir: import.meta.dirname,
       },

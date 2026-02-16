@@ -150,7 +150,7 @@ function generateFollowUpMessage(
 
   const tierTemplates = templates[tier];
   const index = Math.min(followUpCount, tierTemplates.length - 1);
-  return tierTemplates[index];
+  return tierTemplates[index] ?? tierTemplates[0] ?? '';
 }
 
 /**
@@ -160,8 +160,8 @@ export function buildFollowUpMetadata(
   existingMetadata: unknown,
   followUpSchedule: FollowUpSchedule
 ): Record<string, unknown> {
-  const metadata = (existingMetadata as Record<string, unknown>) || {};
-  const followUp = (metadata.followUp as Record<string, unknown>) || {};
+  const metadata = (existingMetadata ?? {}) as Record<string, unknown>;
+  const followUp = (metadata['followUp'] ?? {}) as Record<string, unknown>;
 
   return {
     ...metadata,
@@ -181,14 +181,14 @@ export function buildFollowUpMetadata(
  * Increment follow-up counter in metadata
  */
 export function incrementFollowUpCount(existingMetadata: unknown): Record<string, unknown> {
-  const metadata = (existingMetadata as Record<string, unknown>) || {};
-  const leadScore = (metadata.leadScore as Record<string, unknown>) || {};
+  const metadata = (existingMetadata ?? {}) as Record<string, unknown>;
+  const leadScore = (metadata['leadScore'] ?? {}) as Record<string, unknown>;
 
   return {
     ...metadata,
     leadScore: {
       ...leadScore,
-      followUpCount: ((leadScore.followUpCount as number) || 0) + 1,
+      followUpCount: ((leadScore['followUpCount'] as number | undefined) ?? 0) + 1,
     },
     lastInteraction: new Date().toISOString(),
   };

@@ -8,7 +8,6 @@ import type {
   ProjectId,
   SessionId,
   TraceId,
-  PromptLayerId,
   PromptSnapshot,
   TraceEvent,
 } from '@/core/types.js';
@@ -18,11 +17,11 @@ import { createExecutionTraceRepository } from './execution-trace-repository.js'
 /** Helper to create a valid PromptSnapshot for tests. */
 function testPromptSnapshot(): PromptSnapshot {
   return {
-    identityLayerId: nanoid() as PromptLayerId,
+    identityLayerId: nanoid(),
     identityVersion: 1,
-    instructionsLayerId: nanoid() as PromptLayerId,
+    instructionsLayerId: nanoid(),
     instructionsVersion: 1,
-    safetyLayerId: nanoid() as PromptLayerId,
+    safetyLayerId: nanoid(),
     safetyVersion: 1,
     toolDocsHash: 'abc123',
     runtimeContextHash: 'def456',
@@ -30,7 +29,7 @@ function testPromptSnapshot(): PromptSnapshot {
 }
 
 /** Helper to create a TraceEvent for tests. */
-function testTraceEvent(traceId: TraceId, type: string = 'llm_request'): TraceEvent {
+function testTraceEvent(traceId: TraceId, type = 'llm_request'): TraceEvent {
   return {
     id: nanoid(),
     traceId,
@@ -249,7 +248,10 @@ describe('ExecutionTraceRepository Integration', () => {
 
       expect(traces).toHaveLength(3);
       // Newest first
-      expect(traces[0]!.createdAt.getTime()).toBeGreaterThanOrEqual(traces[1]!.createdAt.getTime());
+      const first = traces[0];
+      const second = traces[1];
+      if (!first || !second) throw new Error('Expected at least 2 traces');
+      expect(first.createdAt.getTime()).toBeGreaterThanOrEqual(second.createdAt.getTime());
     });
 
     it('returns empty for session with no traces', async () => {

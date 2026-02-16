@@ -28,11 +28,11 @@ function createTestEmbedding(seed: number): number[] {
  * Uses a simple hash of the text to generate a seed value.
  */
 function createMockEmbeddingGenerator(): EmbeddingGenerator {
-  return async (text: string): Promise<number[]> => {
+  return (text: string): Promise<number[]> => {
     // Simple hash: sum of char codes mod 100, normalized to [0,1]
     const sum = text.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
     const seed = (sum % 100) / 100;
-    return createTestEmbedding(seed);
+    return Promise.resolve(createTestEmbedding(seed));
   };
 }
 
@@ -77,6 +77,7 @@ describe('PrismaMemoryStore Integration', () => {
 
     it('stores entry with optional session and metadata', async () => {
       const store = createPrismaMemoryStore(testDb.prisma, createMockEmbeddingGenerator());
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
       const sessionId = nanoid() as SessionId;
 
       // Create a session first (FK constraint)
@@ -250,7 +251,7 @@ describe('PrismaMemoryStore Integration', () => {
       await store.retrieve({ query: 'test', topK: 10 });
 
       // Check access count was incremented via raw query
-      const rows = await testDb.prisma.$queryRaw<Array<{ access_count: number }>>`
+      const rows = await testDb.prisma.$queryRaw<{ access_count: number }[]>`
         SELECT access_count FROM memory_entries WHERE id = ${entry.id}
       `;
       expect(rows[0]?.access_count).toBe(1);

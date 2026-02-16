@@ -40,9 +40,9 @@ export interface SeedResult {
  *
  * @returns Test database instance.
  */
-export async function createTestDatabase(): Promise<TestDatabase> {
+export function createTestDatabase(): Promise<TestDatabase> {
   const testDbUrl =
-    process.env['TEST_DATABASE_URL'] ||
+    process.env['TEST_DATABASE_URL'] ??
     'postgresql://nexus:nexus@localhost:5433/nexus_core_test?schema=public';
 
   const prisma = new PrismaClient({
@@ -55,7 +55,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     log: [],
   });
 
-  return {
+  return Promise.resolve<TestDatabase>({
     prisma,
 
     /**
@@ -63,21 +63,26 @@ export async function createTestDatabase(): Promise<TestDatabase> {
      * Faster than running migrations between tests.
      */
     reset: async () => {
-      // Delete in dependency order (children first), sequentially to avoid deadlocks
-      await prisma.message.deleteMany();
-      await prisma.approvalRequest.deleteMany();
-      await prisma.executionTrace.deleteMany();
-      await prisma.session.deleteMany();
-      await prisma.memoryEntry.deleteMany();
-      await prisma.usageRecord.deleteMany();
-      await prisma.scheduledTaskRun.deleteMany();
-      await prisma.scheduledTask.deleteMany();
-      await prisma.promptLayer.deleteMany();
-      await prisma.webhook.deleteMany();
-      await prisma.file.deleteMany();
-      await prisma.contact.deleteMany();
-      await prisma.agent.deleteMany();
-      await prisma.project.deleteMany();
+      // TRUNCATE CASCADE avoids FK ordering issues when tests run in parallel
+      await prisma.$executeRawUnsafe(
+        `TRUNCATE TABLE
+          messages,
+          approval_requests,
+          execution_traces,
+          sessions,
+          memory_entries,
+          usage_records,
+          scheduled_task_runs,
+          scheduled_tasks,
+          prompt_layers,
+          webhooks,
+          files,
+          contacts,
+          agents,
+          channel_integrations,
+          projects
+        CASCADE`,
+      );
     },
 
     /**
@@ -88,8 +93,9 @@ export async function createTestDatabase(): Promise<TestDatabase> {
      * @returns Seed result with project ID.
      */
     seed: async (data?: SeedData) => {
-      const projectId = (data?.projectId || nanoid()) as ProjectId;
-      const config = data?.config || createTestAgentConfig({ projectId });
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
+      const projectId = data?.projectId ?? nanoid() as ProjectId;
+      const config = data?.config ?? createTestAgentConfig({ projectId });
 
       // Create project
       await prisma.project.create({
@@ -154,7 +160,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     disconnect: async () => {
       await prisma.$disconnect();
     },
-  };
+  });
 }
 
 /**

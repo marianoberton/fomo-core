@@ -5,18 +5,24 @@
  */
 
 import { z } from 'zod';
-import type { ExecutableTool } from '../registry/types.js';
-import type { ExecutionContext } from '../../core/types.js';
-import { NexusError } from '../../core/errors.js';
-import { prisma } from '../../infrastructure/database.js';
+import type { ExecutionContext } from '@/core/types.js';
+import type { Result } from '@/core/result.js';
+import { ok, err } from '@/core/result.js';
+import { ToolExecutionError } from '@/core/errors.js';
+import type { NexusError } from '@/core/errors.js';
+import type { ExecutableTool, ToolResult } from '@/tools/types.js';
+import { createLogger } from '@/observability/logger.js';
+import { getDatabase } from '@/infrastructure/database.js';
 import {
   OrderSchema,
   buildOrderHistory,
   getRecentOrders,
   calculateLTV,
-} from '../../verticals/wholesale/order-history.js';
+} from '@/verticals/wholesale/order-history.js';
 
-// ─── Tool Definition ────────────────────────────────────────────
+const logger = createLogger({ name: 'wholesale-order-history' });
+
+// ─── Schemas ───────────────────────────────────────────────────
 
 const inputSchema = z.object({
   contactId: z.string().describe('Contact ID to get order history for'),
@@ -54,115 +60,137 @@ const outputSchema = z.object({
   }),
 });
 
-type Input = z.infer<typeof inputSchema>;
-type Output = z.infer<typeof outputSchema>;
+// ─── Tool Factory ──────────────────────────────────────────────
 
-// ─── Tool Implementation ────────────────────────────────────────
-
-async function execute(input: Input, context: ExecutionContext): Promise<Output> {
-  const { contactId, limit } = input;
-  const { projectId } = context;
-
-  // Get contact and validate
-  const contact = await prisma.contact.findUnique({
-    where: { id: contactId },
-  });
-
-  if (!contact) {
-    throw new NexusError('TOOL_EXECUTION_ERROR', `Contact ${contactId} not found`);
-  }
-
-  if (contact.projectId !== projectId) {
-    throw new NexusError(
-      'TOOL_EXECUTION_ERROR',
-      `Contact ${contactId} does not belong to project ${projectId}`
-    );
-  }
-
-  // Get order history from contact metadata
-  const metadata = (contact.metadata as Record<string, unknown>) || {};
-  const ordersData = (metadata.orders as unknown[]) || [];
-  const orders = ordersData.map((o) => OrderSchema.parse(o));
-
-  // Build history summary
-  const history = buildOrderHistory(orders);
-  const recent = getRecentOrders(orders, limit);
-  const ltv = calculateLTV(orders);
-
-  context.logger.info('Order history retrieved', {
-    contactId,
-    orderCount: orders.length,
-    totalSpent: history.totalSpent,
-  });
-
+export function createWholesaleOrderHistoryTool(): ExecutableTool {
   return {
-    success: true,
-    contactId,
-    totalOrders: history.totalOrders,
-    totalSpent: history.totalSpent,
-    averageOrderValue: history.averageOrderValue,
-    lastOrderDate: history.lastOrderDate,
-    recentOrders: recent.map((order) => ({
-      orderId: order.orderId,
-      date: order.date,
-      total: order.total,
-      itemCount: order.items.length,
-      status: order.status,
-    })),
-    topProducts: history.topProducts.slice(0, 5),
-    ltv: {
-      totalValue: ltv.totalValue,
-      orderCount: ltv.orderCount,
-      averageDaysBetweenOrders: ltv.averageDaysBetweenOrders,
+    id: 'wholesale-order-history',
+    name: 'Get Wholesale Order History',
+    description:
+      'Retrieve customer order history including total spent, recent orders, top products, and lifetime value metrics.',
+    category: 'wholesale',
+    riskLevel: 'low',
+    requiresApproval: false,
+    sideEffects: false,
+    supportsDryRun: true,
+
+    inputSchema,
+    outputSchema,
+
+    async execute(input: unknown, context: ExecutionContext): Promise<Result<ToolResult, NexusError>> {
+      const startTime = Date.now();
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return err(new ToolExecutionError('wholesale-order-history', 'Invalid input', parsed.error));
+      }
+      const { contactId, limit } = parsed.data;
+
+      try {
+        const contact = await getDatabase().client.contact.findUnique({
+          where: { id: contactId },
+        });
+
+        if (!contact) {
+          return err(new ToolExecutionError('wholesale-order-history', `Contact ${contactId} not found`));
+        }
+
+        if (contact.projectId !== context.projectId) {
+          return err(new ToolExecutionError(
+            'wholesale-order-history',
+            `Contact ${contactId} does not belong to project ${context.projectId}`
+          ));
+        }
+
+        const metadata = (contact.metadata ?? {}) as Record<string, unknown>;
+        const ordersData = (metadata['orders'] ?? []) as unknown[];
+        const orders = ordersData.map((o) => OrderSchema.parse(o));
+
+        const history = buildOrderHistory(orders);
+        const recent = getRecentOrders(orders, limit);
+        const ltv = calculateLTV(orders);
+
+        logger.info('Order history retrieved', {
+          component: 'wholesale-order-history',
+          contactId,
+          orderCount: orders.length,
+          totalSpent: history.totalSpent,
+        });
+
+        return ok({
+          success: true,
+          output: {
+            success: true,
+            contactId,
+            totalOrders: history.totalOrders,
+            totalSpent: history.totalSpent,
+            averageOrderValue: history.averageOrderValue,
+            lastOrderDate: history.lastOrderDate,
+            recentOrders: recent.map((order) => ({
+              orderId: order.orderId,
+              date: order.date,
+              total: order.total,
+              itemCount: order.items.length,
+              status: order.status,
+            })),
+            topProducts: history.topProducts.slice(0, 5),
+            ltv: {
+              totalValue: ltv.totalValue,
+              orderCount: ltv.orderCount,
+              averageDaysBetweenOrders: ltv.averageDaysBetweenOrders,
+            },
+          },
+          durationMs: Date.now() - startTime,
+        });
+      } catch (error) {
+        logger.error('Order history retrieval failed', {
+          component: 'wholesale-order-history',
+          contactId,
+          error,
+        });
+        return err(new ToolExecutionError(
+          'wholesale-order-history',
+          'Order history retrieval failed',
+          error instanceof Error ? error : undefined
+        ));
+      }
+    },
+
+    dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+      const parsed = inputSchema.safeParse(input);
+      if (!parsed.success) {
+        return Promise.resolve(err(new ToolExecutionError('wholesale-order-history', 'Invalid input', parsed.error)));
+      }
+
+      return Promise.resolve(ok({
+        success: true,
+        output: {
+          success: true,
+          contactId: parsed.data.contactId,
+          totalOrders: 5,
+          totalSpent: 250000,
+          averageOrderValue: 50000,
+          lastOrderDate: new Date().toISOString(),
+          recentOrders: [{
+            orderId: 'ORD-001',
+            date: new Date().toISOString(),
+            total: 50000,
+            itemCount: 3,
+            status: 'delivered',
+          }],
+          topProducts: [{
+            sku: 'PROD-001',
+            productName: 'Sample Product',
+            totalQuantity: 10,
+            totalSpent: 100000,
+          }],
+          ltv: {
+            totalValue: 250000,
+            orderCount: 5,
+            averageDaysBetweenOrders: 30,
+          },
+        },
+        durationMs: 0,
+      }));
     },
   };
 }
-
-async function dryRun(input: Input): Promise<Output> {
-  return {
-    success: true,
-    contactId: input.contactId,
-    totalOrders: 5,
-    totalSpent: 250000,
-    averageOrderValue: 50000,
-    lastOrderDate: new Date().toISOString(),
-    recentOrders: [
-      {
-        orderId: 'ORD-001',
-        date: new Date().toISOString(),
-        total: 50000,
-        itemCount: 3,
-        status: 'delivered',
-      },
-    ],
-    topProducts: [
-      {
-        sku: 'PROD-001',
-        productName: 'Sample Product',
-        totalQuantity: 10,
-        totalSpent: 100000,
-      },
-    ],
-    ltv: {
-      totalValue: 250000,
-      orderCount: 5,
-      averageDaysBetweenOrders: 30,
-    },
-  };
-}
-
-// ─── Tool Export ────────────────────────────────────────────────
-
-export const wholesaleOrderHistoryTool: ExecutableTool = {
-  id: 'wholesale-order-history',
-  name: 'Get Wholesale Order History',
-  description:
-    'Retrieve customer order history including total spent, recent orders, top products, and lifetime value metrics.',
-  inputSchema,
-  outputSchema,
-  riskLevel: 'low',
-  requiresApproval: false,
-  tags: ['wholesale', 'crm', 'analytics'],
-  execute,
-  dryRun,
-};
