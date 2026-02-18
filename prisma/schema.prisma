@@ -34,6 +34,7 @@ model Project {
   files            File[]
   agents               Agent[]
   channelIntegrations  ChannelIntegration[]
+  secrets              Secret[]
 
   @@map("projects")
 }
@@ -390,6 +391,26 @@ model ChannelIntegration {
   @@unique([projectId, provider])
   @@index([provider, status])
   @@map("channel_integrations")
+}
+
+// ─── Secrets ────────────────────────────────────────────────────
+
+model Secret {
+  id             String   @id @default(cuid())
+  projectId      String   @map("project_id")
+  key            String                          // e.g. "TELEGRAM_BOT_TOKEN", "TAVILY_API_KEY"
+  encryptedValue String   @map("encrypted_value") // AES-256-GCM encrypted
+  iv             String                          // Initialization vector (hex)
+  authTag        String   @map("auth_tag")       // GCM auth tag (hex)
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, key])
+  @@index([projectId])
+  @@map("secrets")
 }
 
 // ─── Files ──────────────────────────────────────────────────────

@@ -118,10 +118,6 @@ export function catalogRoutes(
         }
 
         // Generate embeddings and store in memory_entries
-        // Type guard: openai is guaranteed to be non-null due to check above
-        if (!openai) {
-          throw new Error('OpenAI client not initialized');
-        }
         const inserted = await ingestProducts(projectId as ProjectId, products, prisma, openai, logger);
 
         logger.info('Catalog uploaded successfully', {

@@ -19,6 +19,9 @@ import {
   createFileRepository,
   createAgentRepository,
 } from '@/infrastructure/repositories/index.js';
+import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
+import { createSecretService } from '@/secrets/secret-service.js';
+import { createKnowledgeService } from '@/knowledge/knowledge-service.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
 import { createToolRegistry } from '@/tools/registry/tool-registry.js';
 import {
@@ -83,6 +86,8 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
   const webhookRepository = createWebhookRepository(prisma);
   const fileRepository = createFileRepository(prisma);
   const agentRepository = createAgentRepository(prisma);
+  const secretRepository = createSecretRepository(prisma);
+  const secretService = createSecretService({ secretRepository });
 
   // Create shared services
   const approvalGate = createApprovalGate();
@@ -162,6 +167,8 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     agentComms,
     proactiveMessenger: null,
     longTermMemoryStore: null,
+    secretService,
+    knowledgeService: createKnowledgeService({ prisma }),
     prisma,
     logger,
   };

@@ -15,6 +15,16 @@ export type { CatalogSearchToolOptions } from './catalog-search.js';
 export { createCatalogOrderTool } from './catalog-order.js';
 export type { CatalogOrderToolOptions } from './catalog-order.js';
 
+// Phase 5 tools
+export { createWebSearchTool } from './web-search.js';
+export type { WebSearchToolOptions } from './web-search.js';
+export { createSendEmailTool } from './send-email.js';
+export type { SendEmailToolOptions } from './send-email.js';
+export { createSendChannelMessageTool } from './send-channel-message.js';
+export type { SendChannelMessageToolOptions } from './send-channel-message.js';
+export { createReadFileTool } from './read-file.js';
+export type { ReadFileToolOptions } from './read-file.js';
+
 // Vertical-specific tools
 export { createVehicleLeadScoreTool } from './vehicle-lead-score.js';
 export { createVehicleCheckFollowupTool } from './vehicle-check-followup.js';

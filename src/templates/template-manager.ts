@@ -5,6 +5,7 @@
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type { AgentConfig, ProjectId } from '@/core/types.js';
+import type { AgentId } from '@/agents/types.js';
 import type { PromptLayer } from '@/prompts/types.js';
 import { nanoid } from 'nanoid';
 import { createLogger } from '@/observability/logger.js';
@@ -91,6 +92,8 @@ export interface CreateProjectFromTemplateParams {
   environment: 'production' | 'staging' | 'development';
   owner: string;
   tags?: string[];
+  /** Name for the default agent created with the project. Defaults to projectName. */
+  agentName?: string;
   provider: {
     provider: 'anthropic' | 'openai' | 'google' | 'ollama';
     model: string;
@@ -126,6 +129,7 @@ export class TemplateManager {
    */
   async createProjectFromTemplate(params: CreateProjectFromTemplateParams): Promise<{
     projectId: ProjectId;
+    agentId: AgentId;
     config: AgentConfig;
     sampleData?: unknown;
   }> {
@@ -239,8 +243,42 @@ export class TemplateManager {
       layers: layers.length,
     });
 
+    // Create default agent for the project
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- branded type
+    const agentId = nanoid() as AgentId;
+    await this.prisma.agent.create({
+      data: {
+        id: agentId,
+        projectId,
+        name: params.agentName ?? params.projectName,
+        description: params.projectDescription ?? template.description,
+        promptConfig: {
+          identity: template.identity.content,
+          instructions: template.instructions.content,
+          safety: template.safety.content,
+        } as unknown as Prisma.InputJsonValue,
+        toolAllowlist: template.agentConfig.allowedTools ?? [],
+        mcpServers: [] as unknown as Prisma.InputJsonValue,
+        channelConfig: {
+          allowedChannels: [],
+          defaultChannel: undefined,
+        } as unknown as Prisma.InputJsonValue,
+        maxTurns: 10,
+        maxTokensPerTurn: 4000,
+        budgetPerDayUsd: 10.0,
+        status: 'active',
+      },
+    });
+
+    logger.info('Default agent created', {
+      component: 'template-manager',
+      projectId,
+      agentId,
+    });
+
     const result = {
       projectId,
+      agentId,
       config: agentConfig,
       sampleData: params.includeSampleData ? template.sampleData : undefined,
     };

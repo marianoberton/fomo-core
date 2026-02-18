@@ -130,6 +130,19 @@ export class RateLimitError extends NexusError {
   }
 }
 
+/** Thrown when a requested secret key does not exist for the project. */
+export class SecretNotFoundError extends NexusError {
+  constructor(projectId: string, key: string) {
+    super({
+      message: `Secret "${key}" not found for project "${projectId}"`,
+      code: 'SECRET_NOT_FOUND',
+      statusCode: 404,
+      context: { projectId, key },
+    });
+    this.name = 'SecretNotFoundError';
+  }
+}
+
 /** Thrown when a tool's execute() or dryRun() fails at runtime. */
 export class ToolExecutionError extends NexusError {
   constructor(toolId: string, message: string, cause?: Error) {

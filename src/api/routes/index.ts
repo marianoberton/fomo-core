@@ -22,6 +22,8 @@ import { usageRoutes } from './usage.js';
 import { wsDashboardRoutes } from './ws-dashboard.js';
 import { catalogRoutes } from './catalog.js';
 import { templateRoutes } from './templates.js';
+import { secretRoutes } from './secrets.js';
+import { knowledgeRoutes } from './knowledge.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -47,4 +49,6 @@ export async function registerRoutes(
   await fastify.register(wsDashboardRoutes, deps);
   await fastify.register(catalogRoutes, deps);
   await fastify.register(templateRoutes, deps);
+  await fastify.register(secretRoutes, deps);
+  await fastify.register(knowledgeRoutes, deps);
 }

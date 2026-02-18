@@ -115,6 +115,7 @@ export function templateRoutes(
 
       await sendSuccess(reply, {
         projectId: result.projectId,
+        agentId: result.agentId,
         message: `Project created successfully from template ${templateId}`,
         sampleData: result.sampleData,
       }, 201);

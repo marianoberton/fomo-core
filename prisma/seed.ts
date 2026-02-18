@@ -186,6 +186,10 @@ async function main(): Promise<void> {
           'date-time',
           'catalog-search',
           'send-notification',
+          'web-search',
+          'send-email',
+          'send-channel-message',
+          'read-file',
         ],
         memoryConfig: defaultMemoryConfig,
         costConfig: { ...defaultCostConfig, dailyBudgetUSD: 20, monthlyBudgetUSD: 300 },
@@ -237,7 +241,7 @@ async function main(): Promise<void> {
         instructions: 'Busca productos, calcula totales, ofrece cross-sell',
         safety: 'Solo precios del catálogo, nunca inventar',
       },
-      toolAllowlist: ['calculator', 'date-time', 'catalog-search', 'send-notification'],
+      toolAllowlist: ['calculator', 'date-time', 'catalog-search', 'send-notification', 'web-search', 'send-email', 'send-channel-message', 'read-file'],
       channelConfig: { channels: ['chatwoot', 'whatsapp'] },
       maxTurns: 30,
       maxTokensPerTurn: 4000,
@@ -277,6 +281,9 @@ async function main(): Promise<void> {
           'catalog-search',
           'send-notification',
           'propose-scheduled-task',
+          'web-search',
+          'send-email',
+          'send-channel-message',
         ],
         memoryConfig: defaultMemoryConfig,
         costConfig: { ...defaultCostConfig, dailyBudgetUSD: 25, monthlyBudgetUSD: 500 },
@@ -334,7 +341,7 @@ async function main(): Promise<void> {
         instructions: 'Calificar leads, mostrar catálogo, agendar test drives',
         safety: 'Sin descuentos no autorizados, sin tasaciones por chat',
       },
-      toolAllowlist: ['calculator', 'date-time', 'catalog-search', 'send-notification', 'propose-scheduled-task'],
+      toolAllowlist: ['calculator', 'date-time', 'catalog-search', 'send-notification', 'propose-scheduled-task', 'web-search', 'send-email', 'send-channel-message'],
       channelConfig: { channels: ['chatwoot', 'whatsapp', 'telegram'] },
       maxTurns: 40,
       maxTokensPerTurn: 4000,
@@ -373,6 +380,10 @@ async function main(): Promise<void> {
           'date-time',
           'catalog-search',
           'send-notification',
+          'web-search',
+          'send-email',
+          'send-channel-message',
+          'read-file',
         ],
         memoryConfig: defaultMemoryConfig,
         costConfig: { ...defaultCostConfig, dailyBudgetUSD: 15, monthlyBudgetUSD: 200 },
@@ -430,7 +441,7 @@ async function main(): Promise<void> {
         instructions: 'Reservas, concierge, recomendaciones turísticas, multi-idioma',
         safety: 'Sin confirmar reservas sin disponibilidad, sin datos de otros huéspedes',
       },
-      toolAllowlist: ['calculator', 'date-time', 'catalog-search', 'send-notification'],
+      toolAllowlist: ['calculator', 'date-time', 'catalog-search', 'send-notification', 'web-search', 'send-email', 'send-channel-message', 'read-file'],
       channelConfig: { channels: ['chatwoot', 'whatsapp', 'telegram', 'slack'] },
       maxTurns: 25,
       maxTokensPerTurn: 4000,
@@ -468,6 +479,8 @@ async function main(): Promise<void> {
           'calculator',
           'date-time',
           'send-notification',
+          'web-search',
+          'send-email',
           'mcp:fomo-platform:search-clients',
           'mcp:fomo-platform:get-client-detail',
           'mcp:fomo-platform:list-contacts',
@@ -541,6 +554,8 @@ async function main(): Promise<void> {
         'calculator',
         'date-time',
         'send-notification',
+        'web-search',
+        'send-email',
         'mcp:fomo-platform:search-clients',
         'mcp:fomo-platform:get-client-detail',
         'mcp:fomo-platform:list-contacts',
@@ -571,6 +586,17 @@ async function main(): Promise<void> {
   });
 
   console.log(`  [5/5] Fomo Platform Assistant: ${fomoId}`);
+
+  // ═══════════════════════════════════════════════════════════════
+  // SAMPLE SECRETS (placeholder values — replace in production)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Note: These are placeholder secret METADATA entries only. The actual
+  // encrypted values require SECRETS_ENCRYPTION_KEY to be set in .env.
+  // In dev, use the API: POST /projects/:id/secrets to set real values.
+  console.log('\n  Sample secrets (set via API with real values):');
+  console.log('    - TAVILY_API_KEY (web-search)');
+  console.log('    - RESEND_API_KEY + RESEND_FROM_EMAIL (send-email)');
 
   // ═══════════════════════════════════════════════════════════════
   // Summary

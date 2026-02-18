@@ -355,6 +355,14 @@ export function createMockDeps(): RouteDependencies & {
     agentComms: createMockAgentComms(),
     proactiveMessenger: null,
     longTermMemoryStore: null,
+    secretService: {
+      set: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn(),
+      delete: vi.fn(),
+      exists: vi.fn(),
+    } as RouteDependencies['secretService'],
+    knowledgeService: null,
     prisma: {} as RouteDependencies['prisma'],
     logger: createMockLogger(),
   };

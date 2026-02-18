@@ -147,6 +147,10 @@ export const boutiqueHotelConfig: Partial<AgentConfig> = {
     'send-notification',
     'date-time',
     'http-request', // Para integrar con booking systems, weather APIs, etc
+    'web-search',
+    'send-email',
+    'send-channel-message',
+    'read-file',
   ],
   memoryConfig: {
     longTerm: {

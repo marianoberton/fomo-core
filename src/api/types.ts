@@ -19,6 +19,8 @@ import type { FileService } from '@/files/file-service.js';
 import type { AgentRepository, AgentRegistry, AgentComms } from '@/agents/types.js';
 import type { LongTermMemoryStore } from '@/memory/memory-manager.js';
 import type { ProactiveMessenger } from '@/channels/proactive.js';
+import type { SecretService } from '@/secrets/types.js';
+import type { KnowledgeService } from '@/knowledge/types.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -101,6 +103,10 @@ export interface RouteDependencies {
   proactiveMessenger: ProactiveMessenger | null;
   /** Long-term memory store for pgvector semantic search (null if embeddings not configured). */
   longTermMemoryStore: LongTermMemoryStore | null;
+  /** Encrypted per-project credential store. */
+  secretService: SecretService;
+  /** Knowledge base CRUD service (null if embeddings not configured). */
+  knowledgeService: KnowledgeService | null;
   /** Prisma client for direct queries (dashboard aggregations). */
   prisma: PrismaClient;
   logger: Logger;

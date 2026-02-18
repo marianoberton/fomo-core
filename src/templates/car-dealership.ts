@@ -111,6 +111,9 @@ export const carDealershipConfig: Partial<AgentConfig> = {
     'send-notification',
     'propose-scheduled-task',
     'date-time',
+    'web-search',
+    'send-email',
+    'send-channel-message',
   ],
   memoryConfig: {
     longTerm: {

@@ -130,6 +130,10 @@ export const wholesaleHardwareConfig: Partial<AgentConfig> = {
     'send-notification',
     'calculator',
     'date-time',
+    'web-search',
+    'send-email',
+    'send-channel-message',
+    'read-file',
   ],
   memoryConfig: {
     longTerm: {

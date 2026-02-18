@@ -17,6 +17,10 @@ import {
   createFileRepository,
   createAgentRepository,
 } from '@/infrastructure/repositories/index.js';
+import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
+import { createSecretService } from '@/secrets/secret-service.js';
+import { createKnowledgeService } from '@/knowledge/knowledge-service.js';
+import type { KnowledgeService } from '@/knowledge/types.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
 import { createPrismaApprovalStore } from '@/security/prisma-approval-store.js';
 import { createToolRegistry } from '@/tools/registry/tool-registry.js';
@@ -28,6 +32,10 @@ import {
   createHttpRequestTool,
   createSendNotificationTool,
   createProposeScheduledTaskTool,
+  createWebSearchTool,
+  createSendEmailTool,
+  createSendChannelMessageTool,
+  createReadFileTool,
 } from '@/tools/definitions/index.js';
 import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
 import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
@@ -100,6 +108,10 @@ async function start(): Promise<void> {
     const fileRepository = createFileRepository(prisma);
     const agentRepository = createAgentRepository(prisma);
     const channelIntegrationRepository = createChannelIntegrationRepository(prisma);
+    const secretRepository = createSecretRepository(prisma);
+
+    // Encrypted secrets service (AES-256-GCM) — requires SECRETS_ENCRYPTION_KEY env var
+    const secretService = createSecretService({ secretRepository });
 
     // Create shared services
     const approvalGate = createApprovalGate({ store: createPrismaApprovalStore(prisma) });
@@ -109,18 +121,24 @@ async function start(): Promise<void> {
     toolRegistry.register(createJsonTransformTool());
     toolRegistry.register(createHttpRequestTool());
     toolRegistry.register(createSendNotificationTool());
+    toolRegistry.register(createWebSearchTool({ secretService }));
+    toolRegistry.register(createSendEmailTool({ secretService }));
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));
     const mcpManager = createMCPManager();
 
     // Long-term memory (pgvector embeddings) — enabled when OPENAI_API_KEY is set
     let longTermMemoryStore: LongTermMemoryStore | null = null;
+    let knowledgeService: KnowledgeService | null = null;
     const embeddingGenerator = resolveEmbeddingProvider('openai');
     if (embeddingGenerator) {
       longTermMemoryStore = createPrismaMemoryStore(prisma, embeddingGenerator);
       toolRegistry.register(createKnowledgeSearchTool({ store: longTermMemoryStore }));
+      knowledgeService = createKnowledgeService({ prisma, generateEmbedding: embeddingGenerator });
       logger.info('Long-term memory enabled (pgvector + OpenAI embeddings)', { component: 'main' });
     } else {
+      // Knowledge service still available for list/delete (no embedding generation)
+      knowledgeService = createKnowledgeService({ prisma });
       logger.info('Long-term memory disabled (no embedding API key)', { component: 'main' });
     }
 
@@ -150,6 +168,8 @@ async function start(): Promise<void> {
       }));
       logger.info('Slack adapter registered', { component: 'main' });
     }
+
+    toolRegistry.register(createSendChannelMessageTool({ channelRouter }));
 
     // Shared deps for prepareChatRun (same subset used by chat routes and task-executor)
     const chatSetupDeps = {
@@ -283,6 +303,7 @@ async function start(): Promise<void> {
       repository: fileRepository,
       logger,
     });
+    toolRegistry.register(createReadFileTool({ fileService }));
 
     // Multi-agent system
     const agentRegistry = createAgentRegistry({ agentRepository, logger });
@@ -389,6 +410,8 @@ async function start(): Promise<void> {
       agentComms,
       proactiveMessenger,
       longTermMemoryStore,
+      secretService,
+      knowledgeService,
       prisma,
       logger,
     };
