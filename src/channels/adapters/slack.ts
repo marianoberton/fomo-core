@@ -7,10 +7,12 @@ import type { ProjectId } from '@/core/types.js';
 // ─── Config ─────────────────────────────────────────────────────
 
 export interface SlackAdapterConfig {
-  /** Environment variable name containing the bot token (xoxb-...) */
-  botTokenEnvVar: string;
-  /** Environment variable name containing the signing secret (for webhook verification) */
-  signingSecretEnvVar?: string;
+  /** Direct bot token (resolved by caller from secrets). */
+  botToken: string;
+  /** Signing secret for webhook verification (resolved by caller). */
+  signingSecret?: string;
+  /** Project ID for tagging inbound messages. */
+  projectId: ProjectId;
 }
 
 // ─── Slack API Types ────────────────────────────────────────────
@@ -50,14 +52,6 @@ interface SlackEventPayload {
  * Create a Slack channel adapter.
  */
 export function createSlackAdapter(config: SlackAdapterConfig): ChannelAdapter {
-  const getToken = (): string => {
-    const token = process.env[config.botTokenEnvVar];
-    if (!token) {
-      throw new Error(`Missing env var: ${config.botTokenEnvVar}`);
-    }
-    return token;
-  };
-
   return {
     channelType: 'slack',
 
@@ -81,7 +75,7 @@ export function createSlackAdapter(config: SlackAdapterConfig): ChannelAdapter {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': `Bearer ${getToken()}`,
+            'Authorization': `Bearer ${config.botToken}`,
           },
           body: JSON.stringify(body),
         });
@@ -128,7 +122,7 @@ export function createSlackAdapter(config: SlackAdapterConfig): ChannelAdapter {
         id: `slack-${messageEvent.ts}`,
         channel: 'slack' as const,
         channelMessageId: messageEvent.ts,
-        projectId: '' as ProjectId, // Will be resolved by inbound processor
+        projectId: config.projectId,
         senderIdentifier: messageEvent.channel,
         senderName: messageEvent.user, // This is user ID, would need API call for name
         content: messageEvent.text,
@@ -142,7 +136,7 @@ export function createSlackAdapter(config: SlackAdapterConfig): ChannelAdapter {
       try {
         const response = await fetch('https://slack.com/api/auth.test', {
           headers: {
-            'Authorization': `Bearer ${getToken()}`,
+            'Authorization': `Bearer ${config.botToken}`,
           },
         });
         const data = (await response.json()) as unknown as { ok: boolean };

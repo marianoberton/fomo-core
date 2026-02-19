@@ -7,11 +7,13 @@ import type { ProjectId } from '@/core/types.js';
 // ─── Config ─────────────────────────────────────────────────────
 
 export interface WhatsAppAdapterConfig {
-  /** Environment variable name containing the access token */
-  accessTokenEnvVar: string;
-  /** WhatsApp Business Phone Number ID */
+  /** Direct access token (resolved by caller from secrets). */
+  accessToken: string;
+  /** WhatsApp Business Phone Number ID. */
   phoneNumberId: string;
-  /** API version (default: v18.0) */
+  /** Project ID for tagging inbound messages. */
+  projectId: ProjectId;
+  /** API version (default: v18.0). */
   apiVersion?: string;
 }
 
@@ -72,14 +74,6 @@ interface WhatsAppWebhookPayload {
  * Create a WhatsApp Cloud API channel adapter.
  */
 export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAdapter {
-  const getToken = (): string => {
-    const token = process.env[config.accessTokenEnvVar];
-    if (!token) {
-      throw new Error(`Missing env var: ${config.accessTokenEnvVar}`);
-    }
-    return token;
-  };
-
   const apiVersion = config.apiVersion ?? 'v18.0';
   const baseUrl = `https://graph.facebook.com/${apiVersion}/${config.phoneNumberId}`;
 
@@ -103,7 +97,7 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getToken()}`,
+            'Authorization': `Bearer ${config.accessToken}`,
           },
           body: JSON.stringify(body),
         });
@@ -151,7 +145,7 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
           id: `wa-${message.id}`,
           channel: 'whatsapp' as const,
           channelMessageId: message.id,
-          projectId: '' as ProjectId, // Will be resolved by inbound processor
+          projectId: config.projectId,
           senderIdentifier: message.from,
           senderName: contact?.profile.name,
           content: message.text.body,
@@ -169,7 +163,7 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
           id: `wa-${message.id}`,
           channel: 'whatsapp' as const,
           channelMessageId: message.id,
-          projectId: '' as ProjectId,
+          projectId: config.projectId,
           senderIdentifier: message.from,
           senderName: contact?.profile.name,
           content: caption,
@@ -188,7 +182,7 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
       try {
         const response = await fetch(baseUrl, {
           headers: {
-            'Authorization': `Bearer ${getToken()}`,
+            'Authorization': `Bearer ${config.accessToken}`,
           },
         });
         return response.ok;

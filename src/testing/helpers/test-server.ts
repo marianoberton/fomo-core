@@ -31,17 +31,17 @@ import {
 } from '@/tools/definitions/index.js';
 import { createTaskManager } from '@/scheduling/task-manager.js';
 import { createMCPManager } from '@/mcp/mcp-manager.js';
-import { createChannelRouter } from '@/channels/channel-router.js';
 import { createInboundProcessor } from '@/channels/inbound-processor.js';
 import { createWebhookProcessor } from '@/webhooks/webhook-processor.js';
 import { createFileService } from '@/files/file-service.js';
 import { createLocalStorage } from '@/files/storage-local.js';
 import { createAgentRegistry } from '@/agents/agent-registry.js';
 import { createAgentComms } from '@/agents/agent-comms.js';
+import { createChannelIntegrationRepository } from '@/infrastructure/repositories/channel-integration-repository.js';
+import { createChannelResolver } from '@/channels/channel-resolver.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import type { RouteDependencies } from '@/api/types.js';
-import type { ProjectId } from '@/core/types.js';
 
 /** Options for creating test server. */
 export interface TestServerOptions {
@@ -99,9 +99,12 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
   const mcpManager = createMCPManager();
 
   // Channel system
-  const channelRouter = createChannelRouter({ logger });
-
-  const defaultProjectId = 'test-project' as ProjectId;
+  const channelIntegrationRepository = createChannelIntegrationRepository(prisma);
+  const channelResolver = createChannelResolver({
+    integrationRepository: channelIntegrationRepository,
+    secretService,
+    logger,
+  });
 
   // File system
   const fileStorage = createLocalStorage({
@@ -122,11 +125,10 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
 
   // Inbound processor (for channels)
   const inboundProcessor = createInboundProcessor({
-    channelRouter,
+    channelResolver,
     contactRepository,
     sessionRepository,
     logger,
-    defaultProjectId,
     runAgent: () => {
       // Placeholder for tests
       return Promise.resolve({ response: 'Test agent response.' });
@@ -159,7 +161,6 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     toolRegistry,
     taskManager,
     mcpManager,
-    channelRouter,
     inboundProcessor,
     webhookProcessor,
     fileService,
@@ -169,6 +170,8 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     longTermMemoryStore: null,
     secretService,
     knowledgeService: createKnowledgeService({ prisma }),
+    channelResolver,
+    channelIntegrationRepository,
     prisma,
     logger,
   };

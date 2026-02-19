@@ -7,13 +7,16 @@
  */
 import type { Queue, Job } from 'bullmq';
 import type { Logger } from '@/observability/logger.js';
+import type { ProjectId } from '@/core/types.js';
 import type { ContactId } from '@/contacts/types.js';
-import type { ChannelRouter } from './channel-router.js';
-import type { ChannelType, SendResult } from './types.js';
+import type { ChannelResolver } from './channel-resolver.js';
+import type { ChannelType, IntegrationProvider, SendResult } from './types.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
 export interface ProactiveMessageRequest {
+  /** Project that owns the channel integration */
+  projectId: ProjectId;
   /** Contact ID (for tracking) */
   contactId: ContactId;
   /** Channel to send through */
@@ -42,6 +45,7 @@ export interface ProactiveMessenger {
 // ─── Job Data ───────────────────────────────────────────────────
 
 export interface ProactiveMessageJobData {
+  projectId: ProjectId;
   contactId: ContactId;
   channel: ChannelType;
   recipientIdentifier: string;
@@ -55,8 +59,13 @@ export const PROACTIVE_MESSAGE_QUEUE = 'proactive-messages';
 
 // ─── Messenger Factory ──────────────────────────────────────────
 
+/** Type guard: checks if a ChannelType is a supported IntegrationProvider. */
+function isIntegrationProvider(channel: ChannelType): channel is IntegrationProvider {
+  return channel === 'whatsapp' || channel === 'telegram' || channel === 'slack' || channel === 'chatwoot';
+}
+
 export interface ProactiveMessengerDeps {
-  channelRouter: ChannelRouter;
+  channelResolver: ChannelResolver;
   queue: Queue<ProactiveMessageJobData>;
   logger: Logger;
 }
@@ -65,7 +74,7 @@ export interface ProactiveMessengerDeps {
  * Create a ProactiveMessenger for sending scheduled/immediate messages.
  */
 export function createProactiveMessenger(deps: ProactiveMessengerDeps): ProactiveMessenger {
-  const { channelRouter, queue, logger } = deps;
+  const { channelResolver, queue, logger } = deps;
 
   return {
     async send(request: ProactiveMessageRequest): Promise<SendResult> {
@@ -75,7 +84,11 @@ export function createProactiveMessenger(deps: ProactiveMessengerDeps): Proactiv
         channel: request.channel,
       });
 
-      return channelRouter.send({
+      if (!isIntegrationProvider(request.channel)) {
+        return { success: false, error: `Channel '${request.channel}' is not a supported integration provider` };
+      }
+
+      return channelResolver.send(request.projectId, request.channel, {
         channel: request.channel,
         recipientIdentifier: request.recipientIdentifier,
         content: request.content,
@@ -88,6 +101,7 @@ export function createProactiveMessenger(deps: ProactiveMessengerDeps): Proactiv
         : 0;
 
       const jobData: ProactiveMessageJobData = {
+        projectId: request.projectId,
         contactId: request.contactId,
         channel: request.channel,
         recipientIdentifier: request.recipientIdentifier,
@@ -144,10 +158,10 @@ export function createProactiveMessenger(deps: ProactiveMessengerDeps): Proactiv
  * Use this with BullMQ Worker.
  */
 export function createProactiveMessageHandler(deps: {
-  channelRouter: ChannelRouter;
+  channelResolver: ChannelResolver;
   logger: Logger;
 }): (job: Job<ProactiveMessageJobData>) => Promise<SendResult> {
-  const { channelRouter, logger } = deps;
+  const { channelResolver, logger } = deps;
 
   return async (job: Job<ProactiveMessageJobData>): Promise<SendResult> => {
     const { data } = job;
@@ -159,7 +173,13 @@ export function createProactiveMessageHandler(deps: {
       channel: data.channel,
     });
 
-    const result = await channelRouter.send({
+    if (!isIntegrationProvider(data.channel)) {
+      const error = `Channel '${data.channel}' is not a supported integration provider`;
+      logger.error(error, { component: 'proactive-message-worker', jobId: job.id });
+      return { success: false, error };
+    }
+
+    const result = await channelResolver.send(data.projectId, data.channel, {
       channel: data.channel,
       recipientIdentifier: data.recipientIdentifier,
       content: data.content,

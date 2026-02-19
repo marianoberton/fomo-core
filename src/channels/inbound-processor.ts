@@ -9,20 +9,18 @@
  */
 import type { Logger } from '@/observability/logger.js';
 import type { ProjectId } from '@/core/types.js';
-import type { ChannelRouter } from './channel-router.js';
-import type { ChannelType, InboundMessage, SendResult } from './types.js';
+import type { ChannelResolver } from './channel-resolver.js';
+import type { ChannelType, InboundMessage, IntegrationProvider, SendResult } from './types.js';
 import type { ContactRepository, ChannelIdentifier } from '@/contacts/types.js';
 import type { SessionRepository, Session } from '@/infrastructure/repositories/session-repository.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
 export interface InboundProcessorDeps {
-  channelRouter: ChannelRouter;
+  channelResolver: ChannelResolver;
   contactRepository: ContactRepository;
   sessionRepository: SessionRepository;
   logger: Logger;
-  /** Default project ID for new contacts/sessions (fallback when message has no projectId) */
-  defaultProjectId: ProjectId;
   /** Function to run the agent and get a response */
   runAgent: (params: {
     projectId: ProjectId;
@@ -54,6 +52,11 @@ function channelToIdentifier(channel: ChannelType, value: string): ChannelIdenti
   }
 }
 
+/** Check if a ChannelType is a valid IntegrationProvider (i.e. has a channel integration). */
+function isIntegrationProvider(channel: ChannelType): channel is IntegrationProvider {
+  return channel === 'whatsapp' || channel === 'telegram' || channel === 'slack' || channel === 'chatwoot';
+}
+
 // ─── Processor Factory ──────────────────────────────────────────
 
 /**
@@ -61,11 +64,10 @@ function channelToIdentifier(channel: ChannelType, value: string): ChannelIdenti
  */
 export function createInboundProcessor(deps: InboundProcessorDeps): InboundProcessor {
   const {
-    channelRouter,
+    channelResolver,
     contactRepository,
     sessionRepository,
     logger,
-    defaultProjectId,
     runAgent,
   } = deps;
 
@@ -81,8 +83,16 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
       });
 
       try {
-        // Use project ID from message if available, otherwise fall back to default
-        const projectId = (message.projectId || defaultProjectId);
+        const projectId = message.projectId;
+
+        // Validate channel is a supported integration provider
+        if (!isIntegrationProvider(message.channel)) {
+          logger.error('Channel cannot be sent via ChannelResolver', {
+            component: 'inbound-processor',
+            channel: message.channel,
+          });
+          return { success: false, error: `Channel '${message.channel}' is not a supported integration provider` };
+        }
 
         // 1. Resolve or create contact
         const identifier = channelToIdentifier(message.channel, message.senderIdentifier);
@@ -142,7 +152,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
         });
 
         // 4. Send response back via the same channel
-        const sendResult = await channelRouter.send({
+        const sendResult = await channelResolver.send(projectId, message.channel, {
           channel: message.channel,
           recipientIdentifier: message.senderIdentifier,
           content: agentResult.response,

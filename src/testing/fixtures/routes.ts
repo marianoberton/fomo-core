@@ -17,10 +17,12 @@ import type { ApprovalGate } from '@/security/approval-gate.js';
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
 import type { TaskManager } from '@/scheduling/task-manager.js';
 import type { MCPManager } from '@/mcp/mcp-manager.js';
-import type { ChannelRouter } from '@/channels/channel-router.js';
 import type { InboundProcessor } from '@/channels/inbound-processor.js';
 import type { WebhookProcessor } from '@/webhooks/webhook-processor.js';
 import type { FileService } from '@/files/file-service.js';
+import type { ChannelResolver } from '@/channels/channel-resolver.js';
+import type { ChannelIntegrationRepository } from '@/channels/types.js';
+import type { SecretService } from '@/secrets/types.js';
 import type { Logger } from '@/observability/logger.js';
 import type {
   ExecutionTrace,
@@ -229,20 +231,6 @@ export function createMockAgentRepository(): {
   };
 }
 
-/** Create a mock ChannelRouter with all methods as vi.fn(). */
-export function createMockChannelRouter(): {
-  [K in keyof ChannelRouter]: ReturnType<typeof vi.fn>;
-} {
-  return {
-    registerAdapter: vi.fn(),
-    getAdapter: vi.fn(),
-    send: vi.fn(),
-    parseInbound: vi.fn(),
-    listChannels: vi.fn().mockReturnValue([]),
-    isHealthy: vi.fn().mockReturnValue(true),
-  };
-}
-
 /** Create a mock InboundProcessor with all methods as vi.fn(). */
 export function createMockInboundProcessor(): {
   [K in keyof InboundProcessor]: ReturnType<typeof vi.fn>;
@@ -299,6 +287,49 @@ export function createMockAgentComms(): {
   };
 }
 
+/** Create a mock SecretService with all methods as vi.fn(). */
+export function createMockSecretService(): {
+  [K in keyof SecretService]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    set: vi.fn(),
+    get: vi.fn(),
+    list: vi.fn(),
+    delete: vi.fn(),
+    exists: vi.fn(),
+  };
+}
+
+/** Create a mock ChannelResolver with all methods as vi.fn(). */
+export function createMockChannelResolver(): {
+  [K in keyof ChannelResolver]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    resolveAdapter: vi.fn(),
+    resolveIntegration: vi.fn(),
+    resolveProjectByIntegration: vi.fn(),
+    resolveProjectByAccount: vi.fn(),
+    send: vi.fn(),
+    invalidate: vi.fn(),
+  };
+}
+
+/** Create a mock ChannelIntegrationRepository with all methods as vi.fn(). */
+export function createMockChannelIntegrationRepository(): {
+  [K in keyof ChannelIntegrationRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    create: vi.fn(),
+    findById: vi.fn(),
+    findByProject: vi.fn(),
+    findByProjectAndProvider: vi.fn(),
+    findByProviderAccount: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    listActive: vi.fn(),
+  };
+}
+
 /** Create a silent mock Logger. */
 export function createMockLogger(): Logger {
   return {
@@ -326,12 +357,14 @@ export function createMockDeps(): RouteDependencies & {
   toolRegistry: ReturnType<typeof createMockToolRegistry>;
   taskManager: ReturnType<typeof createMockTaskManager>;
   mcpManager: ReturnType<typeof createMockMCPManager>;
-  channelRouter: ReturnType<typeof createMockChannelRouter>;
   inboundProcessor: ReturnType<typeof createMockInboundProcessor>;
   webhookProcessor: ReturnType<typeof createMockWebhookProcessor>;
   fileService: ReturnType<typeof createMockFileService>;
   agentRegistry: ReturnType<typeof createMockAgentRegistry>;
   agentComms: ReturnType<typeof createMockAgentComms>;
+  secretService: ReturnType<typeof createMockSecretService>;
+  channelResolver: ReturnType<typeof createMockChannelResolver>;
+  channelIntegrationRepository: ReturnType<typeof createMockChannelIntegrationRepository>;
 } {
   return {
     projectRepository: createMockProjectRepository(),
@@ -347,7 +380,6 @@ export function createMockDeps(): RouteDependencies & {
     toolRegistry: createMockToolRegistry(),
     taskManager: createMockTaskManager(),
     mcpManager: createMockMCPManager(),
-    channelRouter: createMockChannelRouter(),
     inboundProcessor: createMockInboundProcessor(),
     webhookProcessor: createMockWebhookProcessor(),
     fileService: createMockFileService(),
@@ -355,14 +387,10 @@ export function createMockDeps(): RouteDependencies & {
     agentComms: createMockAgentComms(),
     proactiveMessenger: null,
     longTermMemoryStore: null,
-    secretService: {
-      set: vi.fn(),
-      get: vi.fn(),
-      list: vi.fn(),
-      delete: vi.fn(),
-      exists: vi.fn(),
-    } as RouteDependencies['secretService'],
+    secretService: createMockSecretService(),
     knowledgeService: null,
+    channelResolver: createMockChannelResolver(),
+    channelIntegrationRepository: createMockChannelIntegrationRepository(),
     prisma: {} as RouteDependencies['prisma'],
     logger: createMockLogger(),
   };

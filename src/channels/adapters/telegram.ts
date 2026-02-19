@@ -7,8 +7,10 @@ import type { ProjectId } from '@/core/types.js';
 // ─── Config ─────────────────────────────────────────────────────
 
 export interface TelegramAdapterConfig {
-  /** Environment variable name containing the bot token */
-  botTokenEnvVar: string;
+  /** Direct bot token (resolved by caller from secrets). */
+  botToken: string;
+  /** Project ID for tagging inbound messages. */
+  projectId: ProjectId;
 }
 
 // ─── Telegram API Types ─────────────────────────────────────────
@@ -53,15 +55,7 @@ interface TelegramUpdate {
  * Create a Telegram channel adapter.
  */
 export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAdapter {
-  const getToken = (): string => {
-    const token = process.env[config.botTokenEnvVar];
-    if (!token) {
-      throw new Error(`Missing env var: ${config.botTokenEnvVar}`);
-    }
-    return token;
-  };
-
-  const baseUrl = (): string => `https://api.telegram.org/bot${getToken()}`;
+  const baseUrl = `https://api.telegram.org/bot${config.botToken}`;
 
   return {
     channelType: 'telegram',
@@ -81,7 +75,7 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
           body['reply_to_message_id'] = Number(message.replyToChannelMessageId);
         }
 
-        const response = await fetch(`${baseUrl()}/sendMessage`, {
+        const response = await fetch(`${baseUrl}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -131,7 +125,7 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
         id: `tg-${message.message_id}`,
         channel: 'telegram' as const,
         channelMessageId: String(message.message_id),
-        projectId: '' as ProjectId, // Will be resolved by inbound processor
+        projectId: config.projectId,
         senderIdentifier: String(chat.id),
         senderName,
         content: text,
@@ -145,7 +139,7 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
 
     async isHealthy(): Promise<boolean> {
       try {
-        const response = await fetch(`${baseUrl()}/getMe`);
+        const response = await fetch(`${baseUrl}/getMe`);
         const data = (await response.json()) as unknown as { ok: boolean };
         return data.ok;
       } catch {

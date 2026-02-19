@@ -10,7 +10,6 @@ import type { TaskManager } from '@/scheduling/task-manager.js';
 import type { MCPManager } from '@/mcp/mcp-manager.js';
 import type { Logger } from '@/observability/logger.js';
 import type { ContactRepository } from '@/contacts/types.js';
-import type { ChannelRouter } from '@/channels/channel-router.js';
 import type { InboundProcessor } from '@/channels/inbound-processor.js';
 import type { WebhookRepository } from '@/webhooks/types.js';
 import type { WebhookProcessor } from '@/webhooks/webhook-processor.js';
@@ -21,6 +20,8 @@ import type { LongTermMemoryStore } from '@/memory/memory-manager.js';
 import type { ProactiveMessenger } from '@/channels/proactive.js';
 import type { SecretService } from '@/secrets/types.js';
 import type { KnowledgeService } from '@/knowledge/types.js';
+import type { ChannelResolver } from '@/channels/channel-resolver.js';
+import type { ChannelIntegrationRepository } from '@/channels/types.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -93,7 +94,6 @@ export interface RouteDependencies {
   toolRegistry: ToolRegistry;
   taskManager: TaskManager;
   mcpManager: MCPManager;
-  channelRouter: ChannelRouter;
   inboundProcessor: InboundProcessor;
   webhookProcessor: WebhookProcessor;
   fileService: FileService;
@@ -107,6 +107,10 @@ export interface RouteDependencies {
   secretService: SecretService;
   /** Knowledge base CRUD service (null if embeddings not configured). */
   knowledgeService: KnowledgeService | null;
+  /** Per-project channel adapter resolver (secrets-based). */
+  channelResolver: ChannelResolver;
+  /** Channel integration repository for CRUD operations. */
+  channelIntegrationRepository: ChannelIntegrationRepository;
   /** Prisma client for direct queries (dashboard aggregations). */
   prisma: PrismaClient;
   logger: Logger;

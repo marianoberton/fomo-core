@@ -1,24 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createTelegramAdapter } from './telegram.js';
+import type { ProjectId } from '@/core/types.js';
 
 describe('TelegramAdapter', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...originalEnv };
-    process.env['TELEGRAM_BOT_TOKEN'] = 'test_bot_token';
     vi.stubGlobal('fetch', vi.fn());
   });
 
   afterEach(() => {
-    process.env = originalEnv;
     vi.unstubAllGlobals();
   });
 
+  const defaultConfig = {
+    botToken: 'test_bot_token',
+    projectId: 'test-project' as ProjectId,
+  };
+
   describe('channelType', () => {
     it('returns telegram', () => {
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       expect(adapter.channelType).toBe('telegram');
     });
   });
@@ -32,7 +32,7 @@ describe('TelegramAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'telegram',
         recipientIdentifier: '987654321',
@@ -46,7 +46,7 @@ describe('TelegramAdapter', () => {
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
       );
     });
 
@@ -58,7 +58,7 @@ describe('TelegramAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       await adapter.send({
         channel: 'telegram',
         recipientIdentifier: '987654321',
@@ -81,7 +81,7 @@ describe('TelegramAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       await adapter.send({
         channel: 'telegram',
         recipientIdentifier: '987654321',
@@ -104,7 +104,7 @@ describe('TelegramAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'telegram',
         recipientIdentifier: 'invalid',
@@ -118,7 +118,7 @@ describe('TelegramAdapter', () => {
     it('handles network errors', async () => {
       vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
 
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'telegram',
         recipientIdentifier: '123',
@@ -128,25 +128,11 @@ describe('TelegramAdapter', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Network error');
     });
-
-    it('returns error when bot token env var is missing', async () => {
-      delete process.env['TELEGRAM_BOT_TOKEN'];
-
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
-      const result = await adapter.send({
-        channel: 'telegram',
-        recipientIdentifier: '123',
-        content: 'Hello',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Missing env var: TELEGRAM_BOT_TOKEN');
-    });
   });
 
   describe('parseInbound', () => {
     it('parses a text message', async () => {
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const payload = {
         message: {
           message_id: 123,
@@ -170,13 +156,14 @@ describe('TelegramAdapter', () => {
       expect(result?.id).toBe('tg-123');
       expect(result?.channel).toBe('telegram');
       expect(result?.channelMessageId).toBe('123');
+      expect(result?.projectId).toBe('test-project');
       expect(result?.senderIdentifier).toBe('987654321');
       expect(result?.senderName).toBe('John Doe');
       expect(result?.content).toBe('Hello from Telegram');
     });
 
     it('returns null for non-message updates', async () => {
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const payload = {
         callback_query: { id: '123' },
       };
@@ -187,7 +174,7 @@ describe('TelegramAdapter', () => {
     });
 
     it('returns null for non-text messages', async () => {
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const payload = {
         message: {
           message_id: 123,
@@ -203,7 +190,7 @@ describe('TelegramAdapter', () => {
     });
 
     it('handles reply messages', async () => {
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const payload = {
         message: {
           message_id: 123,
@@ -226,12 +213,12 @@ describe('TelegramAdapter', () => {
         json: () => Promise.resolve({ ok: true }),
       } as Response);
 
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const isHealthy = await adapter.isHealthy();
 
       expect(isHealthy).toBe(true);
       expect(fetch).toHaveBeenCalledWith(
-        'https://api.telegram.org/bottest_bot_token/getMe'
+        'https://api.telegram.org/bottest_bot_token/getMe',
       );
     });
 
@@ -240,7 +227,7 @@ describe('TelegramAdapter', () => {
         json: () => Promise.resolve({ ok: false }),
       } as Response);
 
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const isHealthy = await adapter.isHealthy();
 
       expect(isHealthy).toBe(false);
@@ -249,7 +236,7 @@ describe('TelegramAdapter', () => {
     it('returns false on network error', async () => {
       vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
 
-      const adapter = createTelegramAdapter({ botTokenEnvVar: 'TELEGRAM_BOT_TOKEN' });
+      const adapter = createTelegramAdapter(defaultConfig);
       const isHealthy = await adapter.isHealthy();
 
       expect(isHealthy).toBe(false);

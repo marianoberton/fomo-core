@@ -45,12 +45,8 @@ import { createTaskRunner } from '@/scheduling/task-runner.js';
 import { createTaskExecutor } from '@/scheduling/task-executor.js';
 import { createMCPManager } from '@/mcp/mcp-manager.js';
 import { Queue } from 'bullmq';
-import { createChannelRouter } from '@/channels/channel-router.js';
 import { createProactiveMessenger, PROACTIVE_MESSAGE_QUEUE } from '@/channels/proactive.js';
 import type { ProactiveMessenger, ProactiveMessageJobData } from '@/channels/proactive.js';
-import { createTelegramAdapter } from '@/channels/adapters/telegram.js';
-import { createWhatsAppAdapter } from '@/channels/adapters/whatsapp.js';
-import { createSlackAdapter } from '@/channels/adapters/slack.js';
 import { createInboundProcessor } from '@/channels/inbound-processor.js';
 import { createWebhookProcessor } from '@/webhooks/webhook-processor.js';
 import { createFileService } from '@/files/file-service.js';
@@ -63,6 +59,7 @@ import { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from '@/channels/handoff
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import { chatwootWebhookRoutes } from '@/api/routes/chatwoot-webhook.js';
+import { channelWebhookRoutes } from '@/api/routes/channel-webhooks.js';
 import { createWebhookQueue } from '@/channels/webhook-queue.js';
 import type { WebhookQueue } from '@/channels/webhook-queue.js';
 import { onboardingRoutes } from '@/api/routes/onboarding.js';
@@ -113,6 +110,13 @@ async function start(): Promise<void> {
     // Encrypted secrets service (AES-256-GCM) — requires SECRETS_ENCRYPTION_KEY env var
     const secretService = createSecretService({ secretRepository });
 
+    // Channel resolver — per-project adapter resolution from DB + secrets
+    const channelResolver = createChannelResolver({
+      integrationRepository: channelIntegrationRepository,
+      secretService,
+      logger,
+    });
+
     // Create shared services
     const approvalGate = createApprovalGate({ store: createPrismaApprovalStore(prisma) });
     const toolRegistry = createToolRegistry();
@@ -123,6 +127,7 @@ async function start(): Promise<void> {
     toolRegistry.register(createSendNotificationTool());
     toolRegistry.register(createWebSearchTool({ secretService }));
     toolRegistry.register(createSendEmailTool({ secretService }));
+    toolRegistry.register(createSendChannelMessageTool({ channelResolver }));
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));
     const mcpManager = createMCPManager();
@@ -141,35 +146,6 @@ async function start(): Promise<void> {
       knowledgeService = createKnowledgeService({ prisma });
       logger.info('Long-term memory disabled (no embedding API key)', { component: 'main' });
     }
-
-    // Channel system
-    const channelRouter = createChannelRouter({ logger });
-
-    // Register channel adapters (conditional on env vars)
-    if (process.env['TELEGRAM_BOT_TOKEN']) {
-      channelRouter.registerAdapter(createTelegramAdapter({
-        botTokenEnvVar: 'TELEGRAM_BOT_TOKEN',
-      }));
-      logger.info('Telegram adapter registered', { component: 'main' });
-    }
-
-    if (process.env['WHATSAPP_ACCESS_TOKEN']) {
-      channelRouter.registerAdapter(createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: process.env['WHATSAPP_PHONE_NUMBER_ID'] ?? '',
-      }));
-      logger.info('WhatsApp adapter registered', { component: 'main' });
-    }
-
-    if (process.env['SLACK_BOT_TOKEN']) {
-      channelRouter.registerAdapter(createSlackAdapter({
-        botTokenEnvVar: 'SLACK_BOT_TOKEN',
-        signingSecretEnvVar: 'SLACK_SIGNING_SECRET',
-      }));
-      logger.info('Slack adapter registered', { component: 'main' });
-    }
-
-    toolRegistry.register(createSendChannelMessageTool({ channelRouter }));
 
     // Shared deps for prepareChatRun (same subset used by chat routes and task-executor)
     const chatSetupDeps = {
@@ -276,14 +252,11 @@ async function start(): Promise<void> {
       }
     };
 
-    const defaultProjectId = (process.env['DEFAULT_PROJECT_ID'] ?? 'default') as ProjectId;
-
     const inboundProcessor = createInboundProcessor({
-      channelRouter,
+      channelResolver,
       contactRepository,
       sessionRepository,
       logger,
-      defaultProjectId,
       runAgent,
     });
 
@@ -309,16 +282,12 @@ async function start(): Promise<void> {
     const agentRegistry = createAgentRegistry({ agentRepository, logger });
     const agentComms = createAgentComms({ logger });
 
-    // Chatwoot integration (channel resolver + handoff)
-    const channelResolver = createChannelResolver({
-      integrationRepository: channelIntegrationRepository,
-      logger,
-    });
+    // Handoff manager (Chatwoot human escalation)
     const handoffManager = createHandoffManager({
       config: DEFAULT_HANDOFF_CONFIG,
       logger,
     });
-    logger.info('Chatwoot integration initialized', { component: 'main' });
+    logger.info('Channel system initialized (dynamic per-project integrations)', { component: 'main' });
 
     // Register Fastify plugins
     const corsOrigin = process.env['CORS_ORIGIN'];
@@ -368,7 +337,7 @@ async function start(): Promise<void> {
       // Proactive messaging (scheduled outbound messages via BullMQ)
       const proactiveQueue = new Queue<ProactiveMessageJobData>(PROACTIVE_MESSAGE_QUEUE, { connection: redisConnection });
       proactiveMessenger = createProactiveMessenger({
-        channelRouter,
+        channelResolver,
         queue: proactiveQueue,
         logger,
       });
@@ -378,7 +347,12 @@ async function start(): Promise<void> {
       webhookQueue = createWebhookQueue({
         logger,
         redisUrl,
-        resolveAdapter: async (projectId) => await channelResolver.resolveAdapter(projectId as ProjectId),
+        resolveAdapter: async (projectId) => {
+          const adapter = await channelResolver.resolveAdapter(projectId as ProjectId, 'chatwoot');
+          if (!adapter) return null;
+          // Chatwoot adapter has extended methods (handoffToHuman, resumeBot)
+          return adapter as unknown as import('@/channels/adapters/chatwoot.js').ChatwootAdapter;
+        },
         inboundProcessor,
         handoffManager,
         runAgent: async (params) => await runAgent({ ...params, projectId: params.projectId as ProjectId }),
@@ -402,7 +376,6 @@ async function start(): Promise<void> {
       toolRegistry,
       taskManager,
       mcpManager,
-      channelRouter,
       inboundProcessor,
       webhookProcessor,
       fileService,
@@ -412,6 +385,8 @@ async function start(): Promise<void> {
       longTermMemoryStore,
       secretService,
       knowledgeService,
+      channelResolver,
+      channelIntegrationRepository,
       prisma,
       logger,
     };
@@ -429,6 +404,9 @@ async function start(): Promise<void> {
           webhookQueue: webhookQueue ?? undefined, // Pass queue if Redis is available
           runAgent,
         });
+
+        // Dynamic channel webhook routes (Telegram, WhatsApp, Slack)
+        channelWebhookRoutes(prefixed, deps);
 
         // Onboarding routes
         onboardingRoutes(prefixed, {

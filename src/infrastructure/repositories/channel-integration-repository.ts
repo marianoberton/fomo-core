@@ -1,5 +1,5 @@
 /**
- * Channel integration repository — CRUD for channel integrations (e.g. Chatwoot).
+ * Channel integration repository — CRUD for channel integrations (all providers).
  */
 import type { PrismaClient } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
@@ -10,6 +10,7 @@ import type {
   ChannelIntegrationRepository,
   ChatwootIntegrationConfig,
   CreateChannelIntegrationInput,
+  IntegrationConfigUnion,
   IntegrationProvider,
   UpdateChannelIntegrationInput,
 } from '@/channels/types.js';
@@ -29,7 +30,7 @@ function toModel(record: {
     id: record.id,
     projectId: record.projectId as ProjectId,
     provider: record.provider as IntegrationProvider,
-    config: record.config as ChatwootIntegrationConfig,
+    config: record.config as IntegrationConfigUnion,
     status: record.status as 'active' | 'paused',
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -61,9 +62,20 @@ export function createChannelIntegrationRepository(prisma: PrismaClient): Channe
       return toModel(record);
     },
 
-    async findByProject(projectId: ProjectId): Promise<ChannelIntegration | null> {
-      const record = await prisma.channelIntegration.findFirst({
+    async findByProject(projectId: ProjectId): Promise<ChannelIntegration[]> {
+      const records = await prisma.channelIntegration.findMany({
         where: { projectId, status: 'active' },
+        orderBy: { createdAt: 'desc' },
+      });
+      return records.map(toModel);
+    },
+
+    async findByProjectAndProvider(
+      projectId: ProjectId,
+      provider: IntegrationProvider,
+    ): Promise<ChannelIntegration | null> {
+      const record = await prisma.channelIntegration.findFirst({
+        where: { projectId, provider },
       });
       if (!record) return null;
       return toModel(record);
@@ -73,7 +85,7 @@ export function createChannelIntegrationRepository(prisma: PrismaClient): Channe
       provider: IntegrationProvider,
       accountId: number,
     ): Promise<ChannelIntegration | null> {
-      // Search through active integrations for matching accountId in config
+      // Search through active integrations for matching accountId in config (Chatwoot-specific)
       const records = await prisma.channelIntegration.findMany({
         where: { provider, status: 'active' },
       });

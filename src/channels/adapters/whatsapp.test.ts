@@ -1,26 +1,29 @@
 /**
  * WhatsApp Adapter Tests
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createWhatsAppAdapter } from './whatsapp.js';
 import type { OutboundMessage } from '../types.js';
+import type { ProjectId } from '@/core/types.js';
 
 describe('WhatsAppAdapter', () => {
-  const mockEnv = {
-    WHATSAPP_ACCESS_TOKEN: 'test-token-123',
-  };
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    process.env['WHATSAPP_ACCESS_TOKEN'] = mockEnv.WHATSAPP_ACCESS_TOKEN;
+    vi.stubGlobal('fetch', vi.fn());
   });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const defaultConfig = {
+    accessToken: 'test-token-123',
+    phoneNumberId: 'test-phone-id',
+    projectId: 'test-project' as ProjectId,
+  };
 
   describe('parseInbound', () => {
     it('parses text message', async () => {
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const payload = {
         object: 'whatsapp_business_account',
@@ -64,6 +67,7 @@ describe('WhatsAppAdapter', () => {
 
       expect(result).not.toBeNull();
       expect(result?.channel).toBe('whatsapp');
+      expect(result?.projectId).toBe('test-project');
       expect(result?.senderIdentifier).toBe('5491132766709');
       expect(result?.senderName).toBe('John Doe');
       expect(result?.content).toBe('Hello, agent!');
@@ -71,10 +75,7 @@ describe('WhatsAppAdapter', () => {
     });
 
     it('parses image message', async () => {
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const payload = {
         object: 'whatsapp_business_account',
@@ -126,10 +127,7 @@ describe('WhatsAppAdapter', () => {
     });
 
     it('parses image message without caption', async () => {
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const payload = {
         object: 'whatsapp_business_account',
@@ -178,10 +176,7 @@ describe('WhatsAppAdapter', () => {
     });
 
     it('returns null for non-whatsapp payload', async () => {
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const payload = { object: 'telegram' };
       const result = await adapter.parseInbound(payload);
@@ -190,10 +185,7 @@ describe('WhatsAppAdapter', () => {
     });
 
     it('returns null for empty messages', async () => {
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const payload = {
         object: 'whatsapp_business_account',
@@ -222,10 +214,7 @@ describe('WhatsAppAdapter', () => {
     });
 
     it('returns null for unsupported message types', async () => {
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const payload = {
         object: 'whatsapp_business_account',
@@ -261,10 +250,7 @@ describe('WhatsAppAdapter', () => {
     });
 
     it('includes reply context when present', async () => {
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const payload = {
         object: 'whatsapp_business_account',
@@ -317,18 +303,14 @@ describe('WhatsAppAdapter', () => {
 
   describe('send', () => {
     it('sends text message successfully', async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
+      vi.mocked(fetch).mockResolvedValue({
         json: () => Promise.resolve({
           messaging_product: 'whatsapp',
           messages: [{ id: 'sent_msg_123' }],
         }),
-      });
-      global.fetch = mockFetch;
+      } as Response);
 
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const message: OutboundMessage = {
         channel: 'whatsapp',
@@ -345,7 +327,7 @@ describe('WhatsAppAdapter', () => {
         'Authorization': 'Bearer test-token-123',
       });
       /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-      expect(mockFetch).toHaveBeenCalledWith(
+      expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/test-phone-id/messages'),
         expect.objectContaining({
           method: 'POST',
@@ -356,7 +338,7 @@ describe('WhatsAppAdapter', () => {
     });
 
     it('handles API errors', async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
+      vi.mocked(fetch).mockResolvedValue({
         json: () => Promise.resolve({
           error: {
             message: 'Invalid phone number',
@@ -364,13 +346,9 @@ describe('WhatsAppAdapter', () => {
             code: 100,
           },
         }),
-      });
-      global.fetch = mockFetch;
+      } as Response);
 
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const message: OutboundMessage = {
         channel: 'whatsapp',
@@ -385,13 +363,9 @@ describe('WhatsAppAdapter', () => {
     });
 
     it('handles network errors', async () => {
-      const mockFetch = vi.fn().mockRejectedValue(new Error('Network timeout'));
-      global.fetch = mockFetch;
+      vi.mocked(fetch).mockRejectedValue(new Error('Network timeout'));
 
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const message: OutboundMessage = {
         channel: 'whatsapp',
@@ -408,28 +382,20 @@ describe('WhatsAppAdapter', () => {
 
   describe('isHealthy', () => {
     it('returns true when API is accessible', async () => {
-      const mockFetch = vi.fn().mockResolvedValue({ ok: true });
-      global.fetch = mockFetch;
+      vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
 
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const healthy = await adapter.isHealthy();
 
       expect(healthy).toBe(true);
-      expect(mockFetch).toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalled();
     });
 
     it('returns false when API is not accessible', async () => {
-      const mockFetch = vi.fn().mockRejectedValue(new Error('Connection failed'));
-      global.fetch = mockFetch;
+      vi.mocked(fetch).mockRejectedValue(new Error('Connection failed'));
 
-      const adapter = createWhatsAppAdapter({
-        accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-        phoneNumberId: 'test-phone-id',
-      });
+      const adapter = createWhatsAppAdapter(defaultConfig);
 
       const healthy = await adapter.isHealthy();
 

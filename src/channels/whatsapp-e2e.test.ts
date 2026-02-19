@@ -19,8 +19,9 @@ import type {
   StoredMessage,
 } from '@/infrastructure/repositories/session-repository.js';
 import { createWhatsAppAdapter } from './adapters/whatsapp.js';
-import { createChannelRouter } from './channel-router.js';
 import { createInboundProcessor } from './inbound-processor.js';
+import type { ChannelResolver } from './channel-resolver.js';
+import type { OutboundMessage } from './types.js';
 
 // ─── Mock Factories ─────────────────────────────────────────────
 
@@ -111,15 +112,10 @@ function createMockSessionRepository(): SessionRepository {
 // ─── Test Suite ─────────────────────────────────────────────────
 
 describe('WhatsApp End-to-End Integration', () => {
-  const mockEnv = {
-    WHATSAPP_ACCESS_TOKEN: 'test-token-123',
-    WHATSAPP_PHONE_NUMBER_ID: 'test-phone-id',
-  };
+  const defaultProjectId = 'test-project' as ProjectId;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env['WHATSAPP_ACCESS_TOKEN'] = mockEnv.WHATSAPP_ACCESS_TOKEN;
-    process.env['WHATSAPP_PHONE_NUMBER_ID'] = mockEnv.WHATSAPP_PHONE_NUMBER_ID;
   });
 
   it('processes text message end-to-end', async () => {
@@ -128,31 +124,37 @@ describe('WhatsApp End-to-End Integration', () => {
     const contactRepository = createMockContactRepository();
     const sessionRepository = createMockSessionRepository();
 
-    const channelRouter = createChannelRouter({ logger });
-    const whatsappAdapter = createWhatsAppAdapter({
-      accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-      phoneNumberId: 'test-phone-id',
-    });
-    channelRouter.registerAdapter(whatsappAdapter);
-
     // Mock send to avoid actual API calls
     const mockSend = vi.fn().mockResolvedValue({
       success: true,
       channelMessageId: 'sent_msg_123',
     });
-    whatsappAdapter.send = mockSend;
+
+    const channelResolver = {
+      resolveAdapter: vi.fn(),
+      resolveIntegration: vi.fn(),
+      resolveProjectByIntegration: vi.fn(),
+      resolveProjectByAccount: vi.fn(),
+      send: vi.fn().mockImplementation(async (_projectId: ProjectId, _provider: string, message: OutboundMessage) => mockSend(message)),
+      invalidate: vi.fn(),
+    } as unknown as ChannelResolver;
 
     // Mock runAgent
     const runAgent = vi.fn().mockResolvedValue({
       response: 'Hello! I am an AI agent. How can I help you?',
     });
 
+    const whatsappAdapter = createWhatsAppAdapter({
+      accessToken: 'test-token-123',
+      phoneNumberId: 'test-phone-id',
+      projectId: defaultProjectId,
+    });
+
     const inboundProcessor = createInboundProcessor({
-      channelRouter,
+      channelResolver,
       contactRepository,
       sessionRepository,
       logger,
-      defaultProjectId: 'test-project' as ProjectId,
       runAgent,
     });
 
@@ -249,29 +251,30 @@ describe('WhatsApp End-to-End Integration', () => {
     const contactRepository = createMockContactRepository();
     const sessionRepository = createMockSessionRepository();
 
-    const channelRouter = createChannelRouter({ logger });
     const whatsappAdapter = createWhatsAppAdapter({
-      accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
+      accessToken: 'test-token-123',
       phoneNumberId: 'test-phone-id',
+      projectId: defaultProjectId,
     });
-    channelRouter.registerAdapter(whatsappAdapter);
 
-    const mockSend = vi.fn().mockResolvedValue({
-      success: true,
-      channelMessageId: 'sent_msg_456',
-    });
-    whatsappAdapter.send = mockSend;
+    const channelResolver = {
+      resolveAdapter: vi.fn(),
+      resolveIntegration: vi.fn(),
+      resolveProjectByIntegration: vi.fn(),
+      resolveProjectByAccount: vi.fn(),
+      send: vi.fn().mockResolvedValue({ success: true, channelMessageId: 'sent_msg_456' }),
+      invalidate: vi.fn(),
+    } as unknown as ChannelResolver;
 
     const runAgent = vi.fn().mockResolvedValue({
       response: 'I see you sent an image. How can I help with that?',
     });
 
     const inboundProcessor = createInboundProcessor({
-      channelRouter,
+      channelResolver,
       contactRepository,
       sessionRepository,
       logger,
-      defaultProjectId: 'test-project' as ProjectId,
       runAgent,
     });
 
@@ -343,23 +346,28 @@ describe('WhatsApp End-to-End Integration', () => {
     const contactRepository = createMockContactRepository();
     const sessionRepository = createMockSessionRepository();
 
-    const channelRouter = createChannelRouter({ logger });
-    const whatsappAdapter = createWhatsAppAdapter({
-      accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-      phoneNumberId: 'test-phone-id',
-    });
-    channelRouter.registerAdapter(whatsappAdapter);
-
-    whatsappAdapter.send = vi.fn().mockResolvedValue({ success: true });
+    const channelResolver = {
+      resolveAdapter: vi.fn(),
+      resolveIntegration: vi.fn(),
+      resolveProjectByIntegration: vi.fn(),
+      resolveProjectByAccount: vi.fn(),
+      send: vi.fn().mockResolvedValue({ success: true }),
+      invalidate: vi.fn(),
+    } as unknown as ChannelResolver;
 
     const runAgent = vi.fn().mockResolvedValue({ response: 'Response' });
 
+    const whatsappAdapter = createWhatsAppAdapter({
+      accessToken: 'test-token-123',
+      phoneNumberId: 'test-phone-id',
+      projectId: defaultProjectId,
+    });
+
     const inboundProcessor = createInboundProcessor({
-      channelRouter,
+      channelResolver,
       contactRepository,
       sessionRepository,
       logger,
-      defaultProjectId: 'test-project' as ProjectId,
       runAgent,
     });
 
@@ -424,24 +432,29 @@ describe('WhatsApp End-to-End Integration', () => {
     const contactRepository = createMockContactRepository();
     const sessionRepository = createMockSessionRepository();
 
-    const channelRouter = createChannelRouter({ logger });
-    const whatsappAdapter = createWhatsAppAdapter({
-      accessTokenEnvVar: 'WHATSAPP_ACCESS_TOKEN',
-      phoneNumberId: 'test-phone-id',
-    });
-    channelRouter.registerAdapter(whatsappAdapter);
-
-    whatsappAdapter.send = vi.fn().mockResolvedValue({ success: true });
+    const channelResolver = {
+      resolveAdapter: vi.fn(),
+      resolveIntegration: vi.fn(),
+      resolveProjectByIntegration: vi.fn(),
+      resolveProjectByAccount: vi.fn(),
+      send: vi.fn().mockResolvedValue({ success: true }),
+      invalidate: vi.fn(),
+    } as unknown as ChannelResolver;
 
     // Mock agent failure
     const runAgent = vi.fn().mockRejectedValue(new Error('Agent processing failed'));
 
+    const whatsappAdapter = createWhatsAppAdapter({
+      accessToken: 'test-token-123',
+      phoneNumberId: 'test-phone-id',
+      projectId: defaultProjectId,
+    });
+
     const inboundProcessor = createInboundProcessor({
-      channelRouter,
+      channelResolver,
       contactRepository,
       sessionRepository,
       logger,
-      defaultProjectId: 'test-project' as ProjectId,
       runAgent,
     });
 

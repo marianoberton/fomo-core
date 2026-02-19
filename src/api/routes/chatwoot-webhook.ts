@@ -18,7 +18,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from '../types.js';
 import type { ChannelResolver } from '@/channels/channel-resolver.js';
 import type { HandoffManager } from '@/channels/handoff.js';
-import type { ChatwootWebhookEvent } from '@/channels/adapters/chatwoot.js';
+import type { ChatwootWebhookEvent, ChatwootAdapter } from '@/channels/adapters/chatwoot.js';
 import type { ProjectId } from '@/core/types.js';
 import type { WebhookQueue } from '@/channels/webhook-queue.js';
 
@@ -146,7 +146,7 @@ export function chatwootWebhookRoutes(
     }
 
     // Fallback: Inline processing (legacy behavior, no queue configured)
-    const adapter = await channelResolver.resolveAdapter(projectId);
+    const adapter = await channelResolver.resolveAdapter(projectId, 'chatwoot') as ChatwootAdapter | null;
     if (!adapter) {
       logger.error('No Chatwoot adapter for project', {
         component: 'chatwoot-webhook',
@@ -279,7 +279,7 @@ export function chatwootWebhookRoutes(
     if (status === 'resolved' && conversationId !== undefined && accountId !== undefined) {
       const projectId = await channelResolver.resolveProjectByAccount(accountId);
       if (projectId) {
-        const adapter = await channelResolver.resolveAdapter(projectId);
+        const adapter = await channelResolver.resolveAdapter(projectId, 'chatwoot') as ChatwootAdapter | null;
         if (adapter) {
           void handoffManager.resume(conversationId, adapter).catch((error: unknown) => {
             logger.error('Failed to resume bot after resolve', {

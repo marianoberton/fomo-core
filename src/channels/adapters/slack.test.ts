@@ -1,24 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSlackAdapter, getSlackUrlChallenge } from './slack.js';
+import type { ProjectId } from '@/core/types.js';
 
 describe('SlackAdapter', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...originalEnv };
-    process.env['SLACK_BOT_TOKEN'] = 'xoxb-test-token';
     vi.stubGlobal('fetch', vi.fn());
   });
 
   afterEach(() => {
-    process.env = originalEnv;
     vi.unstubAllGlobals();
   });
 
+  const defaultConfig = {
+    botToken: 'xoxb-test-token',
+    projectId: 'test-project' as ProjectId,
+  };
+
   describe('channelType', () => {
     it('returns slack', () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       expect(adapter.channelType).toBe('slack');
     });
   });
@@ -34,7 +34,7 @@ describe('SlackAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C12345',
@@ -43,7 +43,7 @@ describe('SlackAdapter', () => {
 
       expect(result.success).toBe(true);
       expect(result.channelMessageId).toBe('1234567890.123456');
-       
+
       expect(fetch).toHaveBeenCalledWith(
         'https://slack.com/api/chat.postMessage',
         expect.objectContaining({
@@ -64,7 +64,7 @@ describe('SlackAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C99999',
@@ -85,7 +85,7 @@ describe('SlackAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C12345',
@@ -106,7 +106,7 @@ describe('SlackAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C12345',
@@ -127,7 +127,7 @@ describe('SlackAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C12345',
@@ -147,7 +147,7 @@ describe('SlackAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C_INVALID',
@@ -165,7 +165,7 @@ describe('SlackAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C12345',
@@ -179,7 +179,7 @@ describe('SlackAdapter', () => {
     it('handles network errors', async () => {
       vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C12345',
@@ -193,7 +193,7 @@ describe('SlackAdapter', () => {
     it('handles non-Error thrown objects', async () => {
       vi.mocked(fetch).mockRejectedValue('string error');
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C12345',
@@ -204,20 +204,6 @@ describe('SlackAdapter', () => {
       expect(result.error).toBe('Unknown error');
     });
 
-    it('returns error when bot token env var is missing', async () => {
-      delete process.env['SLACK_BOT_TOKEN'];
-
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
-      const result = await adapter.send({
-        channel: 'slack',
-        recipientIdentifier: 'C12345',
-        content: 'Hello',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Missing env var: SLACK_BOT_TOKEN');
-    });
-
     it('returns false when ok is true but ts is missing', async () => {
       vi.mocked(fetch).mockResolvedValue({
         json: () => Promise.resolve({
@@ -226,7 +212,7 @@ describe('SlackAdapter', () => {
         }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const result = await adapter.send({
         channel: 'slack',
         recipientIdentifier: 'C12345',
@@ -240,7 +226,7 @@ describe('SlackAdapter', () => {
 
   describe('parseInbound', () => {
     it('parses a text message event', async () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const payload = {
         type: 'event_callback',
         event: {
@@ -260,13 +246,14 @@ describe('SlackAdapter', () => {
       expect(result?.id).toBe('slack-1234567890.123456');
       expect(result?.channel).toBe('slack');
       expect(result?.channelMessageId).toBe('1234567890.123456');
+      expect(result?.projectId).toBe('test-project');
       expect(result?.senderIdentifier).toBe('C12345');
       expect(result?.senderName).toBe('U67890');
       expect(result?.content).toBe('Hello from Slack');
     });
 
     it('includes thread_ts as replyToChannelMessageId', async () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const payload = {
         type: 'event_callback',
         event: {
@@ -287,7 +274,7 @@ describe('SlackAdapter', () => {
     });
 
     it('converts event_ts to receivedAt Date', async () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const payload = {
         type: 'event_callback',
         event: {
@@ -309,7 +296,7 @@ describe('SlackAdapter', () => {
     });
 
     it('returns null for url_verification events', async () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const payload = {
         type: 'url_verification',
         challenge: 'test_challenge_token',
@@ -320,7 +307,7 @@ describe('SlackAdapter', () => {
     });
 
     it('returns null for non-message events', async () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const payload = {
         type: 'event_callback',
         event: {
@@ -337,7 +324,7 @@ describe('SlackAdapter', () => {
     });
 
     it('returns null for bot messages (no user field)', async () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const payload = {
         type: 'event_callback',
         event: {
@@ -356,7 +343,7 @@ describe('SlackAdapter', () => {
     });
 
     it('returns null when no event object', async () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const payload = {
         type: 'event_callback',
         // no event object
@@ -367,7 +354,7 @@ describe('SlackAdapter', () => {
     });
 
     it('preserves raw payload', async () => {
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const payload = {
         type: 'event_callback',
         event: {
@@ -394,11 +381,11 @@ describe('SlackAdapter', () => {
         json: () => Promise.resolve({ ok: true }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const isHealthy = await adapter.isHealthy();
 
       expect(isHealthy).toBe(true);
-       
+
       expect(fetch).toHaveBeenCalledWith(
         'https://slack.com/api/auth.test',
         expect.objectContaining({
@@ -414,7 +401,7 @@ describe('SlackAdapter', () => {
         json: () => Promise.resolve({ ok: false }),
       } as Response);
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const isHealthy = await adapter.isHealthy();
 
       expect(isHealthy).toBe(false);
@@ -423,16 +410,7 @@ describe('SlackAdapter', () => {
     it('returns false on network error', async () => {
       vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
 
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
-      const isHealthy = await adapter.isHealthy();
-
-      expect(isHealthy).toBe(false);
-    });
-
-    it('returns false when token env var is missing', async () => {
-      delete process.env['SLACK_BOT_TOKEN'];
-
-      const adapter = createSlackAdapter({ botTokenEnvVar: 'SLACK_BOT_TOKEN' });
+      const adapter = createSlackAdapter(defaultConfig);
       const isHealthy = await adapter.isHealthy();
 
       expect(isHealthy).toBe(false);

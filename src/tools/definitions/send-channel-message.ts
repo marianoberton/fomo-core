@@ -1,6 +1,6 @@
 /**
- * Send Channel Message Tool — sends messages via registered channel adapters.
- * Routes through the ChannelRouter to WhatsApp, Telegram, Slack, etc.
+ * Send Channel Message Tool — sends messages via per-project channel adapters.
+ * Routes through the ChannelResolver to resolve project-specific adapters.
  */
 import { z } from 'zod';
 import type { ExecutionContext } from '@/core/types.js';
@@ -9,8 +9,8 @@ import { ok, err } from '@/core/result.js';
 import { ToolExecutionError } from '@/core/errors.js';
 import type { NexusError } from '@/core/errors.js';
 import type { ExecutableTool, ToolResult } from '@/tools/types.js';
-import type { ChannelRouter } from '@/channels/channel-router.js';
-import type { ChannelType } from '@/channels/types.js';
+import type { ChannelResolver } from '@/channels/channel-resolver.js';
+import type { IntegrationProvider } from '@/channels/types.js';
 import { createLogger } from '@/observability/logger.js';
 
 const logger = createLogger({ name: 'send-channel-message' });
@@ -21,7 +21,6 @@ const ChannelTypeSchema = z.enum([
   'whatsapp',
   'telegram',
   'slack',
-  'email',
   'chatwoot',
 ]);
 
@@ -41,21 +40,21 @@ const outputSchema = z.object({
 // ─── Options ────────────────────────────────────────────────────
 
 export interface SendChannelMessageToolOptions {
-  channelRouter: ChannelRouter;
+  channelResolver: ChannelResolver;
 }
 
 // ─── Factory ────────────────────────────────────────────────────
 
-/** Create a send-channel-message tool that routes through channel adapters. */
+/** Create a send-channel-message tool that routes through per-project channel adapters. */
 export function createSendChannelMessageTool(
   options: SendChannelMessageToolOptions,
 ): ExecutableTool {
-  const { channelRouter } = options;
+  const { channelResolver } = options;
 
   return {
     id: 'send-channel-message',
     name: 'Send Channel Message',
-    description: 'Sends a message through a registered channel adapter (WhatsApp, Telegram, Slack, etc.). Requires the target channel to be configured. Medium-risk tool that requires human approval.',
+    description: 'Sends a message through a per-project channel adapter (WhatsApp, Telegram, Slack, Chatwoot). Requires the target channel to be configured as an integration for the project. Medium-risk tool that requires human approval.',
     category: 'communication',
     inputSchema,
     outputSchema,
@@ -72,17 +71,17 @@ export function createSendChannelMessageTool(
       const parsed = inputSchema.parse(input);
 
       try {
-        const channel = parsed.channel as ChannelType;
-        const adapter = channelRouter.getAdapter(channel);
+        const channel = parsed.channel as IntegrationProvider;
 
+        const adapter = await channelResolver.resolveAdapter(context.projectId, channel);
         if (!adapter) {
           return err(new ToolExecutionError(
             'send-channel-message',
-            `No adapter registered for channel: ${channel}. Available channels: ${channelRouter.listChannels().join(', ') || 'none'}`,
+            `No ${channel} integration configured for this project. Set up a ${channel} integration first.`,
           ));
         }
 
-        const result = await channelRouter.send({
+        const result = await channelResolver.send(context.projectId, channel, {
           channel,
           recipientIdentifier: parsed.recipientIdentifier,
           content: parsed.message,
@@ -124,22 +123,19 @@ export function createSendChannelMessageTool(
       input: unknown,
       context: ExecutionContext,
     ): Promise<Result<ToolResult, NexusError>> {
-      void context;
       const parsed = inputSchema.parse(input);
 
-      const channel = parsed.channel as ChannelType;
-      const adapter = channelRouter.getAdapter(channel);
-      const availableChannels = channelRouter.listChannels();
+      const channel = parsed.channel as IntegrationProvider;
+      const adapter = await channelResolver.resolveAdapter(context.projectId, channel);
 
-      return Promise.resolve(ok({
+      return await Promise.resolve(ok({
         success: true,
         output: {
           dryRun: true,
           channel,
           recipientIdentifier: parsed.recipientIdentifier,
           messageLength: parsed.message.length,
-          adapterRegistered: adapter !== undefined,
-          availableChannels,
+          adapterConfigured: adapter !== null,
         },
         durationMs: 0,
       }));
