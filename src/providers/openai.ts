@@ -267,15 +267,18 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
         };
       } catch (error) {
         if (error instanceof OpenAI.APIError) {
-          logger.error('OpenAI API error', {
-            component: label,
-            status: error.status,
-            errorMessage: error.message,
-            traceId: params.traceId,
-          });
+          const errorClass = error.constructor.name;
+          const httpStatus = (error as { status?: number }).status;
+          logger.error(
+            `OpenAI API error [${errorClass}] status=${httpStatus ?? 'none'} model=${options.model}: ${error.message}`,
+            {
+              component: label,
+              traceId: params.traceId,
+            },
+          );
           yield {
             type: 'error',
-            error: new ProviderError(label, `${error.status}: ${error.message}`, error),
+            error: new ProviderError(label, `${httpStatus ?? 'none'}: ${error.message}`, error),
           };
         } else {
           throw error;

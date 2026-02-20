@@ -266,9 +266,16 @@ export function createToolRegistry(options?: ToolRegistryOptions): ToolRegistry 
  * OpenAI requires `type: "object"` at the top level for function parameters.
  * Discriminated unions (which produce `anyOf`) are flattened into a single
  * object with all possible properties, making variant-specific ones optional.
+ *
+ * Uses `jsonSchema7` target because OpenAI follows JSON Schema draft 7+ where
+ * `exclusiveMinimum` is a number. The `openApi3` target generates draft 4/5
+ * style `exclusiveMinimum: true` (boolean) which OpenAI rejects.
  */
 function toOpenAICompatibleSchema(zodSchema: import('zod').ZodType): Record<string, unknown> {
-  const raw = zodToJsonSchema(zodSchema, { target: 'openApi3' }) as Record<string, unknown>;
+  const raw = zodToJsonSchema(zodSchema, { target: 'jsonSchema7' }) as Record<string, unknown>;
+
+  // Remove $schema — OpenAI rejects it in function parameters
+  delete raw['$schema'];
 
   // Already a plain object — return as-is
   if (raw['type'] === 'object') {

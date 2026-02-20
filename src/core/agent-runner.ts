@@ -252,6 +252,16 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
           const genericTools = toolRegistry.formatForProvider(context);
           const formattedTools = provider.formatTools(genericTools);
 
+          runLogger.debug('Calling LLM', {
+            component: 'agent-runner',
+            traceId,
+            turn: turnCount,
+            provider: provider.id,
+            messageCount: fittedMessages.length,
+            toolCount: formattedTools.length,
+            abortSignalAborted: context.abortSignal.aborted,
+          });
+
           // Call LLM with streaming
           const chatResult = await executeLLMCall({
             provider,
@@ -283,6 +293,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
               type: 'error',
               data: { error: chatResult.error.message, code: chatResult.error.code },
             });
+            onEvent?.({ type: 'error', code: chatResult.error.code, message: chatResult.error.message });
             break;
           }
 

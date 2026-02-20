@@ -38,6 +38,14 @@ import {
   createReadFileTool,
   createQuerySessionsTool,
   createReadSessionHistoryTool,
+  createCatalogSearchTool,
+  createCatalogOrderTool,
+  createVehicleLeadScoreTool,
+  createVehicleCheckFollowupTool,
+  createWholesaleUpdateStockTool,
+  createWholesaleOrderHistoryTool,
+  createHotelDetectLanguageTool,
+  createHotelSeasonalPricingTool,
 } from '@/tools/definitions/index.js';
 import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
 import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
@@ -302,6 +310,18 @@ async function start(): Promise<void> {
     toolRegistry.register(createQuerySessionsTool({ prisma }));
     toolRegistry.register(createReadSessionHistoryTool({ sessionRepository }));
 
+    // Catalog tools — vertical-specific tools for product search and ordering
+    toolRegistry.register(createCatalogSearchTool());
+    toolRegistry.register(createCatalogOrderTool());
+
+    // Vertical tools — industry-specific capabilities
+    toolRegistry.register(createVehicleLeadScoreTool());
+    toolRegistry.register(createVehicleCheckFollowupTool());
+    toolRegistry.register(createWholesaleUpdateStockTool());
+    toolRegistry.register(createWholesaleOrderHistoryTool());
+    toolRegistry.register(createHotelDetectLanguageTool());
+    toolRegistry.register(createHotelSeasonalPricingTool());
+
     // Multi-agent system
     const agentRegistry = createAgentRegistry({ agentRepository, logger });
     const agentComms = createAgentComms({ logger });
@@ -317,6 +337,8 @@ async function start(): Promise<void> {
     const corsOrigin = process.env['CORS_ORIGIN'];
     await server.register(cors, {
       origin: corsOrigin ? corsOrigin.split(',') : true,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     });
     await server.register(helmet);
     await server.register(rateLimit, { max: 100, timeWindow: '1 minute' });

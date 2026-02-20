@@ -292,6 +292,19 @@ function setupDashboardSocket(
     }
   });
 
+  // Log socket close with code/reason for diagnostics
+  (socket as unknown as {
+    on(event: 'close', listener: (code: number, reason: Buffer) => void): void;
+  }).on('close', (code, reason) => {
+    deps.logger.info('Dashboard WebSocket closed', {
+      component: 'ws-dashboard',
+      projectId,
+      code,
+      reason: reason.toString(),
+      wasRunning: running,
+    });
+  });
+
   socket.on('error', (err: Error) => {
     deps.logger.error('Dashboard WebSocket error', {
       component: 'ws-dashboard',

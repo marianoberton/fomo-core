@@ -6,16 +6,11 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import type { MemoryCategory } from '@/memory/types.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────
 
-const MemoryCategorySchema = z.enum([
-  'fact',
-  'decision',
-  'preference',
-  'task_context',
-  'learning',
-]);
+const MemoryCategorySchema = z.string();
 
 const AddKnowledgeSchema = z.object({
   content: z.string().min(1).max(10_000),
@@ -68,7 +63,7 @@ export function knowledgeRoutes(
       const entry = await knowledgeService.add({
         projectId,
         content: body.content,
-        category: body.category,
+        category: body.category as MemoryCategory | undefined,
         importance: body.importance,
         metadata: body.metadata,
       });
@@ -96,7 +91,7 @@ export function knowledgeRoutes(
         projectId,
         page: query.page,
         limit: query.limit,
-        category: query.category,
+        category: query.category as MemoryCategory | undefined,
       });
 
       await sendSuccess(reply, result);
@@ -142,7 +137,7 @@ export function knowledgeRoutes(
 
       const result = await knowledgeService.bulkImport({
         projectId,
-        items: body.items,
+        items: body.items as import('@/knowledge/types.js').BulkImportItem[],
       });
 
       await sendSuccess(reply, result, result.failed > 0 ? 207 : 201);

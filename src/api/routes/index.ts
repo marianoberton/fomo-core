@@ -27,6 +27,7 @@ import { knowledgeRoutes } from './knowledge.js';
 import { integrationRoutes } from './integrations.js';
 import { inboxRoutes } from './inbox.js';
 import { mcpServerRoutes } from './mcp-servers.js';
+import { proactiveRoutes } from './proactive.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -56,5 +57,6 @@ export async function registerRoutes(
   await fastify.register(knowledgeRoutes, deps);
   await fastify.register(integrationRoutes, deps);
   await fastify.register(inboxRoutes, deps);
+  await fastify.register(proactiveRoutes, deps);
   mcpServerRoutes(fastify, { mcpServerRepository: deps.mcpServerRepository, logger: deps.logger });
 }

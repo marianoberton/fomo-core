@@ -6,6 +6,8 @@ import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
+import { createTaskExecutor } from '@/scheduling/task-executor.js';
+import type { ScheduledTaskId } from '@/core/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -27,7 +29,7 @@ const createTaskSchema = z.object({
 });
 
 const approveSchema = z.object({
-  approvedBy: z.string().min(1),
+  approvedBy: z.string().min(1).optional().default('admin'),
 });
 
 // ─── Routes ─────────────────────────────────────────────────────
@@ -221,6 +223,51 @@ export function scheduledTaskRoutes(
         limit,
       );
       await sendSuccess(reply, runs);
+    },
+  );
+
+  // POST /scheduled-tasks/:id/trigger — manually trigger a task run (for testing)
+  fastify.post(
+    '/scheduled-tasks/:id/trigger',
+    async (
+      request: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const task = await taskManager.getTask(request.params.id as ScheduledTaskId);
+      if (!task) {
+        await sendNotFound(reply, 'ScheduledTask', request.params.id);
+        return;
+      }
+
+      if (task.status !== 'active') {
+        await sendError(
+          reply,
+          'TASK_NOT_ACTIVE',
+          `Cannot trigger task in status '${task.status}'. Only 'active' tasks can be triggered.`,
+          400,
+        );
+        return;
+      }
+
+      const executeTask = createTaskExecutor({
+        projectRepository: opts.projectRepository,
+        sessionRepository: opts.sessionRepository,
+        promptLayerRepository: opts.promptLayerRepository,
+        executionTraceRepository: opts.executionTraceRepository,
+        toolRegistry: opts.toolRegistry,
+        mcpManager: opts.mcpManager,
+        prisma: opts.prisma,
+        logger: opts.logger,
+      });
+
+      const result = await executeTask(task);
+      await sendSuccess(reply, {
+        triggered: true,
+        taskId: task.id,
+        success: result.success,
+        traceId: result.traceId,
+        tokensUsed: result.tokensUsed,
+      });
     },
   );
 }
