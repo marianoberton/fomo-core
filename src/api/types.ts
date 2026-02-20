@@ -22,6 +22,7 @@ import type { SecretService } from '@/secrets/types.js';
 import type { KnowledgeService } from '@/knowledge/types.js';
 import type { ChannelResolver } from '@/channels/channel-resolver.js';
 import type { ChannelIntegrationRepository } from '@/channels/types.js';
+import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -111,6 +112,8 @@ export interface RouteDependencies {
   channelResolver: ChannelResolver;
   /** Channel integration repository for CRUD operations. */
   channelIntegrationRepository: ChannelIntegrationRepository;
+  /** MCP server template + instance repository. */
+  mcpServerRepository: MCPServerRepository;
   /** Prisma client for direct queries (dashboard aggregations). */
   prisma: PrismaClient;
   logger: Logger;

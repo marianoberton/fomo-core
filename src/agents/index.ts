@@ -11,9 +11,11 @@ export type {
   AgentMessageId,
   AgentStatus,
   AgentLimits,
+  AgentLLMConfig,
   MCPServerConfig,
   ChannelConfig,
   AgentPromptConfig,
+  AgentMode,
   AgentConfig,
   CreateAgentInput,
   UpdateAgentInput,
@@ -22,6 +24,11 @@ export type {
   AgentRegistry,
   AgentComms,
 } from './types.js';
+
+// ─── Mode Resolver ──────────────────────────────────────────────
+
+export type { ResolvedMode } from './mode-resolver.js';
+export { resolveAgentMode } from './mode-resolver.js';
 
 // ─── Factory Functions ───────────────────────────────────────────
 

@@ -142,6 +142,7 @@ function setupDashboardSocket(
 ): void {
   let authenticated = false;
   let sessionId: string | null = null;
+  let agentId: string | null = null;
   let running = false;
   let traceId = '';
 
@@ -180,6 +181,9 @@ function setupDashboardSocket(
           sendError('AUTH_REQUIRED', 'Must authenticate before creating a session');
           return;
         }
+
+        // Store agentId for subsequent message.send calls
+        agentId = msg.agentId ?? null;
 
         deps.sessionRepository
           .create({
@@ -237,6 +241,7 @@ function setupDashboardSocket(
           {
             projectId,
             sessionId,
+            agentId: agentId ?? undefined,
             message: msg.content,
           },
           deps,

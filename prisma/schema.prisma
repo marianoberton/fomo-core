@@ -35,6 +35,7 @@ model Project {
   agents               Agent[]
   channelIntegrations  ChannelIntegration[]
   secrets              Secret[]
+  mcpServerInstances   MCPServerInstance[]
 
   @@map("projects")
 }
@@ -53,6 +54,7 @@ model Contact {
   telegramId  String?  @map("telegram_id")
   slackId     String?  @map("slack_id")
 
+  role        String?                          // 'customer' | 'owner' | null
   timezone    String?
   language    String   @default("es")
   metadata    Json?
@@ -352,9 +354,11 @@ model Agent {
 
   // Config
   promptConfig    Json    @map("prompt_config")     // identity, instructions, safety
+  llmConfig       Json?   @map("llm_config")        // Optional per-agent LLM override (provider, model, temperature)
   toolAllowlist   String[] @map("tool_allowlist")   // Allowed tool IDs
   mcpServers      Json?   @map("mcp_servers")       // MCP server configs
   channelConfig   Json?   @map("channel_config")    // Which channels this agent uses
+  modes           Json?   @map("modes")             // AgentMode[] — operating mode definitions (public/internal)
 
   // Limits
   maxTurns            Int     @default(10) @map("max_turns")
@@ -439,4 +443,56 @@ model File {
   @@index([projectId, uploadedAt])
   @@index([projectId, mimeType])
   @@map("files")
+}
+
+// ─── MCP Server Templates ──────────────────────────────────────
+
+model MCPServerTemplate {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  displayName     String   @map("display_name")
+  description     String
+  category        String   // erp, crm, productivity, communication, custom
+  transport       String   // stdio | sse
+  command         String?
+  args            String[]
+  defaultEnv      Json?    @map("default_env")
+  url             String?
+  toolPrefix      String?  @map("tool_prefix")
+  requiredSecrets String[] @map("required_secrets")
+  isOfficial      Boolean  @default(false) @map("is_official")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  instances MCPServerInstance[]
+
+  @@index([category])
+  @@map("mcp_server_templates")
+}
+
+// ─── MCP Server Instances ──────────────────────────────────────
+
+model MCPServerInstance {
+  id             String   @id @default(cuid())
+  projectId      String   @map("project_id")
+  templateId     String?  @map("template_id")
+  name           String
+  displayName    String?  @map("display_name")
+  description    String?
+  transport      String   // stdio | sse
+  command        String?
+  args           String[]
+  envSecretKeys  Json?    @map("env_secret_keys") // { "API_KEY": "ODOO_API_KEY" }
+  url            String?
+  toolPrefix     String?  @map("tool_prefix")
+  status         String   @default("active") // active | paused | error
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  project  Project           @relation(fields: [projectId], references: [id])
+  template MCPServerTemplate? @relation(fields: [templateId], references: [id])
+
+  @@unique([projectId, name])
+  @@index([projectId, status])
+  @@map("mcp_server_instances")
 }

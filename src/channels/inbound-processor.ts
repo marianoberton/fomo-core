@@ -13,6 +13,7 @@ import type { ChannelResolver } from './channel-resolver.js';
 import type { ChannelType, InboundMessage, IntegrationProvider, SendResult } from './types.js';
 import type { ContactRepository, ChannelIdentifier } from '@/contacts/types.js';
 import type { SessionRepository, Session } from '@/infrastructure/repositories/session-repository.js';
+import type { AgentChannelRouter } from './agent-channel-router.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -21,10 +22,15 @@ export interface InboundProcessorDeps {
   contactRepository: ContactRepository;
   sessionRepository: SessionRepository;
   logger: Logger;
+  /** Optional agent-channel router for mode-aware agent resolution. */
+  agentChannelRouter?: AgentChannelRouter;
   /** Function to run the agent and get a response */
   runAgent: (params: {
     projectId: ProjectId;
     sessionId: string;
+    agentId?: string;
+    sourceChannel?: string;
+    contactRole?: string;
     userMessage: string;
   }) => Promise<{ response: string }>;
 }
@@ -68,6 +74,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
     contactRepository,
     sessionRepository,
     logger,
+    agentChannelRouter,
     runAgent,
   } = deps;
 
@@ -112,14 +119,30 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
           });
         }
 
+        // 1b. Resolve agent for this channel (mode-aware routing)
+        let resolvedAgentId: string | undefined;
+        if (agentChannelRouter) {
+          const match = await agentChannelRouter.resolveAgent(
+            projectId,
+            message.channel,
+            contact.role,
+          );
+          if (match) {
+            resolvedAgentId = match.agentId;
+            logger.info('Agent resolved for channel', {
+              component: 'inbound-processor',
+              agentId: match.agentId,
+              modeName: match.mode.modeName,
+              channel: message.channel,
+            });
+          }
+        }
+
         // 2. Find or create session for this contact
-        // For now, we create a new session per message (could be improved with session persistence)
         const sessions = await sessionRepository.listByProject(projectId, 'active');
         let session: Session | null = null;
 
         // Try to find an existing active session for this contact
-        // Note: This is a simplified approach. In production, you'd want to
-        // query sessions by contactId directly.
         for (const s of sessions) {
           const metadata = s.metadata;
           if (metadata?.['contactId'] === contact.id) {
@@ -134,6 +157,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
             metadata: {
               contactId: contact.id,
               channel: message.channel,
+              ...(resolvedAgentId ? { agentId: resolvedAgentId } : {}),
             },
           });
 
@@ -144,10 +168,13 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
           });
         }
 
-        // 3. Run the agent
+        // 3. Run the agent (with mode-aware params)
         const agentResult = await runAgent({
           projectId,
           sessionId: session.id,
+          agentId: resolvedAgentId,
+          sourceChannel: message.channel,
+          contactRole: contact.role,
           userMessage: message.content,
         });
 

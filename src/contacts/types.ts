@@ -17,6 +17,8 @@ export interface Contact {
   slackId?: string;
   timezone?: string;
   language: string;
+  /** Contact role — e.g. 'owner', 'customer', or undefined for default. */
+  role?: string;
   metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +36,7 @@ export interface CreateContactInput {
   slackId?: string;
   timezone?: string;
   language?: string;
+  role?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -46,6 +49,7 @@ export interface UpdateContactInput {
   slackId?: string;
   timezone?: string;
   language?: string;
+  role?: string | null;
   metadata?: Record<string, unknown>;
 }
 

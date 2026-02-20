@@ -1,7 +1,8 @@
 /**
  * Agent repository — CRUD for agents.
  */
-import type { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import type { ProjectId } from '@/core/types.js';
 import type {
   AgentId,
@@ -10,8 +11,10 @@ import type {
   CreateAgentInput,
   UpdateAgentInput,
   AgentPromptConfig,
+  AgentLLMConfig,
   MCPServerConfig,
   ChannelConfig,
+  AgentMode,
   AgentLimits,
   AgentStatus,
 } from '@/agents/types.js';
@@ -31,39 +34,30 @@ const DEFAULT_CHANNEL_CONFIG: ChannelConfig = {
 
 // ─── Mapper ─────────────────────────────────────────────────────
 
-function toAgentConfig(record: {
-  id: string;
-  projectId: string;
-  name: string;
-  description: string | null;
-  promptConfig: unknown;
-  toolAllowlist: string[];
-  mcpServers: unknown;
-  channelConfig: unknown;
-  maxTurns: number;
-  maxTokensPerTurn: number;
-  budgetPerDayUsd: number;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-}): AgentConfig {
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+type AgentRecord = Awaited<ReturnType<PrismaClient['agent']['findUniqueOrThrow']>>;
+
+function toAgentConfig(record: AgentRecord): AgentConfig {
+  const rec = record as AgentRecord & { llmConfig?: unknown; modes?: unknown };
   return {
-    id: record.id as AgentId,
-    projectId: record.projectId as ProjectId,
-    name: record.name,
-    description: record.description ?? undefined,
-    promptConfig: record.promptConfig as AgentPromptConfig,
-    toolAllowlist: record.toolAllowlist,
-    mcpServers: (record.mcpServers as MCPServerConfig[] | null) ?? [],
-    channelConfig: (record.channelConfig as ChannelConfig | null) ?? DEFAULT_CHANNEL_CONFIG,
+    id: rec.id as AgentId,
+    projectId: rec.projectId as ProjectId,
+    name: rec.name,
+    description: rec.description ?? undefined,
+    promptConfig: rec.promptConfig as unknown as AgentPromptConfig,
+    llmConfig: (rec.llmConfig as AgentLLMConfig | null | undefined) ?? undefined,
+    toolAllowlist: rec.toolAllowlist,
+    mcpServers: (rec.mcpServers as MCPServerConfig[] | null) ?? [],
+    channelConfig: (rec.channelConfig as ChannelConfig | null) ?? DEFAULT_CHANNEL_CONFIG,
+    modes: (rec.modes as AgentMode[] | null) ?? [],
     limits: {
-      maxTurns: record.maxTurns,
-      maxTokensPerTurn: record.maxTokensPerTurn,
-      budgetPerDayUsd: record.budgetPerDayUsd,
+      maxTurns: rec.maxTurns,
+      maxTokensPerTurn: rec.maxTokensPerTurn,
+      budgetPerDayUsd: rec.budgetPerDayUsd,
     },
-    status: record.status as AgentStatus,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
+    status: rec.status as AgentStatus,
+    createdAt: rec.createdAt,
+    updatedAt: rec.updatedAt,
   };
 }
 
@@ -78,21 +72,29 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
       const limits = { ...DEFAULT_LIMITS, ...input.limits };
       const channelConfig = input.channelConfig ?? DEFAULT_CHANNEL_CONFIG;
 
-      const record = await prisma.agent.create({
-        data: {
-          projectId: input.projectId,
-          name: input.name,
-          description: input.description ?? null,
-          promptConfig: input.promptConfig as unknown as Prisma.InputJsonValue,
-          toolAllowlist: input.toolAllowlist ?? [],
-          mcpServers: (input.mcpServers ?? []) as unknown as Prisma.InputJsonValue,
-          channelConfig: channelConfig as unknown as Prisma.InputJsonValue,
-          maxTurns: limits.maxTurns,
-          maxTokensPerTurn: limits.maxTokensPerTurn,
-          budgetPerDayUsd: limits.budgetPerDayUsd,
-          status: 'active',
-        },
-      });
+      // Note: llmConfig requires `prisma generate` after migration. Cast to bypass
+      // type checking until the Prisma client is regenerated.
+      const createData = {
+        projectId: input.projectId,
+        name: input.name,
+        description: input.description ?? null,
+        promptConfig: input.promptConfig as unknown as Prisma.InputJsonValue,
+        llmConfig: input.llmConfig
+          ? (input.llmConfig as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+        toolAllowlist: input.toolAllowlist ?? [],
+        mcpServers: (input.mcpServers ?? []) as unknown as Prisma.InputJsonValue,
+        channelConfig: channelConfig as unknown as Prisma.InputJsonValue,
+        modes: input.modes && input.modes.length > 0
+          ? (input.modes as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+        maxTurns: limits.maxTurns,
+        maxTokensPerTurn: limits.maxTokensPerTurn,
+        budgetPerDayUsd: limits.budgetPerDayUsd,
+        status: 'active',
+      } as Prisma.AgentUncheckedCreateInput;
+
+      const record = await prisma.agent.create({ data: createData });
 
       return toAgentConfig(record);
     },
@@ -147,6 +149,20 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
         if (input.limits.budgetPerDayUsd !== undefined) {
           updateData.budgetPerDayUsd = input.limits.budgetPerDayUsd;
         }
+      }
+
+      // llmConfig + modes require `prisma generate` — cast to add them to updateData
+      if (input.llmConfig !== undefined) {
+        const extended = updateData as Prisma.AgentUpdateInput & { llmConfig: unknown };
+        extended.llmConfig = input.llmConfig
+          ? (input.llmConfig as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull;
+      }
+      if (input.modes !== undefined) {
+        const extended = updateData as Prisma.AgentUpdateInput & { modes: unknown };
+        extended.modes = input.modes.length > 0
+          ? (input.modes as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull;
       }
 
       const record = await prisma.agent.update({

@@ -20,6 +20,7 @@ const createContactSchema = z.object({
   slackId: z.string().optional(),
   timezone: z.string().optional(),
   language: z.string().optional(),
+  role: z.string().max(50).optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -32,6 +33,7 @@ const updateContactSchema = z.object({
   slackId: z.string().optional(),
   timezone: z.string().optional(),
   language: z.string().optional(),
+  role: z.string().max(50).nullable().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 

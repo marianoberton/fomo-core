@@ -38,6 +38,7 @@ import { createLocalStorage } from '@/files/storage-local.js';
 import { createAgentRegistry } from '@/agents/agent-registry.js';
 import { createAgentComms } from '@/agents/agent-comms.js';
 import { createChannelIntegrationRepository } from '@/infrastructure/repositories/channel-integration-repository.js';
+import { createMCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 import { createChannelResolver } from '@/channels/channel-resolver.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
@@ -172,6 +173,7 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     knowledgeService: createKnowledgeService({ prisma }),
     channelResolver,
     channelIntegrationRepository,
+    mcpServerRepository: createMCPServerRepository(prisma),
     prisma,
     logger,
   };

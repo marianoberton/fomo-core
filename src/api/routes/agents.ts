@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import type { AgentId, AgentMessageId } from '@/agents/types.js';
+import { checkChannelCollision } from '@/channels/agent-channel-router.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
 
@@ -12,9 +13,12 @@ import { paginationSchema, paginate } from '../pagination.js';
 
 const mcpServerSchema = z.object({
   name: z.string().min(1),
-  command: z.string().min(1),
+  transport: z.enum(['stdio', 'sse']).default('stdio'),
+  command: z.string().optional(),
   args: z.array(z.string()).optional(),
   env: z.record(z.string()).optional(),
+  url: z.string().optional(),
+  toolPrefix: z.string().optional(),
 });
 
 const channelConfigSchema = z.object({
@@ -24,8 +28,8 @@ const channelConfigSchema = z.object({
 
 const promptConfigSchema = z.object({
   identity: z.string().min(1),
-  instructions: z.string().min(1),
-  safety: z.string().min(1),
+  instructions: z.string().optional().default(''),
+  safety: z.string().optional().default(''),
 });
 
 const limitsSchema = z.object({
@@ -34,13 +38,35 @@ const limitsSchema = z.object({
   budgetPerDayUsd: z.number().positive().optional(),
 });
 
+const llmConfigSchema = z.object({
+  provider: z.enum(['anthropic', 'openai', 'google', 'ollama']).optional(),
+  model: z.string().min(1).optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+});
+
+const agentModeSchema = z.object({
+  name: z.string().min(1).max(50),
+  label: z.string().max(100).optional(),
+  promptOverrides: z.object({
+    identity: z.string().optional(),
+    instructions: z.string().optional(),
+    safety: z.string().optional(),
+  }).optional(),
+  toolAllowlist: z.array(z.string()).optional(),
+  mcpServerNames: z.array(z.string()).optional(),
+  channelMapping: z.array(z.string()).min(1),
+});
+
 const createAgentSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   promptConfig: promptConfigSchema,
+  llmConfig: llmConfigSchema.optional(),
   toolAllowlist: z.array(z.string()).optional(),
   mcpServers: z.array(mcpServerSchema).optional(),
   channelConfig: channelConfigSchema.optional(),
+  modes: z.array(agentModeSchema).optional(),
   limits: limitsSchema.optional(),
 });
 
@@ -48,9 +74,11 @@ const updateAgentSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   promptConfig: promptConfigSchema.optional(),
+  llmConfig: llmConfigSchema.optional(),
   toolAllowlist: z.array(z.string()).optional(),
   mcpServers: z.array(mcpServerSchema).optional(),
   channelConfig: channelConfigSchema.optional(),
+  modes: z.array(agentModeSchema).optional(),
   limits: limitsSchema.optional(),
   status: z.enum(['active', 'paused', 'disabled']).optional(),
 });
@@ -150,6 +178,21 @@ export function agentRoutes(
         ...parseResult.data,
       };
 
+      // Validate no channel collision with other agents
+      if (input.modes && input.modes.length > 0) {
+        const collision = await checkChannelCollision(
+          agentRepository, projectId, undefined, input.modes,
+        );
+        if (collision) {
+          return sendError(
+            reply,
+            'CHANNEL_COLLISION',
+            `Channel "${collision.channel}" is already claimed by agent "${collision.agentName}"`,
+            409,
+          );
+        }
+      }
+
       try {
         const agent = await agentRepository.create(input);
         logger.info('Agent created', { component: 'agents', agentId: agent.id, projectId });
@@ -182,6 +225,24 @@ export function agentRoutes(
           error: 'Validation failed',
           details: parseResult.error.flatten(),
         });
+      }
+
+      // Validate no channel collision with other agents
+      if (parseResult.data.modes && parseResult.data.modes.length > 0) {
+        const existing = await agentRepository.findById(agentId as AgentId);
+        if (existing) {
+          const collision = await checkChannelCollision(
+            agentRepository, existing.projectId, agentId, parseResult.data.modes,
+          );
+          if (collision) {
+            return sendError(
+              reply,
+              'CHANNEL_COLLISION',
+              `Channel "${collision.channel}" is already claimed by agent "${collision.agentName}"`,
+              409,
+            );
+          }
+        }
       }
 
       try {

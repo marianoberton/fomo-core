@@ -588,6 +588,132 @@ async function main(): Promise<void> {
   console.log(`  [5/5] Fomo Platform Assistant: ${fomoId}`);
 
   // ═══════════════════════════════════════════════════════════════
+  // MCP SERVER TEMPLATES (global catalog)
+  // ═══════════════════════════════════════════════════════════════
+
+  const mcpTemplates = [
+    {
+      id: nanoid(),
+      name: 'odoo-erp',
+      displayName: 'Odoo ERP',
+      description: 'Odoo ERP — customers, products, invoices, inventory management',
+      category: 'erp',
+      transport: 'sse',
+      url: 'http://localhost:8069/mcp',
+      toolPrefix: 'odoo',
+      requiredSecrets: ['ODOO_URL', 'ODOO_API_KEY', 'ODOO_DB'],
+      isOfficial: true,
+    },
+    {
+      id: nanoid(),
+      name: 'salesforce-crm',
+      displayName: 'Salesforce CRM',
+      description: 'Salesforce — contacts, opportunities, cases, accounts',
+      category: 'crm',
+      transport: 'sse',
+      url: 'https://your-instance.salesforce.com/mcp',
+      toolPrefix: 'sf',
+      requiredSecrets: ['SF_INSTANCE_URL', 'SF_CLIENT_ID', 'SF_CLIENT_SECRET'],
+      isOfficial: true,
+    },
+    {
+      id: nanoid(),
+      name: 'hubspot-crm',
+      displayName: 'HubSpot CRM',
+      description: 'HubSpot — contacts, deals, tickets, company records',
+      category: 'crm',
+      transport: 'sse',
+      url: 'https://api.hubspot.com/mcp',
+      toolPrefix: 'hs',
+      requiredSecrets: ['HUBSPOT_ACCESS_TOKEN'],
+      isOfficial: true,
+    },
+    {
+      id: nanoid(),
+      name: 'sap-business-one',
+      displayName: 'SAP Business One',
+      description: 'SAP B1 — orders, inventory, financials, business partners',
+      category: 'erp',
+      transport: 'sse',
+      url: 'https://your-sap-server/mcp',
+      toolPrefix: 'sap',
+      requiredSecrets: ['SAP_URL', 'SAP_COMPANY_DB', 'SAP_USERNAME', 'SAP_PASSWORD'],
+      isOfficial: true,
+    },
+    {
+      id: nanoid(),
+      name: 'google-workspace',
+      displayName: 'Google Workspace',
+      description: 'Google — Calendar, Drive, Gmail, Sheets integration',
+      category: 'productivity',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@anthropic/google-workspace-mcp'],
+      toolPrefix: 'gw',
+      requiredSecrets: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REFRESH_TOKEN'],
+      isOfficial: true,
+    },
+    {
+      id: nanoid(),
+      name: 'microsoft-365',
+      displayName: 'Microsoft 365',
+      description: 'Microsoft — Teams, Outlook, SharePoint, OneDrive',
+      category: 'productivity',
+      transport: 'sse',
+      url: 'https://graph.microsoft.com/mcp',
+      toolPrefix: 'ms',
+      requiredSecrets: ['MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET'],
+      isOfficial: true,
+    },
+    {
+      id: nanoid(),
+      name: 'notion',
+      displayName: 'Notion',
+      description: 'Notion — pages, databases, search, content management',
+      category: 'productivity',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@anthropic/notion-mcp'],
+      toolPrefix: 'notion',
+      requiredSecrets: ['NOTION_API_KEY'],
+      isOfficial: true,
+    },
+    {
+      id: nanoid(),
+      name: 'generic-rest-api',
+      displayName: 'Generic REST API',
+      description: 'Generic REST API connector — configure any HTTP-based service',
+      category: 'custom',
+      transport: 'sse',
+      toolPrefix: 'api',
+      requiredSecrets: ['API_BASE_URL', 'API_KEY'],
+      isOfficial: false,
+    },
+  ];
+
+  for (const tmpl of mcpTemplates) {
+    await prisma.mCPServerTemplate.create({
+      data: {
+        id: tmpl.id,
+        name: tmpl.name,
+        displayName: tmpl.displayName,
+        description: tmpl.description,
+        category: tmpl.category,
+        transport: tmpl.transport,
+        command: tmpl.command ?? null,
+        args: tmpl.args ?? [],
+        defaultEnv: {},
+        url: tmpl.url ?? null,
+        toolPrefix: tmpl.toolPrefix ?? null,
+        requiredSecrets: tmpl.requiredSecrets,
+        isOfficial: tmpl.isOfficial,
+      },
+    });
+  }
+
+  console.log(`\n  MCP Server Templates: ${mcpTemplates.length} templates seeded`);
+
+  // ═══════════════════════════════════════════════════════════════
   // SAMPLE SECRETS (placeholder values — replace in production)
   // ═══════════════════════════════════════════════════════════════
 
@@ -603,7 +729,7 @@ async function main(): Promise<void> {
   // ═══════════════════════════════════════════════════════════════
 
   console.log('\nSeed completed successfully!');
-  console.log('  5 projects, 4 agents, 15 prompt layers, 1 scheduled task');
+  console.log('  5 projects, 4 agents, 15 prompt layers, 1 scheduled task, 8 MCP templates');
   console.log('\nProjects:');
   console.log(`  1. Demo Project        — ${demoId} (basic tools)`);
   console.log(`  2. Ferretería Mayorista — ${ferreteriaId} (catalog + sales)`);

@@ -25,6 +25,7 @@ const mockAgent: AgentConfig = {
     allowedChannels: ['whatsapp'],
     defaultChannel: 'whatsapp',
   },
+  modes: [],
   limits: {
     maxTurns: 10,
     maxTokensPerTurn: 4000,

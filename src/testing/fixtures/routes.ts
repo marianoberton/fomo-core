@@ -22,6 +22,7 @@ import type { WebhookProcessor } from '@/webhooks/webhook-processor.js';
 import type { FileService } from '@/files/file-service.js';
 import type { ChannelResolver } from '@/channels/channel-resolver.js';
 import type { ChannelIntegrationRepository } from '@/channels/types.js';
+import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 import type { SecretService } from '@/secrets/types.js';
 import type { Logger } from '@/observability/logger.js';
 import type {
@@ -314,6 +315,23 @@ export function createMockChannelResolver(): {
   };
 }
 
+/** Create a mock MCPServerRepository with all methods as vi.fn(). */
+export function createMockMCPServerRepository(): {
+  [K in keyof MCPServerRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    listTemplates: vi.fn().mockResolvedValue([]),
+    findTemplateById: vi.fn().mockResolvedValue(null),
+    findTemplateByName: vi.fn().mockResolvedValue(null),
+    createTemplate: vi.fn(),
+    listInstances: vi.fn().mockResolvedValue([]),
+    findInstanceById: vi.fn().mockResolvedValue(null),
+    createInstance: vi.fn(),
+    updateInstance: vi.fn(),
+    deleteInstance: vi.fn(),
+  };
+}
+
 /** Create a mock ChannelIntegrationRepository with all methods as vi.fn(). */
 export function createMockChannelIntegrationRepository(): {
   [K in keyof ChannelIntegrationRepository]: ReturnType<typeof vi.fn>;
@@ -365,6 +383,7 @@ export function createMockDeps(): RouteDependencies & {
   secretService: ReturnType<typeof createMockSecretService>;
   channelResolver: ReturnType<typeof createMockChannelResolver>;
   channelIntegrationRepository: ReturnType<typeof createMockChannelIntegrationRepository>;
+  mcpServerRepository: ReturnType<typeof createMockMCPServerRepository>;
 } {
   return {
     projectRepository: createMockProjectRepository(),
@@ -391,6 +410,7 @@ export function createMockDeps(): RouteDependencies & {
     knowledgeService: null,
     channelResolver: createMockChannelResolver(),
     channelIntegrationRepository: createMockChannelIntegrationRepository(),
+    mcpServerRepository: createMockMCPServerRepository(),
     prisma: {} as RouteDependencies['prisma'],
     logger: createMockLogger(),
   };

@@ -36,6 +36,8 @@ import {
   createSendEmailTool,
   createSendChannelMessageTool,
   createReadFileTool,
+  createQuerySessionsTool,
+  createReadSessionHistoryTool,
 } from '@/tools/definitions/index.js';
 import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
 import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
@@ -53,8 +55,10 @@ import { createFileService } from '@/files/file-service.js';
 import { createLocalStorage } from '@/files/storage-local.js';
 import { createAgentRegistry } from '@/agents/agent-registry.js';
 import { createAgentComms } from '@/agents/agent-comms.js';
+import { createAgentChannelRouter } from '@/channels/agent-channel-router.js';
 import { createChannelIntegrationRepository } from '@/infrastructure/repositories/channel-integration-repository.js';
 import { createChannelResolver } from '@/channels/channel-resolver.js';
+import { createMCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 import { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from '@/channels/handoff.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
@@ -106,6 +110,7 @@ async function start(): Promise<void> {
     const agentRepository = createAgentRepository(prisma);
     const channelIntegrationRepository = createChannelIntegrationRepository(prisma);
     const secretRepository = createSecretRepository(prisma);
+    const mcpServerRepository = createMCPServerRepository(prisma);
 
     // Encrypted secrets service (AES-256-GCM) — requires SECRETS_ENCRYPTION_KEY env var
     const secretService = createSecretService({ secretRepository });
@@ -148,6 +153,7 @@ async function start(): Promise<void> {
     }
 
     // Shared deps for prepareChatRun (same subset used by chat routes and task-executor)
+    // Note: agentRegistry is added below after creation (line ~282)
     const chatSetupDeps = {
       projectRepository,
       sessionRepository,
@@ -163,10 +169,20 @@ async function start(): Promise<void> {
     const runAgent = async (params: {
       projectId: ProjectId;
       sessionId: string;
+      agentId?: string;
+      sourceChannel?: string;
+      contactRole?: string;
       userMessage: string;
     }): Promise<{ response: string }> => {
       const setupResult = await prepareChatRun(
-        { projectId: params.projectId, sessionId: params.sessionId, message: params.userMessage },
+        {
+          projectId: params.projectId,
+          sessionId: params.sessionId,
+          agentId: params.agentId,
+          sourceChannel: params.sourceChannel,
+          contactRole: params.contactRole,
+          message: params.userMessage,
+        },
         chatSetupDeps,
       );
 
@@ -252,11 +268,15 @@ async function start(): Promise<void> {
       }
     };
 
+    // Agent-channel router — resolves which agent handles a channel message
+    const agentChannelRouter = createAgentChannelRouter({ agentRepository, logger });
+
     const inboundProcessor = createInboundProcessor({
       channelResolver,
       contactRepository,
       sessionRepository,
       logger,
+      agentChannelRouter,
       runAgent,
     });
 
@@ -277,6 +297,10 @@ async function start(): Promise<void> {
       logger,
     });
     toolRegistry.register(createReadFileTool({ fileService }));
+
+    // Shared memory tools (for internal mode — query customer conversations)
+    toolRegistry.register(createQuerySessionsTool({ prisma }));
+    toolRegistry.register(createReadSessionHistoryTool({ sessionRepository }));
 
     // Multi-agent system
     const agentRegistry = createAgentRegistry({ agentRepository, logger });
@@ -387,6 +411,7 @@ async function start(): Promise<void> {
       knowledgeService,
       channelResolver,
       channelIntegrationRepository,
+      mcpServerRepository,
       prisma,
       logger,
     };

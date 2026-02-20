@@ -13,6 +13,14 @@ export type { ChannelResolver, ChannelResolverDeps } from './channel-resolver.js
 export { createInboundProcessor } from './inbound-processor.js';
 export type { InboundProcessor, InboundProcessorDeps } from './inbound-processor.js';
 
+// Agent-Channel Router
+export { createAgentChannelRouter, checkChannelCollision } from './agent-channel-router.js';
+export type {
+  AgentChannelRouter,
+  AgentChannelRouterDeps,
+  AgentChannelMatch,
+} from './agent-channel-router.js';
+
 // Handoff
 export { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from './handoff.js';
 export type { HandoffManager, HandoffManagerDeps, HandoffConfig } from './handoff.js';

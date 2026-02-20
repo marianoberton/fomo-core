@@ -23,6 +23,7 @@ import {
   createPromptSnapshot,
   computeHash,
 } from '@/prompts/index.js';
+import { resolveAgentMode } from '@/agents/mode-resolver.js';
 import type { RouteDependencies } from '../types.js';
 
 // ─── Zod Schema ─────────────────────────────────────────────────
@@ -31,6 +32,9 @@ import type { RouteDependencies } from '../types.js';
 export const chatRequestSchema = z.object({
   projectId: z.string().min(1),
   sessionId: z.string().min(1).optional(),
+  agentId: z.string().min(1).optional(),
+  sourceChannel: z.string().min(1).optional(),
+  contactRole: z.string().min(1).optional(),
   message: z.string().min(1).max(100_000),
   metadata: z.record(z.unknown()).optional(),
 });
@@ -80,7 +84,9 @@ export interface ChatSetupError {
 type ChatSetupDeps = Pick<
   RouteDependencies,
   'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'longTermMemoryStore' | 'prisma' | 'logger'
->;
+> & {
+  agentRegistry?: RouteDependencies['agentRegistry'];
+};
 
 // ─── Setup Function ─────────────────────────────────────────────
 
@@ -116,6 +122,81 @@ export async function prepareChatRun(
   }
 
   const agentConfig = { ...project.config, projectId: project.id };
+
+  // 2b. If agentId provided, load agent and apply LLM config override
+  if (body.agentId && deps.agentRegistry) {
+    const agent = await deps.agentRegistry.get(body.agentId as unknown as import('@/agents/types.js').AgentId);
+    if (!agent) {
+      return err({
+        code: 'NOT_FOUND',
+        message: `Agent "${body.agentId}" not found`,
+        statusCode: 404,
+      });
+    }
+
+    // Override project LLM config with agent-level overrides
+    if (agent.llmConfig) {
+      if (agent.llmConfig.provider) {
+        agentConfig.provider = {
+          ...agentConfig.provider,
+          provider: agent.llmConfig.provider,
+        };
+      }
+      if (agent.llmConfig.model) {
+        agentConfig.provider = {
+          ...agentConfig.provider,
+          model: agent.llmConfig.model,
+        };
+      }
+      if (agent.llmConfig.temperature !== undefined) {
+        agentConfig.provider = {
+          ...agentConfig.provider,
+          temperature: agent.llmConfig.temperature,
+        };
+      }
+      if (agent.llmConfig.maxOutputTokens !== undefined) {
+        agentConfig.provider = {
+          ...agentConfig.provider,
+          maxOutputTokens: agent.llmConfig.maxOutputTokens,
+        };
+      }
+    }
+
+    // 2c. Resolve operating mode based on source channel
+    const resolvedMode = body.sourceChannel
+      ? resolveAgentMode(agent, body.sourceChannel, body.contactRole)
+      : undefined;
+
+    // Apply mode-specific tool allowlist, or fall back to agent's base list
+    const effectiveToolAllowlist = resolvedMode
+      ? resolvedMode.toolAllowlist
+      : agent.toolAllowlist;
+
+    if (effectiveToolAllowlist.length > 0) {
+      agentConfig.allowedTools = [
+        ...new Set([...agentConfig.allowedTools, ...effectiveToolAllowlist]),
+      ];
+    }
+
+    // Use agent MCP servers, filtered by mode if applicable
+    if (agent.mcpServers.length > 0) {
+      const mcpServers = resolvedMode && resolvedMode.mcpServerNames.length > 0
+        ? agent.mcpServers.filter((s) => resolvedMode.mcpServerNames.includes(s.name))
+        : agent.mcpServers;
+      agentConfig.mcpServers = mcpServers as unknown as typeof agentConfig.mcpServers;
+    }
+
+    // Store mode prompt overrides for later prompt building
+    if (resolvedMode?.promptOverrides) {
+      // Stash on metadata so prompt builder can access it (step 11)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!body.metadata) {
+        body.metadata = {};
+      }
+      body.metadata['_modePromptOverrides'] = resolvedMode.promptOverrides;
+      body.metadata['_modeName'] = resolvedMode.modeName;
+    }
+  }
 
   // 3. Load or create session
   let sessionId: SessionId;
@@ -252,10 +333,26 @@ export async function prepareChatRun(
   });
 
   // 11. Build the system prompt from layers + runtime content
+  //     Apply mode-specific prompt overrides if present
+  const modeOverrides = body.metadata?.['_modePromptOverrides'] as
+    { identity?: string; instructions?: string; safety?: string } | undefined;
+
+  const effectiveLayers = {
+    identity: modeOverrides?.identity
+      ? { ...layers.identity, content: `${layers.identity.content}\n\n## Mode Override\n${modeOverrides.identity}` }
+      : layers.identity,
+    instructions: modeOverrides?.instructions
+      ? { ...layers.instructions, content: `${layers.instructions.content}\n\n## Mode Instructions\n${modeOverrides.instructions}` }
+      : layers.instructions,
+    safety: modeOverrides?.safety
+      ? { ...layers.safety, content: `${layers.safety.content}\n\n## Mode Safety\n${modeOverrides.safety}` }
+      : layers.safety,
+  };
+
   const systemPrompt = buildPrompt({
-    identity: layers.identity,
-    instructions: layers.instructions,
-    safety: layers.safety,
+    identity: effectiveLayers.identity,
+    instructions: effectiveLayers.instructions,
+    safety: effectiveLayers.safety,
     toolDescriptions,
     retrievedMemories: retrievedMemories.map((m) => ({
       content: m.content,

@@ -26,14 +26,27 @@ export interface AgentLimits {
   budgetPerDayUsd: number;
 }
 
+// ─── Agent LLM Config ───────────────────────────────────────────
+
+/** Optional per-agent LLM override. When set, overrides project-level LLM config. */
+export interface AgentLLMConfig {
+  provider?: 'anthropic' | 'openai' | 'google' | 'ollama';
+  model?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
+}
+
 // ─── MCP Server Config ───────────────────────────────────────────
 
 /** Configuration for an MCP (Model Context Protocol) server. */
 export interface MCPServerConfig {
   name: string;
-  command: string;
+  transport?: 'stdio' | 'sse';
+  command?: string;
   args?: string[];
   env?: Record<string, string>;
+  url?: string;
+  toolPrefix?: string;
 }
 
 // ─── Channel Config ──────────────────────────────────────────────
@@ -53,6 +66,30 @@ export interface AgentPromptConfig {
   safety: string;
 }
 
+// ─── Agent Mode ──────────────────────────────────────────────────
+
+/**
+ * A single operating mode for a dual-mode agent.
+ *
+ * An agent can have multiple modes (e.g., "public" for customers and
+ * "internal" for the business owner). The active mode is resolved at
+ * runtime based on the source channel of the inbound message.
+ */
+export interface AgentMode {
+  /** Mode identifier (e.g., "public", "internal"). */
+  name: string;
+  /** Human-readable label for the dashboard UI. */
+  label?: string;
+  /** Prompt overrides layered on top of the agent's base promptConfig. */
+  promptOverrides?: Partial<AgentPromptConfig>;
+  /** Tool allowlist for this mode. If empty/undefined, inherits from agent.toolAllowlist. */
+  toolAllowlist?: string[];
+  /** MCP server names active in this mode (references agent-level mcpServers by name). */
+  mcpServerNames?: string[];
+  /** Which channels trigger this mode (e.g., ["whatsapp", "telegram", "slack:C05ABCDEF", "dashboard"]). */
+  channelMapping: string[];
+}
+
 // ─── Agent Config ────────────────────────────────────────────────
 
 /** Full agent configuration. */
@@ -62,9 +99,12 @@ export interface AgentConfig {
   name: string;
   description?: string;
   promptConfig: AgentPromptConfig;
+  llmConfig?: AgentLLMConfig;
   toolAllowlist: string[];
   mcpServers: MCPServerConfig[];
   channelConfig: ChannelConfig;
+  /** Operating modes. Empty array means single-mode (legacy) agent using base config. */
+  modes: AgentMode[];
   limits: AgentLimits;
   status: AgentStatus;
   createdAt: Date;
@@ -79,9 +119,11 @@ export interface CreateAgentInput {
   name: string;
   description?: string;
   promptConfig: AgentPromptConfig;
+  llmConfig?: AgentLLMConfig;
   toolAllowlist?: string[];
   mcpServers?: MCPServerConfig[];
   channelConfig?: ChannelConfig;
+  modes?: AgentMode[];
   limits?: Partial<AgentLimits>;
 }
 
@@ -92,9 +134,11 @@ export interface UpdateAgentInput {
   name?: string;
   description?: string;
   promptConfig?: AgentPromptConfig;
+  llmConfig?: AgentLLMConfig;
   toolAllowlist?: string[];
   mcpServers?: MCPServerConfig[];
   channelConfig?: ChannelConfig;
+  modes?: AgentMode[];
   limits?: Partial<AgentLimits>;
   status?: AgentStatus;
 }

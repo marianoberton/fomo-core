@@ -25,6 +25,12 @@ export type { SendChannelMessageToolOptions } from './send-channel-message.js';
 export { createReadFileTool } from './read-file.js';
 export type { ReadFileToolOptions } from './read-file.js';
 
+// Shared memory tools (internal mode)
+export { createQuerySessionsTool } from './query-sessions.js';
+export type { QuerySessionsToolOptions } from './query-sessions.js';
+export { createReadSessionHistoryTool } from './read-session-history.js';
+export type { ReadSessionHistoryToolOptions } from './read-session-history.js';
+
 // Vertical-specific tools
 export { createVehicleLeadScoreTool } from './vehicle-lead-score.js';
 export { createVehicleCheckFollowupTool } from './vehicle-check-followup.js';

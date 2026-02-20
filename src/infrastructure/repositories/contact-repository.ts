@@ -26,6 +26,7 @@ function toContactModel(record: {
   slackId: string | null;
   timezone: string | null;
   language: string;
+  role: string | null;
   metadata: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +42,7 @@ function toContactModel(record: {
     slackId: record.slackId ?? undefined,
     timezone: record.timezone ?? undefined,
     language: record.language,
+    role: record.role ?? undefined,
     metadata: (record.metadata as Record<string, unknown> | null) ?? undefined,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -66,6 +68,7 @@ export function createContactRepository(prisma: PrismaClient): ContactRepository
           slackId: input.slackId ?? null,
           timezone: input.timezone ?? null,
           language: input.language ?? 'es',
+          role: input.role ?? null,
           metadata: input.metadata as Prisma.InputJsonValue,
         },
       });
@@ -123,6 +126,7 @@ export function createContactRepository(prisma: PrismaClient): ContactRepository
           ...(input.slackId !== undefined && { slackId: input.slackId }),
           ...(input.timezone !== undefined && { timezone: input.timezone }),
           ...(input.language !== undefined && { language: input.language }),
+          ...(input.role !== undefined && { role: input.role }),
           ...(input.metadata !== undefined && { metadata: input.metadata as Prisma.InputJsonValue }),
         },
       });
