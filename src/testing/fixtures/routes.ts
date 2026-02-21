@@ -261,6 +261,7 @@ export function createMockFileService(): {
     getById: vi.fn(),
     delete: vi.fn(),
     getTemporaryUrl: vi.fn(),
+    listByProject: vi.fn(),
   };
 }
 

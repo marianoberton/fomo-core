@@ -36,6 +36,7 @@ function createMockFileService(overrides?: Partial<FileService>): FileService {
     getById: vi.fn(() => Promise.resolve(makeStoredFile())),
     delete: vi.fn(),
     getTemporaryUrl: vi.fn(() => Promise.resolve(null)),
+    listByProject: vi.fn(() => Promise.resolve([])),
     ...overrides,
   };
 }

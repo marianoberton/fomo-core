@@ -127,7 +127,7 @@ export function scheduledTaskRoutes(
       request: FastifyRequest<{ Params: { id: string } }>,
       reply: FastifyReply,
     ) => {
-      const parseResult = approveSchema.safeParse(request.body);
+      const parseResult = approveSchema.safeParse(request.body ?? {});
       if (!parseResult.success) {
         await sendError(reply, 'VALIDATION_ERROR', parseResult.error.message, 400);
         return;

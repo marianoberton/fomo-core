@@ -2,6 +2,7 @@
  * File Service — combines storage and repository for complete file operations.
  */
 import type { Logger } from '@/observability/logger.js';
+import type { ProjectId } from '@/core/types.js';
 import type {
   FileId,
   FileRepository,
@@ -33,6 +34,9 @@ export interface FileService {
 
   /** Get a temporary URL for accessing a file (if supported) */
   getTemporaryUrl(id: FileId, expiresInSeconds?: number): Promise<string | null>;
+
+  /** List all files for a project */
+  listByProject(projectId: ProjectId, options?: { limit?: number }): Promise<StoredFile[]>;
 }
 
 // ─── Service Factory ────────────────────────────────────────────
@@ -125,6 +129,10 @@ export function createFileService(deps: FileServiceDeps): FileService {
         component: 'file-service',
         fileId: id,
       });
+    },
+
+    async listByProject(projectId: ProjectId, options?: { limit?: number }): Promise<StoredFile[]> {
+      return repository.findByProject(projectId, options);
     },
 
     async getTemporaryUrl(id: FileId, expiresInSeconds = 3600): Promise<string | null> {

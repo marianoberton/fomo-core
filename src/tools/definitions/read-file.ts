@@ -3,7 +3,7 @@
  * Retrieves files via the FileService and extracts text or structured data.
  */
 import { z } from 'zod';
-import type { ExecutionContext } from '@/core/types.js';
+import type { ExecutionContext, ProjectId } from '@/core/types.js';
 import type { Result } from '@/core/result.js';
 import { ok, err } from '@/core/result.js';
 import { ToolExecutionError } from '@/core/errors.js';
@@ -30,10 +30,16 @@ const SUPPORTED_MIME_TYPES = [
 // ─── Schemas ────────────────────────────────────────────────────
 
 const inputSchema = z.object({
-  fileId: z.string().min(1).describe('ID of the uploaded file to read'),
+  fileId: z.string().min(1).optional()
+    .describe('ID of the uploaded file (use this when you know the file ID)'),
+  filename: z.string().min(1).optional()
+    .describe('Original filename to look up by name, e.g. "lista-precios.txt" (use when fileId is not known)'),
   extractionMode: z.enum(['text', 'structured']).default('text')
     .describe('Extraction mode: "text" returns raw text, "structured" returns parsed data (JSON objects, CSV rows)'),
-});
+}).refine(
+  (data) => data.fileId !== undefined || data.filename !== undefined,
+  { message: 'Either fileId or filename must be provided' },
+);
 
 const outputSchema = z.object({
   filename: z.string(),
@@ -152,7 +158,7 @@ export function createReadFileTool(options: ReadFileToolOptions): ExecutableTool
   return {
     id: 'read-file',
     name: 'Read File',
-    description: 'Reads and parses an uploaded file. Supports CSV, JSON, plain text, and PDF formats. Returns extracted text or structured data (JSON objects, CSV rows).',
+    description: 'Reads and parses an uploaded file. Supports CSV, JSON, plain text, and PDF formats. Returns extracted text or structured data (JSON objects, CSV rows). You can identify the file by fileId or by its original filename (e.g. "lista-precios.txt").',
     category: 'data',
     inputSchema,
     outputSchema,
@@ -169,8 +175,26 @@ export function createReadFileTool(options: ReadFileToolOptions): ExecutableTool
       const parsed = inputSchema.parse(input);
 
       try {
+        // Resolve fileId — either directly provided or looked up by filename
+        let resolvedFileId = parsed.fileId;
+
+        if (!resolvedFileId && parsed.filename) {
+          const files = await fileService.listByProject(context.projectId as ProjectId);
+          const match = files.find(
+            (f) => f.originalFilename.toLowerCase() === parsed.filename!.toLowerCase(),
+          );
+          if (!match) {
+            const available = files.map((f) => f.originalFilename).join(', ');
+            return err(new ToolExecutionError(
+              'read-file',
+              `File "${parsed.filename}" not found in project.${available ? ` Available files: ${available}` : ''}`,
+            ));
+          }
+          resolvedFileId = match.id;
+        }
+
         // Download file via FileService
-        const { file, content } = await fileService.download(parsed.fileId);
+        const { file, content } = await fileService.download(resolvedFileId!);
 
         // Validate file size
         if (file.sizeBytes > MAX_FILE_SIZE) {
@@ -226,12 +250,18 @@ export function createReadFileTool(options: ReadFileToolOptions): ExecutableTool
       input: unknown,
       context: ExecutionContext,
     ): Promise<Result<ToolResult, NexusError>> {
-      void context;
       const parsed = inputSchema.parse(input);
 
       try {
-        // Check if file exists
-        const file = await fileService.getById(parsed.fileId);
+        // Resolve file — by fileId or by filename lookup
+        let file = parsed.fileId ? await fileService.getById(parsed.fileId) : null;
+
+        if (!file && parsed.filename) {
+          const files = await fileService.listByProject(context.projectId as ProjectId);
+          file = files.find(
+            (f) => f.originalFilename.toLowerCase() === parsed.filename!.toLowerCase(),
+          ) ?? null;
+        }
 
         if (!file) {
           return await Promise.resolve(err(new ToolExecutionError(
