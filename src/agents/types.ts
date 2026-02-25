@@ -106,6 +106,7 @@ export interface AgentConfig {
   /** Operating modes. Empty array means single-mode (legacy) agent using base config. */
   modes: AgentMode[];
   limits: AgentLimits;
+  managerAgentId?: string | null;
   status: AgentStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -125,6 +126,8 @@ export interface CreateAgentInput {
   channelConfig?: ChannelConfig;
   modes?: AgentMode[];
   limits?: Partial<AgentLimits>;
+  managerAgentId?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 // ─── Update Agent Input ──────────────────────────────────────────
@@ -140,6 +143,8 @@ export interface UpdateAgentInput {
   channelConfig?: ChannelConfig;
   modes?: AgentMode[];
   limits?: Partial<AgentLimits>;
+  managerAgentId?: string | null;
+  metadata?: Record<string, unknown>;
   status?: AgentStatus;
 }
 

@@ -13,18 +13,30 @@ import type { LLMProvider } from './types.js';
 const logger = createLogger({ name: 'provider-factory' });
 
 /**
+ * Standard environment variable names per provider.
+ * Used when apiKeyEnvVar is not explicitly set in the provider config.
+ */
+const PROVIDER_DEFAULT_ENV_VARS: Record<string, string> = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GOOGLE_API_KEY',
+};
+
+/**
  * Resolve an API key from an environment variable name.
+ * Falls back to the standard env var for the provider if apiKeyEnvVar is not set.
  * Never logs or returns the actual key value — only whether it was found.
  */
 function resolveApiKey(envVar: string | undefined, provider: string): string {
-  if (!envVar) {
+  const effectiveEnvVar = envVar ?? PROVIDER_DEFAULT_ENV_VARS[provider];
+  if (!effectiveEnvVar) {
     throw new ProviderError(provider, 'No apiKeyEnvVar configured');
   }
-  const key = process.env[envVar];
+  const key = process.env[effectiveEnvVar];
   if (!key) {
     throw new ProviderError(
       provider,
-      `Environment variable "${envVar}" is not set or empty`,
+      `Environment variable "${effectiveEnvVar}" is not set or empty`,
     );
   }
   return key;

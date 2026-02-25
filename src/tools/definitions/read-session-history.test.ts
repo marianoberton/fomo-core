@@ -16,6 +16,7 @@ function createMockSessionRepo(): { [K in keyof SessionRepository]: ReturnType<t
     findById: vi.fn().mockResolvedValue(null),
     findByContactId: vi.fn(),
     updateStatus: vi.fn(),
+    updateMetadata: vi.fn(),
     listByProject: vi.fn(),
     addMessage: vi.fn(),
     getMessages: vi.fn().mockResolvedValue([]),

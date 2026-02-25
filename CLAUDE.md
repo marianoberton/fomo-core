@@ -4,6 +4,62 @@ Model-agnostic, self-hosted autonomous agent framework for enterprise environmen
 Built by Fomo. The core engine is reusable — each client gets a configured instance
 (different tools, permissions, prompts) but the engine is always Nexus Core.
 
+## Product
+
+### What We're Building
+Nexus Core is a platform for creating and managing AI agents that talk to customers
+through WhatsApp, Telegram, and other channels. Each client gets a project with
+one or more specialized agents (sales, support, scheduling, etc.) coordinated by
+a manager agent that acts as the owner's copilot.
+
+### Who Uses the Dashboard
+Only the Fomo team. This is our internal tool for configuring and monitoring client
+agents. It is NOT a client-facing product (that comes later in fomo-platform).
+Even so, it must be simple enough that any team member can set up a new client
+without reading documentation or understanding Docker/MCP/webhooks.
+
+### UX Principles (Dashboard)
+1. **No technical jargon in the UI.** Users see "WhatsApp", not "whatsapp-waha".
+   They see "Add Capability", not "Configure MCP Server". Labels explain what
+   things DO, not what they ARE technically.
+2. **Wizard flows for setup, not forms.** Adding a channel = step-by-step wizard
+   (pick channel → provide credentials → confirm connection). Not a raw form
+   with fields the user has to understand.
+3. **Visual catalogs with logos, not text inputs.** MCP servers, tools, and
+   integrations should be browsable cards with icons/logos. Click to add, not
+   type a command.
+4. **Smart defaults everywhere.** If WAHA runs in Docker Compose, the URL is
+   pre-filled and hidden. If a field has an obvious default, use it.
+5. **Every change must be immediately testable.** After adding WhatsApp, the user
+   must be able to send a test message right there. After configuring an agent,
+   the Test Chat button must work.
+6. **Show, don't ask.** If we can auto-detect something (channel status, MCP
+   health, agent connectivity), show it instead of making the user check manually.
+
+### Commercial Model
+- Fomo sells multi-agent setups to clients
+- Each client = one Nexus project with N specialized agents + 1 manager agent
+- The manager agent is the owner's copilot (chat interface in dashboard +
+  visual panel with metrics and sub-agent status)
+- Channels: WhatsApp (WAHA for QR-based + Meta API for scale), Telegram, Slack
+- Revenue: setup fee + monthly per-agent-active
+
+### Deployment Model
+- Docker Compose bundles everything: PostgreSQL, Redis, Nexus app, WAHA
+- `docker compose up` = full stack running, zero manual config
+- WAHA is always bundled (service name `waha`, internal port 3000)
+- Works both as shared instance (multiple projects) and dedicated per client
+- VPS deployment: same docker-compose.yml + environment variables
+- `WAHA_DEFAULT_URL` env var handles internal Docker networking automatically
+- `NEXUS_PUBLIC_URL` env var enables webhook auto-configuration
+
+### MVP Scope (What Must Work E2E)
+1. Create project → Create agent → Connect WhatsApp (scan QR) → Agent responds
+2. Multiple agents per project with manager coordination
+3. Inbox: see all conversations in real-time (WhatsApp Web style) — already exists
+4. Approval flow: agent asks for permission → dashboard shows it → user approves
+5. Cost tracking: see how much each agent/project costs per day
+
 ## CRITICAL RULES
 
 - NEVER install or import LangChain, AutoGen, CrewAI, or any AI orchestration framework.
@@ -83,7 +139,65 @@ src/
 prisma/
 ├── schema.prisma       # Database schema
 └── migrations/         # Migration history
+dashboard/              # Git submodule — Next.js admin dashboard (separate repo)
 ```
+
+## Dashboard (Git Submodule)
+
+The `dashboard/` directory is a **separate Git repository** managed as a submodule:
+
+- **Repo**: `https://github.com/marianoberton/fomo-core-dashboard`
+- **Stack**: Next.js, TypeScript, Tailwind CSS
+- **Purpose**: Admin control panel for Nexus Core — projects, agents, traces, approvals, sessions
+
+### Working with the submodule
+
+```bash
+# Clone fomo-core including the dashboard submodule
+git clone --recurse-submodules <fomo-core-url>
+
+# If already cloned without submodules
+git submodule update --init --recursive
+
+# Pull latest dashboard changes
+git submodule update --remote dashboard
+
+# Commit a submodule pointer update (after pulling new dashboard commits)
+git add dashboard && git commit -m "chore: update dashboard submodule"
+```
+
+### Development
+
+```bash
+# Run dashboard independently
+cd dashboard && npm install && npm run dev   # runs on port 3000 by default
+
+# The dashboard calls the Nexus Core API (port 3002)
+# Make sure NEXT_PUBLIC_API_URL=http://localhost:3002 is set in dashboard/.env.local
+```
+
+### Key rules
+
+- **Never commit dashboard source changes from this repo.** Changes to dashboard code
+  must be committed inside `dashboard/` (which pushes to the dashboard repo).
+- Changes to the submodule pointer (`git add dashboard`) are committed here to track
+  which dashboard version is paired with this version of the backend.
+- The two repos are independent — CI/CD pipelines are separate.
+
+### Dashboard UX Rules
+- **Channel setup**: Wizard flow. Step 1: pick channel type (with logo).
+  Step 2: channel-specific setup (QR scan for WAHA, token paste for Telegram).
+  Step 3: connection confirmed with green checkmark. No raw URLs or session names.
+- **MCP/Tools setup**: Visual catalog. Cards with logos and descriptions.
+  Click to add. Advanced/custom config hidden behind "Advanced" toggle.
+- **Agent config**: Capabilities shown as toggleable cards, not checkboxes.
+  Channel mapping shown as pills from actual project channels, not CSV text.
+- **Forms**: Maximum 2-3 visible fields. Everything else under "Advanced" toggle.
+  Pre-fill all defaults. Validate inline, not on submit.
+- **Empty states**: Always show a clear call-to-action. "No channels yet → Add
+  your first channel" with a button, not just "No data".
+- **Error states**: Show what went wrong AND what to do about it. "WAHA
+  unreachable → Make sure Docker is running" not just "Unreachable".
 
 ## Architecture
 

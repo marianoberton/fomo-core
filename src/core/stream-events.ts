@@ -14,7 +14,17 @@ export type AgentStreamEvent =
   | ToolResultEvent
   | TurnCompleteEvent
   | AgentCompleteEvent
+  | ApprovalRequestedEvent
   | StreamErrorEvent;
+
+/** An approval is requested by a tool. */
+export interface ApprovalRequestedEvent {
+  readonly type: 'approval_requested';
+  readonly toolCallId: string;
+  readonly toolId: string;
+  readonly approvalId: string;
+  readonly input: unknown;
+}
 
 /** Agent run has been initiated. */
 export interface AgentStartEvent {

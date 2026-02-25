@@ -46,6 +46,7 @@ import {
   createWholesaleOrderHistoryTool,
   createHotelDetectLanguageTool,
   createHotelSeasonalPricingTool,
+  createEscalateToHumanTool,
 } from '@/tools/definitions/index.js';
 import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
 import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
@@ -63,6 +64,7 @@ import { createFileService } from '@/files/file-service.js';
 import { createLocalStorage } from '@/files/storage-local.js';
 import { createAgentRegistry } from '@/agents/agent-registry.js';
 import { createAgentComms } from '@/agents/agent-comms.js';
+import type { ContactId } from '@/contacts/types.js';
 import { createAgentChannelRouter } from '@/channels/agent-channel-router.js';
 import { createChannelIntegrationRepository } from '@/infrastructure/repositories/channel-integration-repository.js';
 import { createChannelResolver } from '@/channels/channel-resolver.js';
@@ -75,6 +77,9 @@ import { channelWebhookRoutes } from '@/api/routes/channel-webhooks.js';
 import { createWebhookQueue } from '@/channels/webhook-queue.js';
 import type { WebhookQueue } from '@/channels/webhook-queue.js';
 import { onboardingRoutes } from '@/api/routes/onboarding.js';
+import { telegramApprovalWebhookRoutes } from '@/api/routes/telegram-webhook.js';
+import { createTelegramApprovalNotifier } from '@/hitl/telegram-approval-notifier.js';
+import { createSessionBroadcaster } from '@/hitl/session-broadcaster.js';
 import type { RouteDependencies } from '@/api/types.js';
 import { createAgentRunner } from '@/core/agent-runner.js';
 import {
@@ -130,9 +135,41 @@ async function start(): Promise<void> {
       logger,
     });
 
+    // Telegram HITL — shared maps for approval tracking
+    const telegramMessageApprovalMap = new Map<string, string>();
+    const telegramInstructionWaitMap = new Map<string, string>();
+
+    // Session broadcaster — bridges external approval contexts (Telegram) with dashboard WS
+    const sessionBroadcaster = createSessionBroadcaster();
+
+    // Telegram HITL notifier — resolves per-project credentials from SecretService
+    const telegramNotifier = createTelegramApprovalNotifier({
+      secretService,
+      sessionRepository,
+      logger,
+      messageApprovalMap: telegramMessageApprovalMap,
+    });
+
     // Create shared services
-    const approvalGate = createApprovalGate({ store: createPrismaApprovalStore(prisma) });
-    const toolRegistry = createToolRegistry();
+    const approvalGate = createApprovalGate({
+      store: createPrismaApprovalStore(prisma),
+      notifier: telegramNotifier,
+      expirationMs: 30 * 60 * 1000, // 30 minutes — realistic for human review
+    });
+    const toolRegistry = createToolRegistry({
+      approvalGate: async (toolId, input, context) => {
+        const request = await approvalGate.requestApproval({
+          projectId: context.projectId,
+          sessionId: context.sessionId,
+          toolCallId: `tc_${Date.now()}` as import('@/core/types.js').ToolCallId,
+          toolId,
+          toolInput: input,
+          riskLevel: 'high',
+        });
+        // Return approved: false to trigger HITL flow — agent pauses until human decides
+        return { approved: false, approvalId: request.id };
+      },
+    });
     toolRegistry.register(createCalculatorTool());
     toolRegistry.register(createDateTimeTool());
     toolRegistry.register(createJsonTransformTool());
@@ -161,7 +198,7 @@ async function start(): Promise<void> {
     }
 
     // Shared deps for prepareChatRun (same subset used by chat routes and task-executor)
-    // Note: agentRegistry is added below after creation (line ~282)
+    // agentRegistry is injected below after creation (search: "chatSetupDeps.agentRegistry")
     const chatSetupDeps = {
       projectRepository,
       sessionRepository,
@@ -171,6 +208,7 @@ async function start(): Promise<void> {
       longTermMemoryStore,
       prisma,
       logger,
+      agentRegistry: undefined as RouteDependencies['agentRegistry'] | undefined,
     };
 
     // Real runAgent — runs the full agent loop for inbound channels and webhooks
@@ -195,12 +233,10 @@ async function start(): Promise<void> {
       );
 
       if (!setupResult.ok) {
-        logger.error('runAgent setup failed', {
+        logger.error(`runAgent setup failed: [${setupResult.error.code}] ${setupResult.error.message}`, {
           component: 'main',
           projectId: params.projectId,
           sessionId: params.sessionId,
-          error: setupResult.error.message,
-          code: setupResult.error.code,
         });
         return { response: `Setup error: ${setupResult.error.message}` };
       }
@@ -254,7 +290,13 @@ async function start(): Promise<void> {
           trace.id,
         );
 
-        const assistantText = extractAssistantResponse(trace.events);
+        let assistantText = extractAssistantResponse(trace.events);
+
+        // When escalation is pending and the LLM didn't include text, send a
+        // user-friendly holding message instead of an empty response.
+        if (!assistantText && trace.status === 'human_approval_pending') {
+          assistantText = 'Tu consulta fue derivada a un responsable. Te responderemos a la brevedad.';
+        }
 
         await sessionRepository.addMessage(
           setup.sessionId,
@@ -268,11 +310,110 @@ async function start(): Promise<void> {
           sessionId: params.sessionId,
           traceId: trace.id,
           tokensUsed: trace.totalTokensUsed,
+          status: trace.status,
         });
 
         return { response: assistantText };
       } finally {
         clearTimeout(timeoutId);
+      }
+    };
+
+    // Auto-resume after human approval — runs the agent to continue the conversation
+    const resumeAfterApproval = async (params: {
+      approvalId: string;
+      decision: 'approved' | 'denied';
+      resolvedBy: string;
+      note?: string;
+    }): Promise<void> => {
+      const approval = await approvalGate.get(params.approvalId as import('@/core/types.js').ApprovalId);
+      if (!approval) {
+        logger.warn('resumeAfterApproval: approval not found', { component: 'main', approvalId: params.approvalId });
+        return;
+      }
+
+      const session = await sessionRepository.findById(approval.sessionId);
+      if (!session) {
+        logger.warn('resumeAfterApproval: session not found', { component: 'main', sessionId: approval.sessionId });
+        return;
+      }
+
+      // Build a synthetic message that the LLM will interpret as manager instructions.
+      // IMPORTANT: The agent must NOT call send-channel-message or any channel tool —
+      // delivery is handled automatically by resumeAfterApproval via proactiveMessenger.
+      const deliveryNote = `IMPORTANTE: Respondé SOLO con texto. NO uses herramientas de envío (send-channel-message, send-email, etc). El mensaje se entrega automáticamente al cliente.`;
+
+      let syntheticMessage: string;
+      if (params.decision === 'denied') {
+        // Owner rejected — agent should ask customer how to continue
+        syntheticMessage = [
+          `[DECISIÓN DEL GERENTE]`,
+          `Decisión: RECHAZADA`,
+          params.note ? `Motivo: ${params.note}` : '',
+          ``,
+          `El gerente decidió no proceder con esta solicitud.`,
+          `Informá al cliente de manera amable y profesional, y preguntale cómo quiere seguir.`,
+          `Ofrecele alternativas razonables basadas en la conversación.`,
+          ``,
+          deliveryNote,
+        ].filter(Boolean).join('\n');
+      } else if (params.note) {
+        // Owner replied with specific instructions
+        syntheticMessage = [
+          `[INSTRUCCIONES DEL GERENTE]`,
+          `Instrucciones: ${params.note}`,
+          ``,
+          `Responde al cliente siguiendo estas instrucciones al pie de la letra.`,
+          ``,
+          deliveryNote,
+        ].join('\n');
+      } else {
+        // Approved without instructions (fallback — shouldn't happen with new UX)
+        syntheticMessage = `[Respuesta del gerente: APROBADO] Informa al cliente que su solicitud fue aprobada. ${deliveryNote}`;
+      }
+
+      const agentId = session.metadata?.['agentId'] as string | undefined;
+      const result = await runAgent({
+        projectId: session.projectId,
+        sessionId: approval.sessionId,
+        agentId,
+        userMessage: syntheticMessage,
+      });
+
+      logger.info('resumeAfterApproval completed', {
+        component: 'main',
+        approvalId: params.approvalId,
+        decision: params.decision,
+        responsePreview: result.response.slice(0, 100),
+      });
+
+      // Broadcast to connected dashboard WebSocket clients watching this session
+      sessionBroadcaster.broadcast(approval.sessionId, {
+        type: 'approval.resolved',
+        approvalId: params.approvalId,
+        decision: params.decision,
+        resolvedBy: params.resolvedBy,
+      });
+      sessionBroadcaster.broadcast(approval.sessionId, {
+        type: 'message.new',
+        role: 'assistant',
+        content: result.response,
+      });
+
+      // Proactively send the agent's response if the session came from a channel
+      const channelType = session.metadata?.['channel'] as string | undefined;
+      const recipientIdentifier = session.metadata?.['recipientIdentifier'] as string | undefined;
+
+      if (channelType && recipientIdentifier && proactiveMessenger && result.response) {
+        const contactId = (session.metadata?.['contactId'] as ContactId | undefined)
+          ?? ('system' as unknown as ContactId);
+        await proactiveMessenger.send({
+          projectId: session.projectId,
+          contactId,
+          channel: channelType as import('@/channels/types.js').ChannelType,
+          recipientIdentifier,
+          content: result.response,
+        });
       }
     };
 
@@ -325,6 +466,11 @@ async function start(): Promise<void> {
     // Multi-agent system
     const agentRegistry = createAgentRegistry({ agentRepository, logger });
     const agentComms = createAgentComms({ logger });
+
+    // Inject agentRegistry into chatSetupDeps (deferred — created after chatSetupDeps)
+    chatSetupDeps.agentRegistry = agentRegistry;
+
+    toolRegistry.register(createEscalateToHumanTool());
 
     // Handoff manager (Chatwoot human escalation)
     const handoffManager = createHandoffManager({
@@ -435,6 +581,8 @@ async function start(): Promise<void> {
       channelIntegrationRepository,
       mcpServerRepository,
       prisma,
+      sessionBroadcaster,
+      resumeAfterApproval,
       logger,
     };
 
@@ -454,6 +602,16 @@ async function start(): Promise<void> {
 
         // Dynamic channel webhook routes (Telegram, WhatsApp, Slack)
         channelWebhookRoutes(prefixed, deps);
+
+        // Telegram HITL approval webhook (credentials resolved per-project from secrets)
+        telegramApprovalWebhookRoutes(prefixed, {
+          approvalGate,
+          secretService,
+          messageApprovalMap: telegramMessageApprovalMap,
+          instructionWaitMap: telegramInstructionWaitMap,
+          onResolved: resumeAfterApproval,
+        });
+        logger.info('Telegram HITL approval webhook registered at POST /api/v1/webhooks/telegram-approval', { component: 'main' });
 
         // Onboarding routes
         onboardingRoutes(prefixed, {

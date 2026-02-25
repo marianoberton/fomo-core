@@ -111,9 +111,15 @@ export function createSendEmailTool(options: SendEmailToolOptions): ExecutableTo
 
         if (!response.ok) {
           const errorText = await response.text();
+          let errorMessage = `Resend API returned ${response.status}: ${errorText}`;
+
+          if (errorText.includes('your own email address') || response.status === 403) {
+            errorMessage = `Error de Resend: El usuario tiene un plan gratuito y no ha verificado un dominio. Sólo puede enviarse correos a SÍ MISMO (la misma dirección de email exacta usada para registrar su cuenta en Resend). Explícale esto claramente y pregúntale cuál es su email de registro en resend.`;
+          }
+
           return err(new ToolExecutionError(
             'send-email',
-            `Resend API returned ${response.status}: ${errorText}`,
+            errorMessage,
           ));
         }
 

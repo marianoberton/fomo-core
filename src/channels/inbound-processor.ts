@@ -47,6 +47,7 @@ function channelToIdentifier(channel: ChannelType, value: string): ChannelIdenti
     case 'telegram':
       return { type: 'telegramId', value };
     case 'whatsapp':
+    case 'whatsapp-waha':
       return { type: 'phone', value };
     case 'slack':
       return { type: 'slackId', value };
@@ -60,7 +61,7 @@ function channelToIdentifier(channel: ChannelType, value: string): ChannelIdenti
 
 /** Check if a ChannelType is a valid IntegrationProvider (i.e. has a channel integration). */
 function isIntegrationProvider(channel: ChannelType): channel is IntegrationProvider {
-  return channel === 'whatsapp' || channel === 'telegram' || channel === 'slack' || channel === 'chatwoot';
+  return channel === 'whatsapp' || channel === 'whatsapp-waha' || channel === 'telegram' || channel === 'slack' || channel === 'chatwoot';
 }
 
 // ─── Processor Factory ──────────────────────────────────────────
@@ -157,6 +158,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
             metadata: {
               contactId: contact.id,
               channel: message.channel,
+              recipientIdentifier: message.senderIdentifier,
               ...(resolvedAgentId ? { agentId: resolvedAgentId } : {}),
             },
           });
@@ -166,6 +168,16 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
             sessionId: session.id,
             contactId: contact.id,
           });
+        } else if (!session.metadata?.['recipientIdentifier'] || !session.metadata['channel']) {
+          // Backfill channel routing metadata on sessions that were created without it
+          // (e.g. from dashboard chat). This is needed for resumeAfterApproval to route responses.
+          const updatedMetadata = {
+            ...session.metadata,
+            channel: session.metadata?.['channel'] ?? message.channel,
+            recipientIdentifier: session.metadata?.['recipientIdentifier'] ?? message.senderIdentifier,
+          };
+          await sessionRepository.updateMetadata(session.id, updatedMetadata);
+          session = { ...session, metadata: updatedMetadata };
         }
 
         // 3. Run the agent (with mode-aware params)

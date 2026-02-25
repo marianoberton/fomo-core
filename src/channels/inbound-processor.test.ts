@@ -84,10 +84,11 @@ function createDeps(overrides: Partial<InboundProcessorDeps> = {}): InboundProce
     create: vi.fn().mockResolvedValue(mockSession),
     findById: vi.fn(),
     findByContactId: vi.fn(),
+    updateStatus: vi.fn(),
+    updateMetadata: vi.fn().mockResolvedValue(true),
     listByProject: vi.fn().mockResolvedValue([mockSession]),
     addMessage: vi.fn(),
     getMessages: vi.fn().mockResolvedValue([]),
-    updateStatus: vi.fn(),
   };
 
   const channelResolver = {
@@ -275,10 +276,11 @@ describe('InboundProcessor', () => {
         create: vi.fn().mockResolvedValue(mockSession),
         findById: vi.fn(),
         findByContactId: vi.fn(),
+        updateStatus: vi.fn(),
+        updateMetadata: vi.fn().mockResolvedValue(true),
         listByProject: vi.fn().mockResolvedValue([]), // No existing session
         addMessage: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
-        updateStatus: vi.fn(),
       };
 
       const deps = createDeps({

@@ -60,7 +60,7 @@ export interface AgentRunner {
    * Returns an ExecutionTrace with full observability.
    */
   run(params: {
-    message: string;
+    message?: string;
     agentConfig: AgentConfig;
     sessionId: SessionId;
     /** Pre-built system prompt string (assembled by chat-setup from prompt layers). */
@@ -142,10 +142,10 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
 
       try {
         // Initialize conversation with history + new user message
-        const conversation: Message[] = [
-          ...conversationHistory,
-          { role: 'user', content: message },
-        ];
+        const conversation: Message[] = [...conversationHistory];
+        if (message) {
+          conversation.push({ role: 'user', content: message });
+        }
 
         // Check abort signal before starting
         if (context.abortSignal.aborted) {
@@ -194,11 +194,15 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
           }
 
           // Retrieve relevant long-term memories
-          const retrievedMemories = await memoryManager.retrieveMemories({
-            query: message,
-            topK: agentConfig.memoryConfig.longTerm.retrievalTopK,
-            sessionScope: sessionId,
-          });
+          let retrievedMemories: Awaited<ReturnType<typeof memoryManager.retrieveMemories>> = [];
+
+          if (message) {
+            retrievedMemories = await memoryManager.retrieveMemories({
+              query: message,
+              topK: agentConfig.memoryConfig.longTerm.retrievalTopK,
+              sessionScope: sessionId,
+            });
+          }
 
           if (retrievedMemories.length > 0) {
             addTraceEvent(trace, {
@@ -373,6 +377,13 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
                       toolId: toolCall.name,
                       approvalId: result.error.context?.['approvalId'],
                     },
+                  });
+                  onEvent?.({
+                    type: 'approval_requested',
+                    toolCallId: toolCall.id,
+                    toolId: toolCall.name,
+                    approvalId: result.error.context?.['approvalId'] as string,
+                    input: toolCall.input,
                   });
                   continue;
                 }
@@ -654,9 +665,9 @@ async function executeLLMCall(params: {
         content:
           toolUses.length > 0
             ? [
-                ...(textParts.length > 0 ? [{ type: 'text' as const, text: textParts.join('') }] : []),
-                ...toolUses.map((t) => ({ type: 'tool_use' as const, ...t })),
-              ]
+              ...(textParts.length > 0 ? [{ type: 'text' as const, text: textParts.join('') }] : []),
+              ...toolUses.map((t) => ({ type: 'tool_use' as const, ...t })),
+            ]
             : textParts.join(''),
       };
 

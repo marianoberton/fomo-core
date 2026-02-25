@@ -20,9 +20,11 @@ import type {
   SlackIntegrationConfig,
   TelegramIntegrationConfig,
   WhatsAppIntegrationConfig,
+  WhatsAppWahaIntegrationConfig,
 } from './types.js';
 import { createTelegramAdapter } from './adapters/telegram.js';
 import { createWhatsAppAdapter } from './adapters/whatsapp.js';
+import { createWhatsAppWahaAdapter } from './adapters/whatsapp-waha.js';
 import { createSlackAdapter } from './adapters/slack.js';
 import { createChatwootAdapter } from './adapters/chatwoot.js';
 
@@ -126,6 +128,16 @@ export function createChannelResolver(deps: ChannelResolverDeps): ChannelResolve
           });
           return null;
         }
+      }
+
+      case 'whatsapp-waha': {
+        const wahaConfig = config as WhatsAppWahaIntegrationConfig;
+        return createWhatsAppWahaAdapter({
+          wahaBaseUrl: wahaConfig.wahaBaseUrl,
+          sessionName: wahaConfig.sessionName ?? 'default',
+          projectId,
+          apiKey: process.env['WAHA_API_KEY'],
+        });
       }
 
       case 'chatwoot': {

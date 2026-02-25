@@ -43,6 +43,8 @@ services:
       LOG_LEVEL: info
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       FILE_STORAGE_PATH: /app/data/files
+      WAHA_DEFAULT_URL: http://waha:3000
+      WAHA_API_KEY: ${WAHA_API_KEY:-nexus}
     volumes:
       - filedata:/app/data/files
     depends_on:
@@ -51,6 +53,21 @@ services:
       redis:
         condition: service_healthy
 
+  waha:
+    image: devlikeapro/waha
+    container_name: nexus-waha
+    restart: unless-stopped
+    ports:
+      - "3003:3000"
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+      WAHA_PRINT_QR: "True"
+      WHATSAPP_RESTART_ALL_SESSIONS: "True"
+      WAHA_API_KEY: ${WAHA_API_KEY:-nexus}
+    volumes:
+      - wahadata:/app/.sessions
+
 volumes:
   pgdata:
   filedata:
+  wahadata:

@@ -68,6 +68,8 @@ const createAgentSchema = z.object({
   channelConfig: channelConfigSchema.optional(),
   modes: z.array(agentModeSchema).optional(),
   limits: limitsSchema.optional(),
+  managerAgentId: z.string().optional().nullable(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const updateAgentSchema = z.object({
@@ -81,6 +83,8 @@ const updateAgentSchema = z.object({
   modes: z.array(agentModeSchema).optional(),
   limits: limitsSchema.optional(),
   status: z.enum(['active', 'paused', 'disabled']).optional(),
+  managerAgentId: z.string().optional().nullable(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const sendMessageSchema = z.object({

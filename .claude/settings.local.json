@@ -12,7 +12,12 @@
       "Bash(pnpm lint:*)",
       "Bash(npx tsc:*)",
       "Bash(npx eslint:*)",
-      "Bash(npx prisma migrate dev:*)"
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npx tsx:*)",
+      "Bash(pnpm add:*)",
+      "Bash(cmd //c:*)"
     ]
   }
 }

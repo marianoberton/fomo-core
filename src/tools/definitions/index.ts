@@ -1,4 +1,6 @@
 // Individual tool implementations
+export { createEscalateToHumanTool } from './escalate-to-human.js';
+
 export { createCalculatorTool } from './calculator.js';
 export { createDateTimeTool } from './date-time.js';
 export { createJsonTransformTool } from './json-transform.js';

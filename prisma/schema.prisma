@@ -62,7 +62,7 @@ model Contact {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  project     Project  @relation(fields: [projectId], references: [id])
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sessions    Session[]
 
   @@unique([projectId, phone])
@@ -86,7 +86,7 @@ model Session {
   updatedAt DateTime  @updatedAt @map("updated_at")
   expiresAt DateTime? @map("expires_at")
 
-  project          Project           @relation(fields: [projectId], references: [id])
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   contact          Contact?          @relation(fields: [contactId], references: [id])
   agent            Agent?            @relation(fields: [agentId], references: [id])
   messages         Message[]
@@ -111,7 +111,7 @@ model Message {
   traceId   String?  @map("trace_id")
   createdAt DateTime @default(now()) @map("created_at")
 
-  session Session @relation(fields: [sessionId], references: [id])
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, createdAt])
   @@map("messages")
@@ -133,7 +133,7 @@ model MemoryEntry {
   expiresAt      DateTime?                   @map("expires_at")
   metadata       Json?
 
-  project Project @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, category])
   @@index([projectId, importance])
@@ -161,7 +161,7 @@ model PromptLayer {
   performanceNotes String?         @map("performance_notes")
   metadata         Json?
 
-  project Project @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, layerType, version])
   @@index([projectId, layerType, isActive])
@@ -184,7 +184,7 @@ model UsageRecord {
   costUsd          Float    @map("cost_usd")
   timestamp        DateTime @default(now())
 
-  project Project @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, timestamp])
   @@index([projectId, sessionId])
@@ -207,7 +207,7 @@ model ExecutionTrace {
   createdAt       DateTime  @default(now()) @map("created_at")
   completedAt     DateTime? @map("completed_at")
 
-  session Session @relation(fields: [sessionId], references: [id])
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([projectId, createdAt])
   @@index([sessionId])
@@ -231,8 +231,8 @@ model ApprovalRequest {
   resolvedBy     String?   @map("resolved_by")
   resolutionNote String?   @map("resolution_note")
 
-  project Project @relation(fields: [projectId], references: [id])
-  session Session @relation(fields: [sessionId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([projectId, status])
@@ -288,7 +288,7 @@ model ScheduledTask {
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
 
-  project Project            @relation(fields: [projectId], references: [id])
+  project Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   runs    ScheduledTaskRun[]
 
   @@index([projectId, status])
@@ -311,7 +311,7 @@ model ScheduledTaskRun {
   retryCount      Int                   @default(0) @map("retry_count")
   createdAt       DateTime              @default(now()) @map("created_at")
 
-  task ScheduledTask @relation(fields: [taskId], references: [id])
+  task ScheduledTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId, createdAt])
   @@index([status])
@@ -337,7 +337,7 @@ model Webhook {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  project     Project  @relation(fields: [projectId], references: [id])
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, status])
   @@map("webhooks")
@@ -368,11 +368,19 @@ model Agent {
   // Status
   status      String   @default("active")  // active, paused, disabled
 
+  // Metadata
+  metadata    Json?    @map("metadata")
+
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  project     Project  @relation(fields: [projectId], references: [id])
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sessions    Session[]
+
+  // Sub-Agent Relations
+  managerAgentId String? @map("manager_agent_id")
+  managerAgent   Agent?  @relation("SubAgentToManager", fields: [managerAgentId], references: [id])
+  subAgents      Agent[] @relation("SubAgentToManager")
 
   @@unique([projectId, name])
   @@index([projectId, status])
@@ -390,7 +398,7 @@ model ChannelIntegration {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, provider])
   @@index([provider, status])
@@ -410,7 +418,7 @@ model Secret {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  project Project @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, key])
   @@index([projectId])
@@ -438,7 +446,7 @@ model File {
 
   metadata         Json?
 
-  project          Project  @relation(fields: [projectId], references: [id])
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, uploadedAt])
   @@index([projectId, mimeType])
@@ -489,7 +497,7 @@ model MCPServerInstance {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  project  Project           @relation(fields: [projectId], references: [id])
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   template MCPServerTemplate? @relation(fields: [templateId], references: [id])
 
   @@unique([projectId, name])

@@ -3,7 +3,7 @@ import type { ProjectId } from '@/core/types.js';
 
 // ─── Channel Types ──────────────────────────────────────────────
 
-export type ChannelType = 'whatsapp' | 'telegram' | 'slack' | 'email' | 'chatwoot';
+export type ChannelType = 'whatsapp' | 'whatsapp-waha' | 'telegram' | 'slack' | 'email' | 'chatwoot';
 
 // ─── Inbound Message ────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ export interface ChannelConfig {
 // ─── Integration Providers ──────────────────────────────────────
 
 export type ChannelIntegrationId = string;
-export type IntegrationProvider = 'chatwoot' | 'telegram' | 'whatsapp' | 'slack';
+export type IntegrationProvider = 'chatwoot' | 'telegram' | 'whatsapp' | 'whatsapp-waha' | 'slack';
 
 // ─── Per-Provider Integration Configs ───────────────────────────
 
@@ -116,6 +116,14 @@ export interface WhatsAppIntegrationConfig {
   verifyTokenSecretKey?: string;
 }
 
+/** WhatsApp WAHA (QR-based) integration config. */
+export interface WhatsAppWahaIntegrationConfig {
+  /** Base URL of the WAHA instance (e.g. "http://localhost:3003"). */
+  wahaBaseUrl: string;
+  /** WAHA session name (default: "default"). */
+  sessionName?: string;
+}
+
 /** Slack integration config. */
 export interface SlackIntegrationConfig {
   /** Key in the secrets table for the bot token (xoxb-...). */
@@ -129,6 +137,7 @@ export type IntegrationConfigUnion =
   | ChatwootIntegrationConfig
   | TelegramIntegrationConfig
   | WhatsAppIntegrationConfig
+  | WhatsAppWahaIntegrationConfig
   | SlackIntegrationConfig;
 
 /** Map from provider to its config type. */
@@ -136,6 +145,7 @@ export interface IntegrationConfigMap {
   chatwoot: ChatwootIntegrationConfig;
   telegram: TelegramIntegrationConfig;
   whatsapp: WhatsAppIntegrationConfig;
+  'whatsapp-waha': WhatsAppWahaIntegrationConfig;
   slack: SlackIntegrationConfig;
 }
 
@@ -160,6 +170,11 @@ export const WhatsAppIntegrationConfigSchema = z.object({
   verifyTokenSecretKey: z.string().min(1).max(128).optional(),
 });
 
+export const WhatsAppWahaIntegrationConfigSchema = z.object({
+  wahaBaseUrl: z.string().url(),
+  sessionName: z.string().min(1).max(64).optional(),
+});
+
 export const SlackIntegrationConfigSchema = z.object({
   botTokenSecretKey: z.string().min(1).max(128),
   signingSecretSecretKey: z.string().min(1).max(128).optional(),
@@ -170,6 +185,7 @@ export const CreateIntegrationConfigSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('chatwoot'), config: ChatwootIntegrationConfigSchema }),
   z.object({ provider: z.literal('telegram'), config: TelegramIntegrationConfigSchema }),
   z.object({ provider: z.literal('whatsapp'), config: WhatsAppIntegrationConfigSchema }),
+  z.object({ provider: z.literal('whatsapp-waha'), config: WhatsAppWahaIntegrationConfigSchema }),
   z.object({ provider: z.literal('slack'), config: SlackIntegrationConfigSchema }),
 ]);
 

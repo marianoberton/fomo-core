@@ -23,6 +23,7 @@ import type { KnowledgeService } from '@/knowledge/types.js';
 import type { ChannelResolver } from '@/channels/channel-resolver.js';
 import type { ChannelIntegrationRepository } from '@/channels/types.js';
 import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
+import type { SessionBroadcaster } from '@/hitl/session-broadcaster.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -116,5 +117,14 @@ export interface RouteDependencies {
   mcpServerRepository: MCPServerRepository;
   /** Prisma client for direct queries (dashboard aggregations). */
   prisma: PrismaClient;
+  /** Session event broadcaster for cross-context updates (Telegram → Dashboard). */
+  sessionBroadcaster: SessionBroadcaster;
+  /** Callback to resume agent execution after human approval. Fire-and-forget. */
+  resumeAfterApproval: (params: {
+    approvalId: string;
+    decision: 'approved' | 'denied';
+    resolvedBy: string;
+    note?: string;
+  }) => Promise<void>;
   logger: Logger;
 }

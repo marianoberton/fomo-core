@@ -62,6 +62,7 @@ export function createMockSessionRepository(): {
     findById: vi.fn(),
     findByContactId: vi.fn(),
     updateStatus: vi.fn(),
+    updateMetadata: vi.fn(),
     listByProject: vi.fn(),
     addMessage: vi.fn(),
     getMessages: vi.fn(),
@@ -413,6 +414,8 @@ export function createMockDeps(): RouteDependencies & {
     channelIntegrationRepository: createMockChannelIntegrationRepository(),
     mcpServerRepository: createMockMCPServerRepository(),
     prisma: {} as RouteDependencies['prisma'],
+    sessionBroadcaster: { subscribe: () => () => { /* noop */ }, broadcast: () => { /* noop */ } },
+    resumeAfterApproval: () => Promise.resolve(),
     logger: createMockLogger(),
   };
 }

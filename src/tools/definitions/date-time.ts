@@ -45,7 +45,7 @@ const diffSchema = z.object({
 
 const addSchema = z.object({
   operation: z.literal('add'),
-  date: z.string(),
+  date: z.string().optional().describe('ISO date string. Defaults to current time if omitted.'),
   amount: z.number(),
   unit: addUnitSchema,
 });
@@ -198,7 +198,7 @@ function executeOperation(input: DateTimeInput): { result: string; iso: string; 
       };
     }
     case 'add': {
-      const date = parseDate(input.date);
+      const date = input.date ? parseDate(input.date) : new Date();
       const result = addToDate(date, input.amount, input.unit);
       return {
         result: result.toISOString(),

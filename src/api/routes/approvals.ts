@@ -7,6 +7,9 @@ import type { ApprovalId, ProjectId } from '@/core/types.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
+import { createLogger } from '@/observability/logger.js';
+
+const logger = createLogger({ name: 'approval-routes' });
 
 // ─── Zod Schemas ────────────────────────────────────────────────
 
@@ -33,19 +36,18 @@ export function approvalRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { approvalGate } = deps;
+  const { approvalGate, resumeAfterApproval } = deps;
 
   // GET /approvals — global list with filters and pagination
   fastify.get('/approvals', async (request, reply) => {
     const query = paginationSchema.merge(approvalsFilterSchema).parse(request.query);
     const { limit, offset, status, projectId } = query;
 
-    // Use existing listPending for now; filter by status client-side
-    let approvals;
+    let approvals = await approvalGate.listAll();
+
+    // Filter by project if provided
     if (projectId) {
-      approvals = await approvalGate.listPending(projectId as ProjectId);
-    } else {
-      approvals = await approvalGate.listAll();
+      approvals = approvals.filter((a) => a.projectId === projectId);
     }
 
     // Filter by status if provided
@@ -104,6 +106,14 @@ export function approvalRoutes(
         );
       }
 
+      // Fire-and-forget: resume agent execution with the decision
+      resumeAfterApproval({ approvalId: request.params.id, decision, resolvedBy, note })
+        .catch((err: unknown) => logger.error('Failed to resume after approval', {
+          component: 'approval-routes',
+          approvalId: request.params.id,
+          error: err instanceof Error ? err.message : String(err),
+        }));
+
       return sendSuccess(reply, resolved);
     },
   );
@@ -133,6 +143,14 @@ export function approvalRoutes(
           { currentStatus: resolved.status },
         );
       }
+
+      // Fire-and-forget: resume agent execution with the decision
+      resumeAfterApproval({ approvalId: request.params.id, decision, resolvedBy: 'dashboard', note })
+        .catch((err: unknown) => logger.error('Failed to resume after approval', {
+          component: 'approval-routes',
+          approvalId: request.params.id,
+          error: err instanceof Error ? err.message : String(err),
+        }));
 
       return sendSuccess(reply, resolved);
     },

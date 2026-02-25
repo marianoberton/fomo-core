@@ -18,7 +18,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from '../types.js';
 import { getSlackUrlChallenge } from '@/channels/adapters/slack.js';
 
-const VALID_PROVIDERS = new Set<string>(['telegram', 'whatsapp', 'slack']);
+const VALID_PROVIDERS = new Set<string>(['telegram', 'whatsapp', 'whatsapp-waha', 'slack']);
 
 // ─── Route Registration ─────────────────────────────────────────
 

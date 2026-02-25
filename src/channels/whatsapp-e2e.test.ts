@@ -106,6 +106,7 @@ function createMockSessionRepository(): SessionRepository {
     }),
     getMessages: vi.fn((): Promise<StoredMessage[]> => Promise.resolve([])),
     updateStatus: vi.fn(),
+    updateMetadata: vi.fn(),
   };
 }
 
@@ -229,12 +230,14 @@ describe('WhatsApp End-to-End Integration', () => {
     });
 
     // Verify agent was called
-    expect(runAgent).toHaveBeenCalledWith({
-      projectId: 'test-project',
+    expect(runAgent).toHaveBeenCalledWith(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      sessionId: expect.stringContaining('session_'),
-      userMessage: 'Hello, are you there?',
-    });
+      expect.objectContaining({
+        projectId: 'test-project',
+        sourceChannel: 'whatsapp',
+        userMessage: 'Hello, are you there?',
+      }),
+    );
 
     // Verify response was sent
     expect(mockSend).toHaveBeenCalledWith({
@@ -332,12 +335,14 @@ describe('WhatsApp End-to-End Integration', () => {
 
     // Assertions
     expect(result.success).toBe(true);
-    expect(runAgent).toHaveBeenCalledWith({
-      projectId: 'test-project',
+    expect(runAgent).toHaveBeenCalledWith(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      sessionId: expect.stringContaining('session_'),
-      userMessage: 'What is this?',
-    });
+      expect.objectContaining({
+        projectId: 'test-project',
+        sourceChannel: 'whatsapp',
+        userMessage: 'What is this?',
+      }),
+    );
   });
 
   it('reuses existing contact for subsequent messages', async () => {

@@ -56,6 +56,7 @@ function toAgentConfig(record: AgentRecord): AgentConfig {
       budgetPerDayUsd: rec.budgetPerDayUsd,
     },
     status: rec.status as AgentStatus,
+    managerAgentId: rec.managerAgentId,
     createdAt: rec.createdAt,
     updatedAt: rec.updatedAt,
   };
@@ -92,6 +93,8 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
         maxTokensPerTurn: limits.maxTokensPerTurn,
         budgetPerDayUsd: limits.budgetPerDayUsd,
         status: 'active',
+        managerAgentId: input.managerAgentId ?? null,
+        metadata: input.metadata ? (input.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
       } as Prisma.AgentUncheckedCreateInput;
 
       const record = await prisma.agent.create({ data: createData });
@@ -138,6 +141,17 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
       }
       if (input.status !== undefined) {
         updateData.status = input.status;
+      }
+      if (input.managerAgentId !== undefined) {
+        if (input.managerAgentId === null) {
+          updateData.managerAgent = { disconnect: true };
+        } else {
+          updateData.managerAgent = { connect: { id: input.managerAgentId } };
+        }
+      }
+      if (input.metadata !== undefined) {
+        const extended = updateData as Prisma.AgentUpdateInput & { metadata: unknown };
+        extended.metadata = input.metadata as unknown as Prisma.InputJsonValue;
       }
       if (input.limits !== undefined) {
         if (input.limits.maxTurns !== undefined) {

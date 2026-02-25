@@ -175,6 +175,8 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     channelIntegrationRepository,
     mcpServerRepository: createMCPServerRepository(prisma),
     prisma,
+    sessionBroadcaster: { subscribe: () => () => { /* noop */ }, broadcast: () => { /* noop */ } },
+    resumeAfterApproval: () => Promise.resolve(),
     logger,
   };
 

@@ -48,11 +48,16 @@ async function main(): Promise<void> {
           maxRetries: 2,
         },
 
-        allowedTools: ['calculator', 'date-time', 'json-transform'],
+        allowedTools: [
+          'calculator', 'date-time', 'json-transform',
+          'knowledge-search', 'read-file', 'send-email',
+          'send-notification', 'http-request', 'web-search',
+          'propose-scheduled-task',
+        ],
 
         memoryConfig: {
           longTerm: {
-            enabled: false,
+            enabled: true,
             maxEntries: 1000,
             retrievalTopK: 5,
             embeddingProvider: 'openai',
@@ -128,9 +133,15 @@ async function main(): Promise<void> {
         '- Calculations (use the calculator tool when appropriate)',
         '- JSON data manipulation (use the json-transform tool)',
         '- Date and time queries (use the date-time tool)',
+        '- Search the knowledge base for stored information (use knowledge-search)',
+        '- Read uploaded files (use read-file)',
+        '- Send emails when requested (use send-email)',
+        '- Search the web for information (use web-search)',
+        '- Schedule recurring tasks (use propose-scheduled-task)',
         '',
         'Always explain your reasoning before using a tool.',
         'When you use a tool, state which tool you are using and why.',
+        'If asked about stored knowledge or uploaded data, use knowledge-search or read-file.',
         'If you are unsure about something, say so.',
       ].join('\n'),
       isActive: true,
@@ -164,6 +175,106 @@ async function main(): Promise<void> {
   console.log('  Prompt layers created (identity, instructions, safety)');
 
   // ─── Done ──────────────────────────────────────────────────────
+
+  // ─── 3. Seed MCP server templates (idempotent) ────────────────
+
+  const mcpTemplates = [
+    {
+      name: 'hubspot',
+      displayName: 'HubSpot CRM',
+      description: 'Access HubSpot CRM — contacts, deals, companies, and pipelines.',
+      category: 'crm',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@hubspot/mcp-server'],
+      requiredSecrets: ['HUBSPOT_ACCESS_TOKEN'],
+      isOfficial: true,
+    },
+    {
+      name: 'twenty-crm',
+      displayName: 'Twenty CRM',
+      description: 'Open-source CRM. Manage people, companies, and opportunities.',
+      category: 'crm',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', 'twenty-mcp-server'],
+      requiredSecrets: ['TWENTY_API_KEY'],
+      isOfficial: false,
+    },
+    {
+      name: 'github',
+      displayName: 'GitHub',
+      description: 'Search code, manage issues, pull requests, repositories, and workflows.',
+      category: 'productivity',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-github'],
+      requiredSecrets: ['GITHUB_PERSONAL_ACCESS_TOKEN'],
+      isOfficial: true,
+    },
+    {
+      name: 'google-drive',
+      displayName: 'Google Drive',
+      description: 'Search and read Google Drive files and documents.',
+      category: 'productivity',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-google-drive'],
+      requiredSecrets: ['GDRIVE_CREDENTIALS_PATH'],
+      isOfficial: true,
+    },
+    {
+      name: 'slack-mcp',
+      displayName: 'Slack',
+      description: 'Send messages, search channels, and list workspace members in Slack.',
+      category: 'communication',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-slack'],
+      requiredSecrets: ['SLACK_BOT_TOKEN'],
+      isOfficial: true,
+    },
+    {
+      name: 'postgres-mcp',
+      displayName: 'PostgreSQL',
+      description: 'Read-only access to a PostgreSQL database. Query, inspect schema, and analyze data.',
+      category: 'custom',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-postgres'],
+      requiredSecrets: ['POSTGRES_CONNECTION_STRING'],
+      isOfficial: true,
+    },
+  ];
+
+  for (const template of mcpTemplates) {
+    await prisma.mCPServerTemplate.upsert({
+      where: { name: template.name },
+      update: {
+        displayName: template.displayName,
+        description: template.description,
+        category: template.category,
+        transport: template.transport,
+        command: template.command,
+        args: template.args,
+        requiredSecrets: template.requiredSecrets,
+        isOfficial: template.isOfficial,
+      },
+      create: {
+        name: template.name,
+        displayName: template.displayName,
+        description: template.description,
+        category: template.category,
+        transport: template.transport,
+        command: template.command,
+        args: template.args,
+        requiredSecrets: template.requiredSecrets,
+        isOfficial: template.isOfficial,
+      },
+    });
+  }
+
+  console.log(`  MCP templates seeded: ${mcpTemplates.map((t) => t.displayName).join(', ')}`);
 
   console.log(`\n  Fomo Internal Assistant ready!`);
   console.log(`  Project ID: ${projectId}`);

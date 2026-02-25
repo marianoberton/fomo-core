@@ -34,12 +34,16 @@ interface AuthMessage {
 interface SessionCreateMessage {
   type: 'session.create';
   agentId?: string;
+  sourceChannel?: string;
+  contactRole?: string;
   metadata?: Record<string, unknown>;
 }
 
 interface MessageSendMessage {
   type: 'message.send';
   content: string;
+  sourceChannel?: string;
+  contactRole?: string;
 }
 
 interface ApprovalDecideMessage {
@@ -93,6 +97,15 @@ function mapEvent(event: AgentStreamEvent, traceId: string): NexusEventBase | nu
         durationMs: 0,
       };
 
+    case 'approval_requested':
+      return {
+        type: 'message.approval_required',
+        toolCallId: event.toolCallId,
+        tool: event.toolId,
+        approvalId: event.approvalId,
+        action: event.input,
+      };
+
     case 'turn_complete':
       // No dashboard equivalent — skip
       return null;
@@ -143,8 +156,13 @@ function setupDashboardSocket(
   let authenticated = false;
   let sessionId: string | null = null;
   let agentId: string | null = null;
+  let sourceChannel: string | null = null;
+  let contactRole: string | null = null;
   let running = false;
   let traceId = '';
+  let unsubscribeBroadcast: (() => void) | null = null;
+  // Track approval IDs resolved by THIS WS connection to avoid broadcast duplicates
+  let dashboardResolvedApprovalId: string | null = null;
 
   const sendEvent = (event: NexusEventBase): void => {
     // 1 === WebSocket.OPEN
@@ -182,19 +200,49 @@ function setupDashboardSocket(
           return;
         }
 
-        // Store agentId for subsequent message.send calls
+        // Store agentId + channel info for subsequent message.send calls
         agentId = msg.agentId ?? null;
+        sourceChannel = msg.sourceChannel ?? null;
+        contactRole = msg.contactRole ?? null;
 
         deps.sessionRepository
           .create({
             projectId: projectId as ProjectId,
-            metadata: msg.metadata,
+            metadata: { ...msg.metadata, agentId: agentId ?? undefined },
           })
           .then((session) => {
             sessionId = session.id;
             sendEvent({
               type: 'session.created',
               sessionId: session.id,
+            });
+
+            // Subscribe to session broadcasts (external approval resolutions, e.g. Telegram)
+            unsubscribeBroadcast = deps.sessionBroadcaster.subscribe(session.id, (broadcastMsg) => {
+              // Skip events for approvals resolved by THIS dashboard connection
+              if (broadcastMsg['approvalId'] === dashboardResolvedApprovalId) return;
+
+              if (broadcastMsg.type === 'approval.resolved') {
+                sendEvent({
+                  type: 'approval.decided',
+                  approvalId: broadcastMsg['approvalId'] as string,
+                  decision: broadcastMsg['decision'] as string,
+                  resolvedBy: broadcastMsg['resolvedBy'] as string,
+                });
+              }
+
+              if (broadcastMsg.type === 'message.new') {
+                sendEvent({
+                  type: 'message.content_delta',
+                  text: broadcastMsg['content'] as string,
+                });
+                sendEvent({
+                  type: 'message.complete',
+                  messageId: `external-${Date.now()}`,
+                  usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 },
+                  traceId: '',
+                });
+              }
             });
           })
           .catch((err: unknown) => {
@@ -242,6 +290,8 @@ function setupDashboardSocket(
             projectId,
             sessionId,
             agentId: agentId ?? undefined,
+            sourceChannel: msg.sourceChannel ?? sourceChannel ?? undefined,
+            contactRole: msg.contactRole ?? contactRole ?? undefined,
             message: msg.content,
           },
           deps,
@@ -265,10 +315,13 @@ function setupDashboardSocket(
           return;
         }
 
+        // Mark this approval as resolved by THIS connection to skip broadcast duplicates
+        dashboardResolvedApprovalId = msg.approvalId;
+
         const decision = msg.approved ? 'approved' : 'denied';
         deps.approvalGate
           .resolve(msg.approvalId as ApprovalId, decision, 'dashboard', msg.note)
-          .then((resolved) => {
+          .then(async (resolved) => {
             if (!resolved) {
               sendError('NOT_FOUND', `Approval ${msg.approvalId} not found`);
               return;
@@ -278,6 +331,62 @@ function setupDashboardSocket(
               approvalId: msg.approvalId,
               decision,
             });
+
+            // Resume agent loop and stream output to frontend
+            try {
+              const approval = await deps.approvalGate.get(msg.approvalId as ApprovalId);
+              if (approval && approval.sessionId && approval.toolCallId) {
+                await deps.sessionRepository.addMessage(
+                  approval.sessionId,
+                  {
+                    role: 'tool',
+                    content: JSON.stringify({ approved: msg.approved, note: msg.note }),
+                  },
+                  `trace-resume-${Date.now()}` as import('@/core/types.js').TraceId
+                );
+
+                if (running) {
+                  sendError('BUSY', 'Agent run already in progress');
+                  return;
+                }
+
+                running = true;
+                traceId = `trace-resume-${Date.now()}`;
+                const messageAbort = new AbortController();
+                const onClose = (): void => {
+                  messageAbort.abort();
+                };
+                socket.on('close', onClose);
+
+                const wrappedSend = (event: AgentStreamEvent): void => {
+                  if (event.type === 'agent_start') {
+                    traceId = event.traceId;
+                  }
+                  const mapped = mapEvent(event, traceId);
+                  if (mapped) sendEvent(mapped);
+                };
+
+                await handleChatStreamMessage(
+                  {
+                    projectId,
+                    sessionId: approval.sessionId,
+                    agentId: agentId ?? undefined,
+                    sourceChannel: sourceChannel ?? undefined,
+                    contactRole: contactRole ?? undefined,
+                    message: undefined,
+                  },
+                  deps,
+                  wrappedSend,
+                  messageAbort.signal
+                ).finally(() => {
+                  running = false;
+                  socket.removeListener('close', onClose);
+                });
+              }
+            } catch (err: unknown) {
+              const errMsg = err instanceof Error ? err.message : 'Failed to resume agent';
+              sendError('RESUME_ERROR', errMsg);
+            }
           })
           .catch((err: unknown) => {
             const errMsg = err instanceof Error ? err.message : 'Failed to decide approval';
@@ -292,10 +401,11 @@ function setupDashboardSocket(
     }
   });
 
-  // Log socket close with code/reason for diagnostics
+  // Log socket close with code/reason for diagnostics + clean up broadcast subscription
   (socket as unknown as {
     on(event: 'close', listener: (code: number, reason: Buffer) => void): void;
   }).on('close', (code, reason) => {
+    unsubscribeBroadcast?.();
     deps.logger.info('Dashboard WebSocket closed', {
       component: 'ws-dashboard',
       projectId,

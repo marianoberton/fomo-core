@@ -26,6 +26,58 @@ import {
 import { resolveAgentMode } from '@/agents/mode-resolver.js';
 import type { RouteDependencies } from '../types.js';
 
+// ─── Defaults ───────────────────────────────────────────────────
+
+/**
+ * Sensible defaults for projects created with a simplified config (config: {}).
+ * These mirror the seed.ts defaults and ensure the agent loop never crashes
+ * due to missing fields, regardless of how the project was created.
+ * Agent-level llmConfig overrides are applied on top of these after loading.
+ */
+const DEFAULT_AGENT_CONFIG = {
+  allowedTools: [] as string[],
+  mcpServers: [] as AgentConfig['mcpServers'],
+  maxTurnsPerSession: 10,
+  maxConcurrentSessions: 5,
+  failover: {
+    maxRetries: 2,
+    onTimeout: true,
+    onRateLimit: true,
+    onServerError: true,
+    timeoutMs: 30_000,
+  },
+  memoryConfig: {
+    longTerm: {
+      enabled: false,
+      maxEntries: 100,
+      retrievalTopK: 5,
+      embeddingProvider: 'openai',
+      decayEnabled: false,
+      decayHalfLifeDays: 30,
+    },
+    contextWindow: {
+      reserveTokens: 2000,
+      pruningStrategy: 'turn-based' as const,
+      maxTurnsInContext: 20,
+      compaction: {
+        enabled: false,
+        memoryFlushBeforeCompaction: false,
+      },
+    },
+  },
+  costConfig: {
+    dailyBudgetUSD: 10,
+    monthlyBudgetUSD: 100,
+    maxTokensPerTurn: 4096,
+    maxTurnsPerSession: 50,
+    maxToolCallsPerTurn: 10,
+    alertThresholdPercent: 80,
+    hardLimitPercent: 100,
+    maxRequestsPerMinute: 60,
+    maxRequestsPerHour: 1000,
+  },
+} satisfies Partial<AgentConfig>;
+
 // ─── Zod Schema ─────────────────────────────────────────────────
 
 /** Zod schema for chat request body validation. */
@@ -35,7 +87,7 @@ export const chatRequestSchema = z.object({
   agentId: z.string().min(1).optional(),
   sourceChannel: z.string().min(1).optional(),
   contactRole: z.string().min(1).optional(),
-  message: z.string().min(1).max(100_000),
+  message: z.string().max(100_000).optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 
@@ -108,8 +160,10 @@ export async function prepareChatRun(
 ): Promise<Result<ChatSetupResult, ChatSetupError>> {
   const { projectRepository, sessionRepository, promptLayerRepository } = deps;
 
-  // 1. Sanitize user message
-  const sanitized = validateUserInput(body.message);
+  // 1. Sanitize user message if provided
+  const sanitized = body.message
+    ? validateUserInput(body.message)
+    : { sanitized: '', flags: [], original: '', isSafe: true, reason: null };
 
   // 2. Load project
   const project = await projectRepository.findById(body.projectId as ProjectId);
@@ -121,7 +175,10 @@ export async function prepareChatRun(
     });
   }
 
-  const agentConfig = { ...project.config, projectId: project.id };
+  // Merge defaults first so any field absent from project.config (e.g. config: {})
+  // is always initialised. Project config then overrides the defaults, and agent
+  // llmConfig overrides are applied on top in step 2b below.
+  const agentConfig = { ...DEFAULT_AGENT_CONFIG, ...project.config, projectId: project.id };
 
   // 2b. If agentId provided, load agent and apply LLM config override
   if (body.agentId && deps.agentRegistry) {
@@ -176,6 +233,27 @@ export async function prepareChatRun(
       agentConfig.allowedTools = [
         ...new Set([...agentConfig.allowedTools, ...effectiveToolAllowlist]),
       ];
+    }
+
+    // 2d. Sub-Agent Magic: Autowire the escalation tool and instructions
+    // We keep this behavior for backward compatibility or if the user explicitly configures a manager,
+    // though the escalation now goes to a human.
+    if (agent.managerAgentId) {
+      // Automatically add the escalation tool if not present
+      if (!agentConfig.allowedTools.includes('escalate-to-human')) {
+        agentConfig.allowedTools.push('escalate-to-human');
+      }
+
+      // Automatically add the context to the instructions
+      const escalationPrompt = `
+## Escalation Path & Manager
+You have a human "Manager" available via the \`escalate-to-human\` tool. 
+If a user asks for something outside your permissions (like a large discount), or if you encounter a complex situation you cannot resolve, you MUST use the \`escalate-to-human\` tool to consult them before taking final action. 
+Do not decline a request if your Manager might be able to approve it.
+`;
+      // We will append this during step 11, we pass it via metadata
+      if (!body.metadata) body.metadata = {};
+      body.metadata['_managerPrompt'] = escalationPrompt;
     }
 
     // Use agent MCP servers, filtered by mode if applicable
@@ -237,6 +315,14 @@ export async function prepareChatRun(
   }));
 
   // 6. Resolve LLM providers (primary + optional fallback)
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (!agentConfig.provider) {
+    return err({
+      code: 'MISCONFIGURATION',
+      message: 'No LLM provider configured. Set "provider" in the project config or agent llmConfig.',
+      statusCode: 400,
+    });
+  }
   const provider = createProvider(agentConfig.provider);
   const fallbackProvider = agentConfig.fallbackProvider
     ? createProvider(agentConfig.fallbackProvider)
@@ -337,6 +423,8 @@ export async function prepareChatRun(
   const modeOverrides = body.metadata?.['_modePromptOverrides'] as
     { identity?: string; instructions?: string; safety?: string } | undefined;
 
+  const managerPrompt = body.metadata?.['_managerPrompt'] as string | undefined;
+
   const effectiveLayers = {
     identity: modeOverrides?.identity
       ? { ...layers.identity, content: `${layers.identity.content}\n\n## Mode Override\n${modeOverrides.identity}` }
@@ -348,6 +436,10 @@ export async function prepareChatRun(
       ? { ...layers.safety, content: `${layers.safety.content}\n\n## Mode Safety\n${modeOverrides.safety}` }
       : layers.safety,
   };
+
+  if (managerPrompt) {
+    effectiveLayers.instructions.content = `${effectiveLayers.instructions.content}\n\n${managerPrompt}`;
+  }
 
   const systemPrompt = buildPrompt({
     identity: effectiveLayers.identity,
