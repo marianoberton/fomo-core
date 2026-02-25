@@ -1,111 +1,91 @@
 # WhatsApp Integration Setup
 
-## Overview
+Nexus Core supports two WhatsApp integration modes. Choose based on your use case.
 
-Nexus Core integrates with WhatsApp Cloud API to receive and send messages. The integration supports:
+| Mode | Best For | Requires |
+|------|----------|----------|
+| **WAHA (QR scan)** | SME clients, existing numbers, fast setup | Docker Compose (bundled) |
+| **Meta Cloud API** | Enterprise, high volume, official support | Meta Business Account + approval |
 
-- ✅ Text messages (receive & send)
-- ✅ Image messages (receive)
-- ⚠️ Other media types (not yet implemented)
+---
 
-## Architecture
+## Option A: WhatsApp via WAHA (Recommended for most clients)
 
-```
-WhatsApp Cloud API
-    ↓
-Webhook (POST /api/v1/webhooks/whatsapp)
-    ↓
-WhatsAppAdapter.parseInbound()
-    ↓
-InboundProcessor.process()
-    ├─ Create/find Contact
-    ├─ Create/find Session
-    ├─ runAgent() → Execute agent loop
-    └─ Send response via WhatsAppAdapter.send()
-```
+WAHA is bundled in Docker Compose and starts automatically with `docker compose up -d`.
 
-## Prerequisites
+**Setup**: Dashboard → Project → Integrations → Add Channel → WhatsApp (WAHA / QR Scan)
 
-1. **WhatsApp Business Account**
-   - Sign up at https://business.facebook.com/
-   - Create a WhatsApp Business App in Meta for Developers
+See the full guide: [WAHA_SETUP.md](WAHA_SETUP.md)
 
-2. **Required Credentials**
-   - `WHATSAPP_ACCESS_TOKEN` - Permanent access token from Meta
-   - `WHATSAPP_PHONE_NUMBER_ID` - Phone number ID from WhatsApp Business
-   - `WHATSAPP_WEBHOOK_VERIFY_TOKEN` - Custom token for webhook verification (you choose this)
+---
 
-3. **OpenAI API Key** (for agent processing)
-   - `OPENAI_API_KEY` - Used as the LLM provider
+## Option B: WhatsApp via Meta Cloud API
 
-## Environment Configuration
+Use this for enterprise deployments that need official Meta support, high message volumes, or WhatsApp template messages.
 
-Add to `.env`:
+### Prerequisites
 
-```bash
-# WhatsApp Cloud API
-WHATSAPP_ACCESS_TOKEN=your_permanent_access_token_here
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id_here
-WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_custom_verify_token_here
+1. **Meta Business Account** — [business.facebook.com](https://business.facebook.com)
+2. **WhatsApp Business App** — created in Meta for Developers
+3. **Required credentials**:
+   - Access Token (permanent token from Meta)
+   - Phone Number ID (from WhatsApp Business settings)
+   - Webhook Verify Token (a secret string you choose)
 
-# OpenAI (used by agent)
-OPENAI_API_KEY=sk-...
+### Step 1: Create a Meta App
 
-# Default project for inbound messages
-DEFAULT_PROJECT_ID=default
-```
+1. Go to [developers.facebook.com](https://developers.facebook.com) → **My Apps** → **Create App**
+2. Choose **Business** app type
+3. Add the **WhatsApp** product to your app
+4. Go to **WhatsApp** → **Getting Started** and note your:
+   - **Phone Number ID**
+   - **Access Token** (generate a permanent one via System Users)
 
-## Webhook Setup
+### Step 2: Add the Channel in the Dashboard
 
-### 1. Get Your Webhook URL
+1. Dashboard → Project → **Integrations** → **Add Channel** → **WhatsApp (Meta Cloud API)**
+2. Enter:
+   - **Access Token** — permanent token from Meta
+   - **Phone Number ID** — from WhatsApp Business settings
+   - **Webhook Verify Token** — any secret string you choose (e.g. `nexus_verify_abc123`)
+3. Click **Connect**
+4. The dashboard shows you a webhook URL:
+   ```
+   https://your-domain.com/api/v1/channels/webhooks/{projectId}/whatsapp
+   ```
 
-Your webhook endpoint will be:
-```
-https://your-domain.com/api/v1/webhooks/whatsapp
-```
+### Step 3: Configure Webhook in Meta
 
-### 2. Configure in Meta for Developers
+1. Go to your WhatsApp App → **WhatsApp** → **Configuration**
+2. Click **Edit** next to Webhook
+3. Enter:
+   - **Callback URL**: the webhook URL from Step 2
+   - **Verify Token**: the same token you entered in Step 2
+4. Click **Verify and Save** — Meta will call your URL to verify it
 
-1. Go to your WhatsApp Business App
-2. Navigate to **WhatsApp** → **Configuration**
-3. Click **Edit** next to Webhook
-4. Enter:
-   - **Callback URL**: `https://your-domain.com/api/v1/webhooks/whatsapp`
-   - **Verify Token**: Same value as `WHATSAPP_WEBHOOK_VERIFY_TOKEN` in .env
-5. Click **Verify and Save**
+### Step 4: Subscribe to Webhook Fields
 
-### 3. Subscribe to Webhook Fields
+In Meta's webhook settings, subscribe to:
+- ✅ `messages` — required (receive incoming messages)
+- ⚠️ `message_status` — optional (delivery receipts)
 
-Subscribe to:
-- ✅ `messages` - Required for receiving messages
-- ⚠️ `message_status` - Optional, for delivery status
+---
 
-## Testing
+## Testing (Meta Cloud API)
 
-### Unit Tests
+### Test Webhook Verification (GET)
 
 ```bash
-# Test WhatsApp adapter
-pnpm test src/channels/adapters/whatsapp.test.ts
+curl "https://your-domain.com/api/v1/channels/webhooks/{projectId}/whatsapp?\
+hub.mode=subscribe&hub.verify_token=nexus_verify_abc123&hub.challenge=test123"
 
-# Test end-to-end flow
-pnpm test src/channels/whatsapp-e2e.test.ts
+# Expected: test123
 ```
 
-### Manual Testing with cURL
-
-#### Test Webhook Verification (GET)
+### Test Incoming Message (POST)
 
 ```bash
-curl "http://localhost:3000/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=your_custom_verify_token_here&hub.challenge=test_challenge"
-
-# Expected: "test_challenge"
-```
-
-#### Test Incoming Text Message (POST)
-
-```bash
-curl -X POST http://localhost:3000/api/v1/webhooks/whatsapp \
+curl -X POST https://your-domain.com/api/v1/channels/webhooks/{projectId}/whatsapp \
   -H "Content-Type: application/json" \
   -d '{
     "object": "whatsapp_business_account",
@@ -118,16 +98,13 @@ curl -X POST http://localhost:3000/api/v1/webhooks/whatsapp \
             "display_phone_number": "+1234567890",
             "phone_number_id": "test-phone-id"
           },
-          "contacts": [{
-            "profile": { "name": "Test User" },
-            "wa_id": "5491132766709"
-          }],
+          "contacts": [{"profile": {"name": "Test User"}, "wa_id": "5491112345678"}],
           "messages": [{
-            "from": "5491132766709",
+            "from": "5491112345678",
             "id": "msg_123",
-            "timestamp": "1633036800",
+            "timestamp": "1700000000",
             "type": "text",
-            "text": { "body": "Hello, agent!" }
+            "text": {"body": "Hola, ¿tienen stock de tornillos 6x50?"}
           }]
         },
         "field": "messages"
@@ -138,162 +115,80 @@ curl -X POST http://localhost:3000/api/v1/webhooks/whatsapp \
 # Expected: { "ok": true }
 ```
 
-#### Test Incoming Image Message (POST)
+---
 
-```bash
-curl -X POST http://localhost:3000/api/v1/webhooks/whatsapp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "object": "whatsapp_business_account",
-    "entry": [{
-      "id": "entry-id",
-      "changes": [{
-        "value": {
-          "messaging_product": "whatsapp",
-          "metadata": {
-            "display_phone_number": "+1234567890",
-            "phone_number_id": "test-phone-id"
-          },
-          "contacts": [{
-            "profile": { "name": "Image Sender" },
-            "wa_id": "5491132766710"
-          }],
-          "messages": [{
-            "from": "5491132766710",
-            "id": "msg_456",
-            "timestamp": "1633036900",
-            "type": "image",
-            "image": {
-              "id": "media_abc123",
-              "mime_type": "image/jpeg",
-              "caption": "What is this?"
-            }
-          }]
-        },
-        "field": "messages"
-      }]
-    }]
-  }'
-
-# Expected: { "ok": true }
-```
-
-### Check Health
-
-```bash
-curl http://localhost:3000/api/v1/webhooks/health
-
-# Expected:
-# {
-#   "channels": ["whatsapp"],
-#   "health": { "whatsapp": true },
-#   "timestamp": "..."
-# }
-```
-
-## Message Flow
-
-### Receiving Messages
-
-1. **WhatsApp sends webhook** → POST /api/v1/webhooks/whatsapp
-2. **Parse payload** → `WhatsAppAdapter.parseInbound()`
-3. **Process message**:
-   - Find or create Contact by phone number
-   - Find or create Session for the Contact
-   - Run agent with message content
-   - Get agent response
-4. **Send response** → `WhatsAppAdapter.send()`
-
-### Sending Messages
-
-Messages are sent via the channel router:
-
-```typescript
-await channelRouter.send({
-  channel: 'whatsapp',
-  recipientIdentifier: '5491132766709', // Phone number
-  content: 'Hello from Nexus!',
-  replyToChannelMessageId: 'msg_123', // Optional
-});
-```
-
-## Supported Message Types
+## Message Support
 
 ### Receive (Inbound)
 
-| Type | Status | Notes |
-|------|--------|-------|
-| Text | ✅ | Fully supported |
-| Image | ✅ | Stores media ID, caption as content |
-| Audio | ⚠️ | Not yet implemented |
-| Video | ⚠️ | Not yet implemented |
-| Document | ⚠️ | Not yet implemented |
-| Sticker | ⚠️ | Not yet implemented |
-| Location | ⚠️ | Not yet implemented |
+| Type | WAHA | Meta Cloud API |
+|------|------|----------------|
+| Text | ✅ | ✅ |
+| Image | ✅ (caption as text) | ✅ |
+| Audio | ⚠️ Not transcribed | ⚠️ Not transcribed |
+| Video | ⚠️ Not processed | ⚠️ Not processed |
+| Document | ⚠️ Not processed | ⚠️ Not processed |
 
 ### Send (Outbound)
 
-| Type | Status | Notes |
-|------|--------|-------|
-| Text | ✅ | Fully supported |
-| Image | ⚠️ | Not yet implemented |
-| Template | ⚠️ | Not yet implemented |
+| Type | WAHA | Meta Cloud API |
+|------|------|----------------|
+| Text | ✅ | ✅ |
+| Image | ⚠️ Not implemented | ⚠️ Not implemented |
+| Template | ⚠️ N/A | ⚠️ Not implemented |
+
+---
+
+## Architecture
+
+### WAHA flow
+```
+User → WhatsApp (phone)
+    → WAHA container (WhatsApp Web protocol)
+    → POST /api/v1/channels/webhooks/{projectId}/waha
+    → InboundProcessor → AgentRunner
+    → WAHA → User
+```
+
+### Meta Cloud API flow
+```
+User → WhatsApp → Meta servers
+    → POST /api/v1/channels/webhooks/{projectId}/whatsapp
+    → InboundProcessor → AgentRunner
+    → Meta Graph API (/{phoneNumberId}/messages) → User
+```
+
+---
 
 ## Troubleshooting
 
-### Webhook Not Receiving Messages
+### WAHA Issues
 
-1. **Check webhook is registered**:
-   ```bash
-   curl http://localhost:3000/api/v1/webhooks/health
-   ```
+See [WAHA_SETUP.md — Troubleshooting](WAHA_SETUP.md#troubleshooting).
 
-2. **Verify environment variables**:
-   ```bash
-   echo $WHATSAPP_ACCESS_TOKEN
-   echo $WHATSAPP_PHONE_NUMBER_ID
-   ```
+### Meta API: Webhook Verification Fails
 
-3. **Check logs**:
-   ```bash
-   pnpm dev | grep whatsapp
-   ```
+- Ensure your `NEXUS_PUBLIC_URL` is publicly accessible (not localhost)
+- The verify token entered in the dashboard must exactly match what Meta sends
+- Check server logs: `docker logs nexus-app | grep whatsapp`
 
-### Messages Not Being Processed
+### Meta API: Messages Not Delivered
 
-1. **Check if contact was created**:
-   - Look for log: `Created new contact`
-   
-2. **Check if session was created**:
-   - Look for log: `Created new session`
-
-3. **Check agent execution**:
-   - Look for log: `runAgent completed`
+- Verify phone number is associated with a WhatsApp Business account in Meta
+- Check that the access token has not expired (use a permanent System User token)
+- Test sending via Meta's testing tool in the developer dashboard
 
 ### Agent Not Responding
 
-1. **Verify OpenAI API key**:
-   ```bash
-   echo $OPENAI_API_KEY
-   ```
+1. Dashboard → Integrations — verify channel status is "Connected"
+2. Dashboard → Traces — check if a trace was created for the message
+3. If no trace: webhook is not reaching Nexus (check URL and network)
+4. If trace exists but no response: check agent is assigned to the WhatsApp channel
 
-2. **Check agent configuration**:
-   - Ensure DEFAULT_PROJECT_ID exists in database
-   - Check project has a valid provider config
-
-## Next Steps
-
-- [ ] Implement image download and vision API integration
-- [ ] Support for audio messages (transcription via Whisper)
-- [ ] Support for video messages
-- [ ] Support for document messages
-- [ ] Template message support for notifications
-- [ ] Media upload for outbound images
-- [ ] Message status tracking (delivered, read)
-- [ ] Rate limiting per contact
+---
 
 ## References
 
+- [WAHA_SETUP.md](WAHA_SETUP.md) — Detailed WAHA guide
 - [WhatsApp Cloud API Documentation](https://developers.facebook.com/docs/whatsapp/cloud-api)
-- [WhatsApp Webhook Reference](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)
-- [Message Types Reference](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/components)
+- [Meta Webhook Reference](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)

@@ -16,7 +16,7 @@ Nexus Core integrates with the Slack Web API to receive and send messages. The i
 ```
 Slack Events API
     ↓
-Webhook (POST /api/v1/webhooks/slack)
+Webhook (POST /api/v1/channels/webhooks/{projectId}/slack)
     ↓
 SlackAdapter.parseInbound()
     ↓
@@ -36,9 +36,9 @@ InboundProcessor.process()
    - Bot Token Scopes configured
    - Event Subscriptions enabled
 
-3. **Required Credentials**
-   - `SLACK_BOT_TOKEN` - Bot user OAuth token (`xoxb-...`)
-   - `SLACK_SIGNING_SECRET` - Signing secret for webhook verification (optional, recommended)
+3. **Required Credentials** (stored per-project in dashboard, not in `.env`)
+   - Bot User OAuth Token (`xoxb-...`)
+   - Signing Secret (optional but recommended)
 
 ## Step-by-Step Setup
 
@@ -69,14 +69,21 @@ Navigate to **OAuth & Permissions** → **Scopes** → **Bot Token Scopes**:
 3. Review permissions and click **Allow**
 4. Copy the **Bot User OAuth Token** (`xoxb-...`)
 
-### 4. Configure Event Subscriptions
+### 4. Add the Channel in the Dashboard
 
-1. Navigate to **Event Subscriptions**
+1. Dashboard → Project → **Integrations** → **Add Channel** → **Slack**
+2. Paste the **Bot User OAuth Token** (`xoxb-...`)
+3. Paste the **Signing Secret** (optional but recommended)
+4. Click **Connect** — the dashboard shows you a webhook URL:
+   ```
+   https://your-domain.com/api/v1/channels/webhooks/{projectId}/slack
+   ```
+
+### 5. Configure Event Subscriptions
+
+1. Navigate to **Event Subscriptions** in your Slack app
 2. Toggle **Enable Events** → **On**
-3. Enter your **Request URL**:
-   ```
-   https://your-domain.com/api/v1/webhooks/slack
-   ```
+3. Enter the webhook URL from Step 4 as the **Request URL**
    Slack will send a `url_verification` challenge — Nexus Core handles this automatically.
 
 4. Under **Subscribe to bot events**, add:
@@ -87,41 +94,18 @@ Navigate to **OAuth & Permissions** → **Scopes** → **Bot Token Scopes**:
 
 5. Click **Save Changes**
 
-### 5. Invite Bot to Channels
+### 6. Invite Bot to Channels
 
 In Slack, invite the bot to channels where it should respond:
 ```
 /invite @NexusAgent
 ```
 
-## Environment Configuration
+## Configuration
 
-Add to `.env`:
+Slack credentials are stored **per project** in the database via SecretService — no `.env` entries needed.
 
-```bash
-# Slack Bot Token (from OAuth & Permissions page)
-SLACK_BOT_TOKEN=xoxb-your-bot-token-here
-
-# Slack Signing Secret (from Basic Information page — optional but recommended)
-SLACK_SIGNING_SECRET=your-signing-secret-here
-```
-
-## Agent Configuration
-
-In your project config or `prisma/seed.ts`:
-
-```typescript
-{
-  channels: [
-    {
-      type: 'slack',
-      enabled: true,
-      botTokenEnvVar: 'SLACK_BOT_TOKEN',
-      webhookSecretEnvVar: 'SLACK_SIGNING_SECRET',
-    },
-  ],
-}
-```
+The dashboard wizard handles all credential storage. Credentials entered in the dashboard Integrations page are encrypted and stored in the `channel_integrations` table.
 
 ## Testing
 
@@ -139,7 +123,7 @@ pnpm test src/channels/adapters/slack.test.ts
 Slack sends this when you configure event subscriptions:
 
 ```bash
-curl -X POST http://localhost:3002/api/v1/webhooks/slack \
+curl -X POST http://localhost:3002/api/v1/channels/webhooks/{projectId}/slack \
   -H "Content-Type: application/json" \
   -d '{
     "type": "url_verification",
@@ -152,7 +136,7 @@ curl -X POST http://localhost:3002/api/v1/webhooks/slack \
 #### Test Incoming Message (POST)
 
 ```bash
-curl -X POST http://localhost:3002/api/v1/webhooks/slack \
+curl -X POST http://localhost:3002/api/v1/channels/webhooks/{projectId}/slack \
   -H "Content-Type: application/json" \
   -d '{
     "type": "event_callback",
@@ -176,7 +160,7 @@ curl -X POST http://localhost:3002/api/v1/webhooks/slack \
 #### Test Thread Reply (POST)
 
 ```bash
-curl -X POST http://localhost:3002/api/v1/webhooks/slack \
+curl -X POST http://localhost:3002/api/v1/channels/webhooks/{projectId}/slack \
   -H "Content-Type: application/json" \
   -d '{
     "type": "event_callback",
@@ -212,7 +196,7 @@ curl http://localhost:3002/api/v1/webhooks/health
 
 ### Receiving Messages
 
-1. **Slack sends event** → POST /api/v1/webhooks/slack
+1. **Slack sends event** → POST /api/v1/channels/webhooks/{projectId}/slack
 2. **Parse payload** → `SlackAdapter.parseInbound()`
 3. **Process message**:
    - Find or create Contact by Slack user ID
@@ -282,7 +266,7 @@ await channelRouter.send({
 
 1. **Check server is accessible**:
    ```bash
-   curl https://your-domain.com/api/v1/webhooks/slack
+   curl https://your-domain.com/api/v1/channels/webhooks/{projectId}/slack
    ```
 
 2. **Check logs for challenge**:

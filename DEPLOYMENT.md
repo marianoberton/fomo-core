@@ -1,134 +1,95 @@
-# Nexus Core - Deployment Guide
-
-## 📦 Deployment al VPS
-
-### Pre-requisitos
-
-- VPS con Ubuntu/Debian
-- Node.js 22 LTS instalado
-- PostgreSQL 14+ con extensión pgvector
-- Redis (opcional, solo si usas scheduled tasks)
-- PM2 o systemd para process management
-- Nginx como reverse proxy (recomendado)
+# Nexus Core — Deployment Guide
 
 ---
 
-## 🚀 Deployment Steps
+## Option A: Docker Compose (Recommended)
 
-### 1. En el VPS (SSH)
+The simplest and recommended deployment. One command starts everything: Nexus Core, PostgreSQL, Redis, and WAHA (WhatsApp gateway).
+
+### Requirements
+
+- A VPS with Docker + Docker Compose installed (Ubuntu 22.04 LTS recommended)
+- Minimum 2 GB RAM, 20 GB disk
+- A domain name with an A record pointing to your server (for HTTPS + webhooks)
+
+### 1. Clone the Repository
 
 ```bash
-# Navegar al directorio del proyecto
-cd /path/to/fomo-core
-
-# Pull latest changes
-git pull origin main
-
-# Instalar/actualizar dependencias
-pnpm install
-
-# Build TypeScript
-pnpm build
-
-# CRÍTICO: Ejecutar migraciones de DB
-pnpm prisma migrate deploy
-
-# Verificar que las migraciones se aplicaron correctamente
-pnpm prisma migrate status
-
-# Generar Prisma Client
-pnpm prisma generate
+git clone --recurse-submodules https://github.com/your-org/fomo-core.git
+cd fomo-core
 ```
 
-### 2. Variables de Entorno
+### 2. Configure Environment
 
-**Archivo**: `/path/to/fomo-core/.env`
+```bash
+cp .env.example .env
+nano .env
+```
+
+Minimum required configuration:
 
 ```env
-# Database
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/nexus_core?schema=public"
-
-# Redis (opcional, solo para scheduled tasks)
-REDIS_URL="redis://localhost:6379"
-
-# Server
-NODE_ENV=production
-PORT=3002
-HOST=0.0.0.0
-
-# LLM Providers
+# LLM Providers (add at least one)
 OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=sk-ant-...  # Optional
 
-# Otros
-LOG_LEVEL=info
+# Public URL — enables webhook auto-configuration for channels
+NEXUS_PUBLIC_URL=https://your-domain.com
+
+# CORS — allow dashboard to call API
+CORS_ORIGIN=https://your-dashboard-domain.com
+
+# WAHA API Key (set a strong key for production)
+WAHA_API_KEY=your-strong-api-key-here
 ```
 
-### 3. Reiniciar Server
+Everything else (database, Redis, ports) has working defaults in `docker-compose.yml`.
 
-#### Opción A: Con PM2 (recomendado)
+### 3. Start the Stack
 
 ```bash
-# Primera vez (setup)
-pm2 start dist/main.js --name nexus-core --node-args="--experimental-specifier-resolution=node"
-pm2 save
-pm2 startup
-
-# Deployments subsiguientes
-pm2 restart nexus-core
-
-# Ver logs
-pm2 logs nexus-core
-
-# Monitorear
-pm2 monit
+docker compose up -d
 ```
 
-#### Opción B: Con systemd
+Services started:
 
-**Archivo**: `/etc/systemd/system/nexus-core.service`
+| Service | Container | External Port |
+|---------|-----------|--------------|
+| PostgreSQL + pgvector | `nexus-postgres` | 5433 |
+| Redis | `nexus-redis` | 6380 |
+| Nexus Core API | `nexus-app` | 3002 |
+| WAHA (WhatsApp) | `nexus-waha` | 3003 |
 
-```ini
-[Unit]
-Description=Nexus Core API
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=nexus
-WorkingDirectory=/path/to/fomo-core
-Environment=NODE_ENV=production
-ExecStart=/usr/bin/node dist/main.js
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
+### 4. Run Database Migrations + Seed
 
 ```bash
-# Reload systemd
-sudo systemctl daemon-reload
+# Migrations (run once on first deploy, and after each update with new migrations)
+docker exec nexus-app pnpm prisma migrate deploy
 
-# Enable + start
-sudo systemctl enable nexus-core
-sudo systemctl start nexus-core
-
-# Check status
-sudo systemctl status nexus-core
-
-# Ver logs
-sudo journalctl -u nexus-core -f
+# Seed demo data (optional — only for first-time setup)
+docker exec nexus-app pnpm db:seed
 ```
 
-### 4. Nginx Reverse Proxy (opcional pero recomendado)
+### 5. Verify
 
-**Archivo**: `/etc/nginx/sites-available/nexus-core`
+```bash
+# API health check
+curl https://your-domain.com/health
+# Expected: { "status": "ok", "timestamp": "..." }
+
+# Check containers
+docker compose ps
+```
+
+### 6. HTTPS with Nginx + Let's Encrypt
+
+Set up Nginx as a reverse proxy in front of port 3002:
 
 ```nginx
+# /etc/nginx/sites-available/nexus-core
 server {
     listen 80;
-    server_name tu-dominio.com;
+    server_name your-domain.com;
 
     location / {
         proxy_pass http://localhost:3002;
@@ -141,336 +102,265 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
     }
-
-    # WebSocket support
-    location /ws {
-        proxy_pass http://localhost:3002/ws;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host $host;
-        proxy_read_timeout 86400;
-    }
 }
 ```
 
 ```bash
-# Enable site
 sudo ln -s /etc/nginx/sites-available/nexus-core /etc/nginx/sites-enabled/
-
-# Test config
 sudo nginx -t
-
-# Reload nginx
 sudo systemctl reload nginx
 
-# Setup SSL with Let's Encrypt (recomendado)
-sudo certbot --nginx -d tu-dominio.com
+# SSL
+sudo certbot --nginx -d your-domain.com
 ```
 
-### 5. Firewall
+### Subsequent Deployments
 
 ```bash
-# Allow HTTP/HTTPS
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
+# Pull latest code
+git pull origin main
 
-# Allow direct port (opcional, solo si no usas nginx)
-sudo ufw allow 3002/tcp
+# Restart with new image
+docker compose up -d --build
 
-# Enable firewall
-sudo ufw enable
+# Run any new migrations
+docker exec nexus-app pnpm prisma migrate deploy
 
-# Check status
-sudo ufw status
+# Verify
+curl https://your-domain.com/health
 ```
 
 ---
 
-## 🔗 Conectar marketpaper-demo al VPS
+## Option B: Bare-Metal VPS (Advanced)
 
-### En tu máquina local (marketpaper-demo)
+For deployments that don't use Docker.
 
-**Archivo**: `marketpaper-demo/.env.local`
+### Requirements
+
+- Ubuntu/Debian VPS
+- Node.js 22 LTS
+- PostgreSQL 14+ with pgvector extension
+- Redis 7+
+- PM2 (process manager)
+- Nginx (reverse proxy)
+
+### 1. Install Dependencies
+
+```bash
+# Node.js 22
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# pnpm
+npm install -g pnpm
+
+# PM2
+npm install -g pm2
+
+# PostgreSQL + pgvector
+sudo apt install postgresql postgresql-contrib
+# Install pgvector: https://github.com/pgvector/pgvector#installation
+
+# Redis
+sudo apt install redis-server
+```
+
+### 2. Configure Environment
 
 ```env
-# Cambiar de localhost a VPS
-NEXT_PUBLIC_NEXUS_API_URL=https://tu-dominio.com
+DATABASE_URL=postgresql://nexus:password@localhost:5432/nexus_core?schema=public
+REDIS_URL=redis://localhost:6379
+PORT=3002
+HOST=0.0.0.0
+NODE_ENV=production
+LOG_LEVEL=info
 
-# O si usas IP + puerto directo:
-# NEXT_PUBLIC_NEXUS_API_URL=http://IP_DEL_VPS:3002
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+NEXUS_PUBLIC_URL=https://your-domain.com
+
+# WAHA runs as a separate Docker container (recommended even in bare-metal)
+WAHA_DEFAULT_URL=http://localhost:3003
+WAHA_API_KEY=your-api-key
 ```
 
-**Reiniciar dev server**:
+### 3. Build and Deploy
 
 ```bash
-cd marketpaper-demo
-npm run dev
-```
-
-**Verificar conexión**:
-- Abrir `http://localhost:3000/admin/nexus`
-- Debería cargar proyectos desde el VPS
-
----
-
-## ✅ Verificación Post-Deployment
-
-### 1. Health Check
-
-```bash
-# Desde cualquier máquina
-curl https://tu-dominio.com/health
-
-# Respuesta esperada:
-# {"status":"ok","timestamp":"2026-02-16T..."}
-```
-
-### 2. Verificar DB Migration
-
-```bash
-# En el VPS
-psql -U nexus -d nexus_core
-
-# En psql:
-\d channel_integrations
-
-# Debería mostrar la estructura de la tabla
-```
-
-### 3. Test API
-
-```bash
-# List projects
-curl https://tu-dominio.com/api/v1/projects
-
-# Debería retornar JSON con proyectos
-```
-
-### 4. Test desde marketpaper-demo
-
-```bash
-# En tu máquina local
-cd marketpaper-demo
-npm run dev
-
-# Abrir browser:
-# http://localhost:3000/admin/nexus
-# Verificar que carga datos del VPS
-```
-
----
-
-## 🚨 Troubleshooting
-
-### Migración falla
-
-**Error**: "Drift detected"
-
-```bash
-# Ver estado detallado
-pnpm prisma migrate status
-
-# Si la tabla ya existe (creada con db push), marcar como aplicada:
-pnpm prisma migrate resolve --applied 20260216020000_add_channel_integrations
-
-# Reintentar:
-pnpm prisma migrate deploy
-```
-
-**Error**: "Table already exists"
-
-La migración es idempotente (usa `IF NOT EXISTS`), pero si falla:
-
-```bash
-# Ver qué falló
-pnpm prisma migrate status
-
-# Si necesitas forzar:
-psql -U nexus -d nexus_core -f prisma/migrations/20260216020000_add_channel_integrations/migration.sql
-```
-
-### Server no inicia
-
-```bash
-# Verificar logs
-pm2 logs nexus-core --lines 100
-# o
-sudo journalctl -u nexus-core -f
-
-# Causas comunes:
-# 1. Puerto 3002 ocupado
-sudo lsof -i :3002
-sudo kill -9 <PID>
-
-# 2. PostgreSQL no corriendo
-sudo systemctl status postgresql
-sudo systemctl start postgresql
-
-# 3. Redis no corriendo (si usas scheduled tasks)
-sudo systemctl status redis
-sudo systemctl start redis
-
-# 4. Variables de entorno incorrectas
-cat .env | grep DATABASE_URL
-```
-
-### marketpaper-demo no conecta
-
-**Error**: CORS o Network Error
-
-1. Verificar CORS en fomo-core `src/main.ts`:
-   ```typescript
-   await server.register(cors, {
-     origin: [
-       'http://localhost:3000',
-       'https://tu-dominio-marketpaper.com'
-     ],
-     credentials: true
-   });
-   ```
-
-2. Verificar firewall:
-   ```bash
-   sudo ufw status
-   # Asegurar que puerto 3002 o 80/443 estén abiertos
-   ```
-
-3. Test directo:
-   ```bash
-   # Desde tu máquina local
-   curl https://tu-dominio.com/api/v1/projects
-   ```
-
-### WebSocket no conecta
-
-**Error**: WebSocket connection failed
-
-1. Verificar Nginx config (si usas nginx):
-   - Debe tener `proxy_http_version 1.1`
-   - Debe tener `Upgrade` y `Connection` headers
-
-2. Test WebSocket:
-   ```bash
-   # Instalar wscat
-   npm install -g wscat
-
-   # Test conexión
-   wscat -c wss://tu-dominio.com/ws
-   ```
-
----
-
-## 🔄 Workflow de Deployment Futuro
-
-Para deployments subsiguientes:
-
-```bash
-# 1. En tu máquina local (push changes)
-git add .
-git commit -m "feat: nueva feature"
-git push origin main
-
-# 2. En el VPS (pull + deploy)
 cd /path/to/fomo-core
-git pull origin main
 pnpm install
 pnpm build
-pnpm prisma migrate deploy  # Solo si hay nuevas migraciones
+pnpm prisma migrate deploy
+pnpm prisma generate
+```
+
+### 4. Start with PM2
+
+```bash
+# First time
+pm2 start dist/main.js --name nexus-core
+pm2 save
+pm2 startup  # Follow the output instructions
+
+# Subsequent deployments
 pm2 restart nexus-core
 
-# 3. Verificar
-curl https://tu-dominio.com/health
+# Logs
 pm2 logs nexus-core
+pm2 monit
+```
+
+### 5. Run WAHA
+
+Even in bare-metal deployments, run WAHA as a Docker container:
+
+```bash
+docker run -d \
+  --name nexus-waha \
+  --restart unless-stopped \
+  -p 3003:3000 \
+  -e WHATSAPP_DEFAULT_ENGINE=NOWEB \
+  -e WAHA_API_KEY=your-api-key \
+  -v wahadata:/app/.sessions \
+  devlikeapro/waha
 ```
 
 ---
 
-## 📊 Monitoring
+## Dashboard
 
-### Logs
+The dashboard (`dashboard/`) is a Next.js app deployed separately.
 
 ```bash
-# PM2
-pm2 logs nexus-core --lines 100
-pm2 logs nexus-core --err  # Solo errores
-
-# systemd
-sudo journalctl -u nexus-core -f
-sudo journalctl -u nexus-core --since "1 hour ago"
+cd dashboard
+npm install
+npm run build
+npm start  # Runs on port 3000
 ```
 
-### Métricas
+Or deploy to Vercel / any Node.js hosting. Set:
+
+```env
+# dashboard/.env.local or hosting env vars
+NEXT_PUBLIC_API_URL=https://your-domain.com
+```
+
+---
+
+## Environment Variables Reference
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `REDIS_URL` | ✅ | Redis connection string (for BullMQ scheduled tasks) |
+| `PORT` | No | API port (default: 3002) |
+| `HOST` | No | Bind address (default: `0.0.0.0`, use `::` on Windows) |
+| `NODE_ENV` | No | `production` or `development` |
+| `LOG_LEVEL` | No | `info`, `debug`, `warn`, `error` |
+| `OPENAI_API_KEY` | ✅ (one LLM needed) | OpenAI API key |
+| `ANTHROPIC_API_KEY` | No | Anthropic Claude API key |
+| `GOOGLE_AI_API_KEY` | No | Google Gemini API key |
+| `NEXUS_PUBLIC_URL` | No | Public URL for webhook auto-configuration |
+| `CORS_ORIGIN` | No | Allowed CORS origin for dashboard |
+| `WAHA_DEFAULT_URL` | No | WAHA base URL (default: `http://waha:3000` in Docker) |
+| `WAHA_API_KEY` | No | WAHA authentication key (default: `nexus`) |
+| `FILE_STORAGE_PATH` | No | Directory for uploaded files |
+
+---
+
+## Security Checklist
+
+- [ ] `WAHA_API_KEY` set to a strong random value (not the default `nexus`)
+- [ ] All API keys in `.env` with permissions `chmod 600 .env`
+- [ ] HTTPS enabled (Let's Encrypt)
+- [ ] Firewall: only ports 80, 443, and SSH open externally
+- [ ] PostgreSQL: dedicated user (not `postgres`), password set
+- [ ] Redis: bound to localhost only (not exposed externally)
+- [ ] `NEXUS_PUBLIC_URL` set for webhook auto-configuration
+- [ ] Regular DB backups configured
+
+---
+
+## Monitoring
+
+### Docker Compose
 
 ```bash
-# PM2 monit
-pm2 monit
+# Check container status
+docker compose ps
 
-# Status
-pm2 status
+# Follow all logs
+docker compose logs -f
+
+# Follow specific service
+docker logs nexus-app -f
+docker logs nexus-waha -f
 
 # Resource usage
-pm2 show nexus-core
+docker stats
 ```
 
 ### Database
 
 ```bash
-# Conexiones activas
-psql -U nexus -d nexus_core -c "SELECT count(*) FROM pg_stat_activity WHERE datname='nexus_core';"
+# Active connections
+docker exec nexus-postgres psql -U nexus -d nexus_core \
+  -c "SELECT count(*) FROM pg_stat_activity WHERE datname='nexus_core';"
 
-# Tamaño de DB
-psql -U nexus -d nexus_core -c "SELECT pg_size_pretty(pg_database_size('nexus_core'));"
-
-# Tablas más grandes
-psql -U nexus -d nexus_core -c "SELECT schemaname,tablename,pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size FROM pg_tables WHERE schemaname='public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC LIMIT 10;"
+# DB size
+docker exec nexus-postgres psql -U nexus -d nexus_core \
+  -c "SELECT pg_size_pretty(pg_database_size('nexus_core'));"
 ```
 
 ---
 
-## 🔐 Security Checklist
+## Troubleshooting
 
-- [ ] Firewall configurado (solo puertos necesarios abiertos)
-- [ ] SSL/TLS con certificado válido (Let's Encrypt)
-- [ ] Variables de entorno NO committed a git
-- [ ] PostgreSQL con usuario dedicado (no `postgres`)
-- [ ] API keys guardadas en `.env` con permisos `600`
-- [ ] Nginx configurado con rate limiting
-- [ ] Logs rotados (logrotate)
-- [ ] Backups automáticos de DB configurados
+### Container Won't Start
+
+```bash
+docker compose logs nexus-app
+```
+
+Common causes:
+- `DATABASE_URL` incorrect or PostgreSQL not ready → wait for health checks
+- Port 3002 already in use → `sudo lsof -i :3002` and kill the process
+
+### Migration Fails
+
+```bash
+docker exec nexus-app pnpm prisma migrate status
+```
+
+If "drift detected" (table exists but migration not recorded):
+```bash
+docker exec nexus-app pnpm prisma migrate resolve --applied <migration_name>
+docker exec nexus-app pnpm prisma migrate deploy
+```
+
+### WAHA Not Accessible
+
+```bash
+# From host
+curl http://localhost:3003/api/server/status -H "X-Api-Key: nexus"
+
+# From nexus-app container
+docker exec nexus-app curl http://waha:3000/api/server/status -H "X-Api-Key: nexus"
+```
+
+### WebSocket Not Working Through Nginx
+
+Verify the Nginx config has both headers:
+```nginx
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "Upgrade";
+```
 
 ---
 
-## 📝 Migración Importante: channel_integrations
-
-**Commit**: `b291e73` - feat: stabilization + channel_integrations migration (VPS-ready)
-
-**Migración**: `20260216020000_add_channel_integrations`
-
-Esta migración:
-- ✅ Es idempotente (usa `IF NOT EXISTS`)
-- ✅ Safe para bases de datos existentes
-- ✅ Agrega tabla `channel_integrations` para Chatwoot/WhatsApp/Telegram/Slack
-- ✅ Incluye índices para performance
-- ✅ Foreign key a `projects`
-
-**Se ejecuta automáticamente con**: `pnpm prisma migrate deploy`
-
----
-
-## 🆘 Support
-
-Si encuentras problemas durante deployment:
-
-1. Verificar logs: `pm2 logs nexus-core --err`
-2. Verificar DB: `pnpm prisma migrate status`
-3. Verificar health: `curl https://tu-dominio.com/health`
-4. Revisar este documento: `DEPLOYMENT.md`
-5. Revisar docs: `docs/` (MCP_GUIDE.md, SLACK_SETUP.md, etc.)
-
----
-
-**Última actualización**: 2026-02-16
-**Versión Nexus Core**: 1.0.0 (stabilization release)
-**Node.js requerido**: 22 LTS
-**PostgreSQL requerido**: 14+ (con pgvector)
+**Last updated**: 2026-02-24
+**Node.js required**: 22 LTS
+**PostgreSQL required**: 14+ with pgvector
