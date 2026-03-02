@@ -8,8 +8,9 @@
  *   - Anthropic: https://www.anthropic.com/pricing
  *   - OpenAI: https://openai.com/api/pricing/
  *   - Google: https://ai.google.dev/pricing
+ *   - OpenRouter: https://openrouter.ai/models (use provider/model format)
  *
- * LAST UPDATED: 2026-02-10
+ * LAST UPDATED: 2026-03-02
  */
 
 export interface ModelMeta {
@@ -269,6 +270,123 @@ const MODEL_REGISTRY: Record<string, ModelMeta> = {
     maxOutputTokens: 8_192,
     supportsTools: true,
     inputPricePer1M: 0.1,
+    outputPricePer1M: 0.4,
+  },
+
+  // ─── OpenRouter ─────────────────────────────────────────────
+  // OpenRouter model IDs use format: provider/model-name
+  // Prices shown are OpenRouter's listed rates (may include small markup over direct API).
+  // Actual cost per call is returned by OpenRouter in usage.total_cost.
+
+  // Anthropic via OpenRouter
+  'anthropic/claude-sonnet-4-5': {
+    contextWindow: 1_000_000,
+    maxOutputTokens: 16_384,
+    supportsTools: true,
+    inputPricePer1M: 3,
+    outputPricePer1M: 15,
+  },
+  'anthropic/claude-haiku-4-5': {
+    contextWindow: 200_000,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 1,
+    outputPricePer1M: 5,
+  },
+  'anthropic/claude-3-5-sonnet': {
+    contextWindow: 200_000,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 3,
+    outputPricePer1M: 15,
+  },
+
+  // OpenAI via OpenRouter
+  'openai/gpt-4o': {
+    contextWindow: 128_000,
+    maxOutputTokens: 16_384,
+    supportsTools: true,
+    inputPricePer1M: 2.5,
+    outputPricePer1M: 10,
+  },
+  'openai/gpt-4o-mini': {
+    contextWindow: 128_000,
+    maxOutputTokens: 16_384,
+    supportsTools: true,
+    inputPricePer1M: 0.15,
+    outputPricePer1M: 0.6,
+  },
+
+  // Meta Llama (open-source, very cheap)
+  'meta-llama/llama-3.3-70b-instruct': {
+    contextWindow: 128_000,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.09,
+    outputPricePer1M: 0.28,
+  },
+  'meta-llama/llama-3.1-8b-instruct': {
+    contextWindow: 131_072,
+    maxOutputTokens: 4_096,
+    supportsTools: true,
+    inputPricePer1M: 0.04,
+    outputPricePer1M: 0.04,
+  },
+
+  // DeepSeek (very cheap, strong reasoning)
+  'deepseek/deepseek-chat': {
+    contextWindow: 64_000,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.14,
+    outputPricePer1M: 0.28,
+  },
+  'deepseek/deepseek-r1': {
+    contextWindow: 64_000,
+    maxOutputTokens: 8_192,
+    supportsTools: false,
+    inputPricePer1M: 0.55,
+    outputPricePer1M: 2.19,
+  },
+
+  // Mistral
+  'mistralai/mistral-large-2411': {
+    contextWindow: 128_000,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 2,
+    outputPricePer1M: 6,
+  },
+  'mistralai/mistral-small-3.1-24b-instruct': {
+    contextWindow: 128_000,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.1,
+    outputPricePer1M: 0.3,
+  },
+
+  // Google via OpenRouter
+  'google/gemini-2.0-flash-lite': {
+    contextWindow: 1_048_576,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.075,
+    outputPricePer1M: 0.3,
+  },
+  'google/gemini-2.5-pro-preview': {
+    contextWindow: 2_097_152,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 1.25,
+    outputPricePer1M: 10,
+  },
+
+  // Qwen (Alibaba, cost-efficient)
+  'qwen/qwen-2.5-72b-instruct': {
+    contextWindow: 131_072,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.35,
     outputPricePer1M: 0.4,
   },
 };

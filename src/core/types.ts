@@ -19,7 +19,7 @@ export type ScheduledTaskRunId = Brand<string, 'ScheduledTaskRunId'>;
 
 export interface LLMProviderConfig {
   /** Provider identifier. */
-  provider: 'anthropic' | 'openai' | 'google' | 'ollama';
+  provider: 'anthropic' | 'openai' | 'google' | 'ollama' | 'openrouter';
   /** Model identifier (e.g. 'claude-sonnet-4-5-20250929', 'gpt-4o'). */
   model: string;
   temperature?: number;

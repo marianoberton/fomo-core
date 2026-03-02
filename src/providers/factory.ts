@@ -9,6 +9,7 @@ import { createLogger } from '@/observability/logger.js';
 import { createAnthropicProvider } from './anthropic.js';
 import { createGoogleProvider } from './google.js';
 import { createOpenAIProvider } from './openai.js';
+import { createOpenRouterProvider } from './openrouter.js';
 import type { LLMProvider } from './types.js';
 
 const logger = createLogger({ name: 'provider-factory' });
@@ -21,6 +22,7 @@ const PROVIDER_DEFAULT_ENV_VARS: Record<string, string> = {
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
   google: 'GOOGLE_AI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
 };
 
 /**
@@ -90,6 +92,14 @@ export function createProvider(config: LLMProviderConfig): LLMProvider {
         model: config.model,
         baseUrl: config.baseUrl ?? 'http://localhost:11434/v1',
         providerLabel: 'ollama',
+      });
+    }
+
+    case 'openrouter': {
+      const apiKey = resolveApiKey(config.apiKeyEnvVar, 'openrouter');
+      return createOpenRouterProvider({
+        apiKey,
+        model: config.model,
       });
     }
 

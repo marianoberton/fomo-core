@@ -21,6 +21,8 @@ export { createOpenAIProvider } from './openai.js';
 export type { OpenAIProviderOptions } from './openai.js';
 export { createGoogleProvider } from './google.js';
 export type { GoogleProviderOptions } from './google.js';
+export { createOpenRouterProvider } from './openrouter.js';
+export type { OpenRouterProviderOptions } from './openrouter.js';
 export { getModelMeta, calculateCost } from './models.js';
 export type { ModelMeta } from './models.js';
 export { createEmbeddingProvider, resolveEmbeddingProvider } from './embeddings.js';
