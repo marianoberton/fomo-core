@@ -97,7 +97,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
     async run(params) {
       const {
         message,
-        agentConfig,
+        agentConfig: agentConfigParam,
         sessionId,
         systemPrompt: preBuiltSystemPrompt,
         promptSnapshot,
@@ -106,6 +106,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
         onEvent,
       } = params;
 
+      let agentConfig = agentConfigParam;
       const traceId = randomUUID() as TraceId;
       const startTime = Date.now();
 
@@ -175,7 +176,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
               activeProvider = {
                 ...provider,
                 chat(chatParams) {
-                  return provider.chat({ ...chatParams, model: routedModel });
+                  return provider.chat({ ...chatParams, model: routedModel } as any);
                 },
               };
               // Reflect routed model in agentConfig so cost tracking is accurate

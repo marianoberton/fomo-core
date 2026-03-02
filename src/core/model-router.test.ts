@@ -24,7 +24,7 @@ function mockProvider(response: string): LLMProvider {
   return {
     id: 'mock',
     supportsToolUse: () => false,
-    formatTools: (t) => t,
+    formatTools: (t: unknown[]) => t,
     chat: vi.fn(() => {
       async function* gen() {
         yield { type: 'text_delta' as const, text: response };

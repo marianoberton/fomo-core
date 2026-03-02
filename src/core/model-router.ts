@@ -102,17 +102,16 @@ export function createModelRouter(config: ModelRouterConfig, provider: LLMProvid
         // Use a minimal chat call for classification
         let rawResponse = '';
         const stream = provider.chat({
-          model: config.classifierModel,
           systemPrompt: CLASSIFIER_SYSTEM,
           messages: [{ role: 'user', content: userPrompt }],
           tools: [],
           maxTokens: 10,
           temperature: 0,
-        });
+        } as any);
 
         for await (const event of stream) {
-          if (event.type === 'text_delta') {
-            rawResponse += event.text;
+          if ((event as { type: string; text?: string }).type === 'text_delta') {
+            rawResponse += (event as { type: string; text?: string }).text ?? '';
           }
         }
 

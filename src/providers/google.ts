@@ -95,7 +95,7 @@ function toGoogleTools(tools: ToolDefinitionForProvider[]): Tool[] {
   const functionDeclarations: FunctionDeclaration[] = tools.map((t) => ({
     name: t.name,
     description: t.description,
-    parameters: t.inputSchema as Record<string, unknown>,
+    parameters: t.inputSchema as any,
   }));
   return [{ functionDeclarations }];
 }
