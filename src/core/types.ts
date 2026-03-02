@@ -119,6 +119,9 @@ export interface AgentConfig {
 
   maxTurnsPerSession: number;
   maxConcurrentSessions: number;
+
+  /** Optional model router config for cost-optimized model selection. */
+  modelRouterConfig?: import('./model-router.js').ModelRouterConfig;
 }
 
 // ─── Execution Context ──────────────────────────────────────────

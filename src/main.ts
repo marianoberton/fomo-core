@@ -54,6 +54,9 @@ import {
   createGetOperationsSummaryTool,
   createGetAgentPerformanceTool,
   createReviewAgentActivityTool,
+  createExportConversationsTool,
+  createAlertRuleTool,
+  createControlAgentTool,
   createScrapeWebpageTool,
   createTriggerCampaignTool,
 } from '@/tools/definitions/index.js';
@@ -531,6 +534,9 @@ async function start(): Promise<void> {
     toolRegistry.register(createGetOperationsSummaryTool({ prisma }));
     toolRegistry.register(createGetAgentPerformanceTool({ prisma, agentRegistry }));
     toolRegistry.register(createReviewAgentActivityTool({ prisma, agentRegistry }));
+    toolRegistry.register(createExportConversationsTool({ prisma }));
+    toolRegistry.register(createAlertRuleTool({ prisma }));
+    toolRegistry.register(createControlAgentTool({ prisma, agentRegistry }));
 
     // Handoff manager (Chatwoot human escalation)
     const handoffManager = createHandoffManager({

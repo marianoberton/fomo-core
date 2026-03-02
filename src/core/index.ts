@@ -41,6 +41,14 @@ export {
 export { createAgentRunner } from './agent-runner.js';
 export type { AgentRunner, AgentRunnerOptions } from './agent-runner.js';
 
+export { createModelRouter, buildModelRouterConfig, DEFAULT_MODEL_MAP } from './model-router.js';
+export type {
+  MessageComplexity,
+  ModelRouter,
+  ModelRouterConfig,
+  RoutingDecision,
+} from './model-router.js';
+
 export type {
   AgentStreamEvent,
   AgentStartEvent,

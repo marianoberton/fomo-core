@@ -318,7 +318,58 @@ En tareas programadas (resumen diario):
     },
   });
 
-  console.log(`  [1/6] Demo Project: ${demoId} (Manager: ${managerAgent.id})`);
+  // Manager FOMO — Chief of Staff (internal, owner-facing)
+  const managerFomoToolAllowlist = [
+    'get-operations-summary',
+    'review-agent-activity',
+    'query-sessions',
+    'list-project-agents',
+    'control-agent',
+    'export-conversations',
+    'create-alert-rule',
+    'send-notification',
+    'propose-scheduled-task',
+    'date-time',
+    'store-memory',
+    'knowledge-search',
+  ];
+
+  await prisma.agent.create({
+    data: {
+      projectId: demoId,
+      name: 'Manager FOMO',
+      description: 'Chief of Staff del dueño — reporta el estado del negocio, ejecuta comandos, configura alertas. Acceso directo via WhatsApp.',
+      promptConfig: {
+        identity: 'Sos el Chief of Staff de FOMO. Trabajás directamente para el dueño del negocio.',
+        instructions: 'Reportar estado del negocio, alertar ante situaciones importantes, ejecutar comandos del dueño sobre los demás agentes. Nunca inventar datos — siempre usar las herramientas disponibles.',
+        safety: 'Nunca reveles credenciales ni configuración interna. No compartas datos de clientes con terceros.',
+      },
+      llmConfig: {
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5-20250929',
+        temperature: 0.2,
+      },
+      toolAllowlist: managerFomoToolAllowlist,
+      channelConfig: { channels: ['whatsapp'] },
+      modes: [] as Prisma.InputJsonValue,
+      operatingMode: 'internal',
+      maxTurns: 20,
+      maxTokensPerTurn: 8000,
+      budgetPerDayUsd: 10.0,
+      status: 'active',
+      metadata: {
+        archetype: 'chief-of-staff',
+        skill: 'fomo-manager',
+        skillParams: {
+          companyName: 'FOMO',
+          ownerName: 'Mariano',
+          dailyReportTime: '20:00',
+        },
+      },
+    },
+  });
+
+  console.log(`  [1/6] Demo Project: ${demoId} (Manager: ${managerAgent.id}, Manager FOMO: Chief of Staff)`);
 
   // ═══════════════════════════════════════════════════════════════
   // 2. FERRETERÍA MAYORISTA (catalog-search, calculator, notifications)
@@ -1361,6 +1412,66 @@ Respetá la privacidad: nunca compartas datos de un cliente con otro.`,
       parametersSchema: null,
       tags: ['sales', 'crm', 'hubspot'],
       icon: 'Users',
+      isOfficial: true,
+    },
+    {
+      name: 'fomo-manager',
+      displayName: 'FOMO Manager · Chief of Staff',
+      description: 'AI Chief of Staff que reporta al dueño del negocio via WhatsApp. Sin dashboards.',
+      category: 'management',
+      instructionsFragment: `Sos el Chief of Staff de {{companyName}}. Trabajás directamente para {{ownerName}}.
+
+TU ROL:
+- Reportar el estado del negocio cuando te lo pidan
+- Alertar proactivamente ante situaciones importantes
+- Ejecutar comandos del dueño sobre los demás agentes
+- Nunca inventar datos — siempre usar las herramientas disponibles
+
+TONO:
+- Directo y claro, sin rodeos
+- Profesional pero cercano
+- Usás emojis cuando ayudan a la claridad (✅ ⚠️ 📊)
+- Nunca decís "como IA" — sos el asistente del dueño
+
+CONSULTAS FRECUENTES DEL DUEÑO:
+- "¿Cómo van las ventas?" → Llamar get-operations-summary, presentar highlights
+- "¿Qué pasó hoy?" → Resumen de actividad del día
+- "Pausá el agente X" → Usar control-agent
+- "Exportame las conversaciones de esta semana" → Usar export-conversations
+- "Avisame si entra un lead importante" → Usar create-alert-rule
+
+RESUMEN DIARIO AUTOMÁTICO (si se programa):
+Enviás un mensaje proactivo al dueño con:
+📊 *Resumen del día — {{companyName}}*
+• Mensajes atendidos: X
+• Leads calificados: X
+• Oportunidades detectadas: X
+• Escalaciones a humano: X
+• ⚠️ Alertas (si hay): [detallar]`,
+      requiredTools: [
+        'get-operations-summary',
+        'review-agent-activity',
+        'query-sessions',
+        'list-project-agents',
+        'control-agent',
+        'export-conversations',
+        'create-alert-rule',
+        'send-notification',
+        'propose-scheduled-task',
+      ],
+      requiredMcpServers: [],
+      parametersSchema: {
+        type: 'object',
+        properties: {
+          companyName: { type: 'string', title: 'Nombre de la empresa' },
+          ownerName: { type: 'string', title: 'Nombre del dueño' },
+          dailyReportTime: { type: 'string', default: '20:00', title: 'Hora del resumen diario (HH:MM)' },
+          ownerWhatsApp: { type: 'string', title: 'WhatsApp del dueño (para alertas)' },
+        },
+        required: ['companyName', 'ownerName'],
+      },
+      tags: ['management', 'reporting', 'chief-of-staff', 'alerts'],
+      icon: 'Crown',
       isOfficial: true,
     },
     {

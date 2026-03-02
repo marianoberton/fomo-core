@@ -7,6 +7,7 @@ import type { LLMProviderConfig } from '@/core/types.js';
 import { ProviderError } from '@/core/errors.js';
 import { createLogger } from '@/observability/logger.js';
 import { createAnthropicProvider } from './anthropic.js';
+import { createGoogleProvider } from './google.js';
 import { createOpenAIProvider } from './openai.js';
 import type { LLMProvider } from './types.js';
 
@@ -19,7 +20,7 @@ const logger = createLogger({ name: 'provider-factory' });
 const PROVIDER_DEFAULT_ENV_VARS: Record<string, string> = {
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
-  google: 'GOOGLE_API_KEY',
+  google: 'GOOGLE_AI_API_KEY',
 };
 
 /**
@@ -76,11 +77,9 @@ export function createProvider(config: LLMProviderConfig): LLMProvider {
 
     case 'google': {
       const apiKey = resolveApiKey(config.apiKeyEnvVar, 'google');
-      return createOpenAIProvider({
+      return createGoogleProvider({
         apiKey,
         model: config.model,
-        baseUrl: config.baseUrl ?? 'https://generativelanguage.googleapis.com/v1beta/openai',
-        providerLabel: 'google',
       });
     }
 

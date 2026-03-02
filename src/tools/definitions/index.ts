@@ -29,6 +29,12 @@ export type { ReadFileToolOptions } from './read-file.js';
 export { createScrapeWebpageTool } from './scrape-webpage.js';
 
 // Manager / orchestration tools
+export { createExportConversationsTool } from './export-conversations.js';
+export type { ExportConversationsToolOptions } from './export-conversations.js';
+export { createAlertRuleTool } from './create-alert-rule.js';
+export type { CreateAlertRuleToolOptions } from './create-alert-rule.js';
+export { createControlAgentTool } from './control-agent.js';
+export type { ControlAgentToolOptions } from './control-agent.js';
 export { createDelegateToAgentTool } from './delegate-to-agent.js';
 export type { DelegateToAgentToolOptions, RunSubAgentFn } from './delegate-to-agent.js';
 export { createListProjectAgentsTool } from './list-project-agents.js';

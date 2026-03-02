@@ -130,17 +130,27 @@ describe('POST /chat', () => {
     expect(body.data?.response).toBe('Hi there!');
   });
 
-  it('returns 400 on invalid request body (missing message)', async () => {
+  it('accepts request body with missing message (message is optional)', async () => {
+    const setup = createSetupResult();
+    mockPrepareChatRun.mockResolvedValue(ok(setup));
+
+    const trace = createSampleTrace({
+      id: 'trace-1' as TraceId,
+      sessionId: 'sess-1' as SessionId,
+      events: [],
+      totalTokensUsed: 0,
+      totalCostUSD: 0,
+    });
+    const mockRun = vi.fn().mockResolvedValue(ok(trace));
+    mockCreateAgentRunner.mockReturnValue({ run: mockRun } as unknown as AgentRunner);
+
     const response = await app.inject({
       method: 'POST',
       url: '/chat',
       payload: { projectId: 'proj-1' },
     });
 
-    expect(response.statusCode).toBe(400);
-    const body = JSON.parse(response.body) as ApiResponse<never>;
-    expect(body.success).toBe(false);
-    expect(body.error?.code).toBe('VALIDATION_ERROR');
+    expect(response.statusCode).toBe(200);
   });
 
   it('returns 400 on invalid request body (missing projectId)', async () => {

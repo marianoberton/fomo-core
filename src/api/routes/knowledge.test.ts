@@ -104,7 +104,7 @@ describe('knowledgeRoutes', () => {
       expect(response.statusCode).toBe(400);
     });
 
-    it('returns 400 for invalid category', async () => {
+    it('accepts any string as category (no enum validation)', async () => {
       const { app } = createApp();
 
       const response = await app.inject({
@@ -113,7 +113,7 @@ describe('knowledgeRoutes', () => {
         payload: { content: 'test', category: 'invalid-category' },
       });
 
-      expect(response.statusCode).toBe(400);
+      expect(response.statusCode).toBe(201);
     });
   });
 

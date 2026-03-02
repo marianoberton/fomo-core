@@ -259,7 +259,7 @@ describe('WhatsAppWahaAdapter', () => {
       expect(healthy).toBe(true);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost:3003/api/sessions/default',
-        { method: 'GET' },
+        { method: 'GET', headers: { 'Content-Type': 'application/json' } },
       );
     });
 

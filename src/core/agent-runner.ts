@@ -31,6 +31,7 @@ import type {
   TraceId,
 } from './types.js';
 import type { AgentStreamEvent } from './stream-events.js';
+import type { ModelRouter } from './model-router.js';
 import { randomUUID } from 'node:crypto';
 
 const logger = createLogger({ name: 'agent-runner' });
@@ -50,6 +51,8 @@ export interface AgentRunnerOptions {
   costGuard: CostGuard;
   /** Logger instance (optional, creates new if not provided). */
   logger?: Logger;
+  /** Optional model router for cost-optimized model selection. */
+  modelRouter?: ModelRouter;
 }
 
 // ─── Agent Runner ───────────────────────────────────────────────────
@@ -85,6 +88,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
     memoryManager,
     costGuard,
     logger: injectedLogger,
+    modelRouter,
   } = options;
 
   const runLogger = injectedLogger ?? logger;
@@ -93,7 +97,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
     async run(params) {
       const {
         message,
-        agentConfig,
+        agentConfig: agentConfigParam,
         sessionId,
         systemPrompt: preBuiltSystemPrompt,
         promptSnapshot,
@@ -102,6 +106,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
         onEvent,
       } = params;
 
+      let agentConfig = agentConfigParam;
       const traceId = randomUUID() as TraceId;
       const startTime = Date.now();
 
@@ -146,6 +151,49 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
         if (message) {
           conversation.push({ role: 'user', content: message });
         }
+
+        // ── Model Routing ───────────────────────────────────────────
+        // If a modelRouter is configured, classify the incoming message and
+        // potentially override the model used for this run.
+        let activeProvider = provider;
+        if (modelRouter && message) {
+          try {
+            const routingDecision = await modelRouter.classify(message);
+            const routedModel = routingDecision.recommendedModel;
+
+            runLogger.info('Model router decision', {
+              component: 'agent-runner',
+              traceId,
+              complexity: routingDecision.complexity,
+              routedModel,
+              confidence: routingDecision.confidence,
+              reason: routingDecision.reason,
+            });
+
+            // Build a thin provider wrapper that overrides the model field
+            // without mutating the shared provider instance.
+            if (routedModel !== agentConfig.provider.model) {
+              activeProvider = {
+                ...provider,
+                chat(chatParams) {
+                  return provider.chat({ ...chatParams, model: routedModel });
+                },
+              };
+              // Reflect routed model in agentConfig so cost tracking is accurate
+              agentConfig = {
+                ...agentConfig,
+                provider: { ...agentConfig.provider, model: routedModel },
+              };
+            }
+          } catch (routerErr) {
+            runLogger.warn('Model router failed, using default provider', {
+              component: 'agent-runner',
+              traceId,
+              error: String(routerErr),
+            });
+          }
+        }
+        // ── End Model Routing ───────────────────────────────────────
 
         // Check abort signal before starting
         if (context.abortSignal.aborted) {
@@ -268,7 +316,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
 
           // Call LLM with streaming
           const chatResult = await executeLLMCall({
-            provider,
+            provider: activeProvider,
             fallbackProvider,
             systemPrompt,
             messages: fittedMessages,
