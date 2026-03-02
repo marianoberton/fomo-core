@@ -261,7 +261,7 @@ describe('send-email tool', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error.message).toContain('403');
+        expect(result.error.message).toContain('plan gratuito');
       }
     });
 

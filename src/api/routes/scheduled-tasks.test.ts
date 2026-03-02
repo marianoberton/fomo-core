@@ -170,14 +170,21 @@ describe('POST /scheduled-tasks/:id/approve', () => {
     );
   });
 
-  it('returns 400 when approvedBy missing', async () => {
+  it('uses default approvedBy of "admin" when missing', async () => {
+    const task = createSampleScheduledTask({ status: 'active' });
+    deps.taskManager.approveTask.mockResolvedValue({
+      ok: true,
+      value: task,
+    });
+
     const response = await app.inject({
       method: 'POST',
       url: '/scheduled-tasks/task-1/approve',
       payload: {},
     });
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(200);
+    expect(deps.taskManager.approveTask).toHaveBeenCalledWith('task-1', 'admin');
   });
 });
 
