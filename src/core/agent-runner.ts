@@ -176,7 +176,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
               activeProvider = {
                 ...provider,
                 chat(chatParams) {
-                  return provider.chat({ ...chatParams, model: routedModel } as any);
+                  return provider.chat({ ...chatParams, model: routedModel });
                 },
               };
               // Reflect routed model in agentConfig so cost tracking is accurate

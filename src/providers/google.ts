@@ -95,7 +95,7 @@ function toGoogleTools(tools: ToolDefinitionForProvider[]): Tool[] {
   const functionDeclarations: FunctionDeclaration[] = tools.map((t) => ({
     name: t.name,
     description: t.description,
-    parameters: t.inputSchema as any,
+    parameters: t.inputSchema as unknown as FunctionDeclaration['parameters'],
   }));
   return [{ functionDeclarations }];
 }
@@ -143,7 +143,7 @@ export function createGoogleProvider(options: GoogleProviderOptions): LLMProvide
         };
 
         const modelInstance = genAI.getGenerativeModel({
-          model: options.model,
+          model: params.model ?? options.model,
           systemInstruction: systemPrompt ? { role: 'system', parts: [{ text: systemPrompt }] } : undefined,
           generationConfig,
           safetySettings,

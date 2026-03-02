@@ -41,6 +41,8 @@ export interface ChatParams {
   temperature: number;
   stopSequences?: string[];
   traceId?: TraceId;
+  /** Optional model override — used by ModelRouter to route to a different model per call. */
+  model?: string;
 }
 
 // ─── Streaming Events ───────────────────────────────────────────

@@ -103,11 +103,11 @@ export function createModelRouter(config: ModelRouterConfig, provider: LLMProvid
         let rawResponse = '';
         const stream = provider.chat({
           systemPrompt: CLASSIFIER_SYSTEM,
-          messages: [{ role: 'user', content: userPrompt }],
-          tools: [],
+          messages: [{ role: 'user' as const, content: userPrompt }],
           maxTokens: 10,
           temperature: 0,
-        } as any);
+          model: config.classifierModel,
+        });
 
         for await (const event of stream) {
           if ((event as { type: string; text?: string }).type === 'text_delta') {

@@ -115,7 +115,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions): LLMP
 
       try {
         const stream = client.messages.stream({
-          model: options.model,
+          model: params.model ?? options.model,
           messages: anthropicMessages,
           max_tokens: params.maxTokens,
           temperature: params.temperature,

@@ -156,7 +156,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
 
       try {
         const stream = await client.chat.completions.create({
-          model: options.model,
+          model: params.model ?? options.model,
           messages: openaiMessages,
           max_tokens: params.maxTokens,
           temperature: params.temperature,
