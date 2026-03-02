@@ -24,6 +24,8 @@ import type { ChannelResolver } from '@/channels/channel-resolver.js';
 import type { ChannelIntegrationRepository } from '@/channels/types.js';
 import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 import type { SessionBroadcaster } from '@/hitl/session-broadcaster.js';
+import type { SkillService } from '@/skills/skill-service.js';
+import type { CampaignRunner } from '@/campaigns/campaign-runner.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -115,6 +117,10 @@ export interface RouteDependencies {
   channelIntegrationRepository: ChannelIntegrationRepository;
   /** MCP server template + instance repository. */
   mcpServerRepository: MCPServerRepository;
+  /** Skill service for template browsing, instance management, and composition. */
+  skillService: SkillService;
+  /** Campaign runner for executing outbound campaigns (null if Redis not configured). */
+  campaignRunner: CampaignRunner | null;
   /** Prisma client for direct queries (dashboard aggregations). */
   prisma: PrismaClient;
   /** Session event broadcaster for cross-context updates (Telegram → Dashboard). */

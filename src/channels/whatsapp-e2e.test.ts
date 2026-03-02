@@ -59,6 +59,7 @@ function createMockContactRepository(): ContactRepository {
         telegramId: data.telegramId ?? undefined,
         slackId: data.slackId ?? undefined,
         language: 'es',
+        tags: [],
         metadata: data.metadata ?? {},
         createdAt: new Date(),
         updatedAt: new Date(),

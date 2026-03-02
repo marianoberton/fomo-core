@@ -65,6 +65,7 @@ export interface HubSpotApiConfig {
 
 export interface HubSpotApiClient {
   searchContacts(params: { query?: string; email?: string; phone?: string; limit?: number }): Promise<HSSearchResponse<HSContact>>;
+  searchDeals(params: { stage?: string; pipeline?: string; inactiveDays?: number; ownerId?: string; limit?: number }): Promise<HSSearchResponse<HSDeal>>;
   getContactDeals(params: { contactId: string; limit?: number }): Promise<HSDeal[]>;
   getDealDetail(params: { dealId: string }): Promise<HSDeal>;
   getCompanyDetail(params: { companyId: string }): Promise<HSCompany>;
@@ -169,6 +170,57 @@ export function createHubSpotApiClient(config: HubSpotApiConfig): HubSpotApiClie
 
       return fetchJson<HSSearchResponse<HSContact>>(
         `${BASE_URL}/crm/v3/objects/contacts/search`,
+        { method: 'POST', body: JSON.stringify(body) },
+      );
+    },
+
+    /**
+     * Search HubSpot deals by stage, pipeline, inactivity, or owner.
+     * Filters within a single call are ANDed. Results sorted by last modified (oldest first).
+     */
+    async searchDeals(params: {
+      stage?: string;
+      pipeline?: string;
+      inactiveDays?: number;
+      ownerId?: string;
+      limit?: number;
+    }): Promise<HSSearchResponse<HSDeal>> {
+      const filters: Array<{ propertyName: string; operator: string; value: string }> = [];
+
+      if (params.stage) {
+        filters.push({ propertyName: 'dealstage', operator: 'EQ', value: params.stage });
+      }
+
+      if (params.pipeline) {
+        filters.push({ propertyName: 'pipeline', operator: 'EQ', value: params.pipeline });
+      }
+
+      if (params.inactiveDays !== undefined && params.inactiveDays > 0) {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - params.inactiveDays);
+        filters.push({
+          propertyName: 'notes_last_updated',
+          operator: 'LT',
+          value: cutoff.getTime().toString(),
+        });
+      }
+
+      if (params.ownerId) {
+        filters.push({ propertyName: 'hubspot_owner_id', operator: 'EQ', value: params.ownerId });
+      }
+
+      const body: Record<string, unknown> = {
+        properties: DEAL_PROPERTIES,
+        limit: Math.min(params.limit ?? 20, 100),
+        sorts: [{ propertyName: 'hs_lastmodifieddate', direction: 'ASCENDING' }],
+      };
+
+      if (filters.length > 0) {
+        body['filterGroups'] = [{ filters }];
+      }
+
+      return fetchJson<HSSearchResponse<HSDeal>>(
+        `${BASE_URL}/crm/v3/objects/deals/search`,
         { method: 'POST', body: JSON.stringify(body) },
       );
     },

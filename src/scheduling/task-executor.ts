@@ -15,6 +15,7 @@ import type { ExecutionTraceRepository } from '@/infrastructure/repositories/exe
 import type { ToolRegistry } from '@/tools/registry/tool-registry.js';
 import type { PrismaClient } from '@prisma/client';
 import type { MCPManager } from '@/mcp/mcp-manager.js';
+import type { SkillService } from '@/skills/skill-service.js';
 import type { Logger } from '@/observability/logger.js';
 import {
   prepareChatRun,
@@ -33,6 +34,7 @@ export interface TaskExecutorOptions {
   executionTraceRepository: ExecutionTraceRepository;
   toolRegistry: ToolRegistry;
   mcpManager: MCPManager;
+  skillService: SkillService;
   prisma: PrismaClient;
   logger: Logger;
 }
@@ -56,6 +58,7 @@ export function createTaskExecutor(
     executionTraceRepository,
     toolRegistry,
     mcpManager,
+    skillService,
     prisma,
     logger,
   } = options;
@@ -66,6 +69,7 @@ export function createTaskExecutor(
     promptLayerRepository,
     toolRegistry,
     mcpManager,
+    skillService,
     longTermMemoryStore: null,
     prisma,
     logger,

@@ -36,6 +36,8 @@ model Project {
   channelIntegrations  ChannelIntegration[]
   secrets              Secret[]
   mcpServerInstances   MCPServerInstance[]
+  skillInstances       SkillInstance[]
+  campaigns            Campaign[]
 
   @@map("projects")
 }
@@ -54,7 +56,8 @@ model Contact {
   telegramId  String?  @map("telegram_id")
   slackId     String?  @map("slack_id")
 
-  role        String?                          // 'customer' | 'owner' | null
+  role        String?                          // 'customer' | 'staff' | 'owner' | null
+  tags        String[]                         // e.g. ["vip", "wholesale", "prospect"]
   timezone    String?
   language    String   @default("es")
   metadata    Json?
@@ -122,7 +125,9 @@ model Message {
 model MemoryEntry {
   id             String                      @id
   projectId      String                      @map("project_id")
+  agentId        String?                     @map("agent_id")
   sessionId      String?                     @map("session_id")
+  scope          String                      @default("agent")
   category       String
   content        String
   embedding      Unsupported("vector(1536)")?
@@ -137,6 +142,8 @@ model MemoryEntry {
 
   @@index([projectId, category])
   @@index([projectId, importance])
+  @@index([projectId, agentId])
+  @@index([projectId, scope])
   @@map("memory_entries")
 }
 
@@ -365,6 +372,12 @@ model Agent {
   maxTokensPerTurn    Int     @default(4000) @map("max_tokens_per_turn")
   budgetPerDayUsd     Float   @default(10.0) @map("budget_per_day_usd")
 
+  // Skills
+  skillIds        String[] @map("skill_ids")    // References to SkillInstance IDs
+
+  // Operating Mode
+  operatingMode String @default("customer-facing") @map("operating_mode") // customer-facing, internal, copilot, manager
+
   // Status
   status      String   @default("active")  // active, paused, disabled
 
@@ -503,4 +516,120 @@ model MCPServerInstance {
   @@unique([projectId, name])
   @@index([projectId, status])
   @@map("mcp_server_instances")
+}
+
+// ─── Skill Templates ──────────────────────────────────────────
+
+model SkillTemplate {
+  id                   String   @id @default(cuid())
+  name                 String   @unique
+  displayName          String   @map("display_name")
+  description          String
+  category             String   // sales, support, operations, communication
+
+  // Composition
+  instructionsFragment String   @map("instructions_fragment")  // Appended to agent's Instructions
+  requiredTools        String[] @map("required_tools")         // Tool IDs needed
+  requiredMcpServers   String[] @map("required_mcp_servers")   // MCP server names needed (optional)
+
+  // Parameters schema (JSON Schema format for dashboard form generation)
+  parametersSchema     Json?    @map("parameters_schema")
+
+  // Metadata
+  tags         String[]
+  icon         String?                      // Lucide icon name for dashboard
+  isOfficial   Boolean  @default(false) @map("is_official")
+  version      Int      @default(1)
+  status       String   @default("published") // draft | published | deprecated
+
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  instances    SkillInstance[]
+
+  @@index([category])
+  @@map("skill_templates")
+}
+
+// ─── Skill Instances ──────────────────────────────────────────
+
+model SkillInstance {
+  id                   String   @id @default(cuid())
+  projectId            String   @map("project_id")
+  templateId           String?  @map("template_id")         // null = custom skill
+  name                 String
+  displayName          String   @map("display_name")
+  description          String?
+
+  // Can override template values
+  instructionsFragment String   @map("instructions_fragment")
+  requiredTools        String[] @map("required_tools")
+  requiredMcpServers   String[] @map("required_mcp_servers")
+
+  // Resolved parameters (user-filled values)
+  parameters           Json?
+
+  status               String   @default("active") // active | disabled
+
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  project              Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  template             SkillTemplate? @relation(fields: [templateId], references: [id])
+
+  @@unique([projectId, name])
+  @@index([projectId, status])
+  @@map("skill_instances")
+}
+
+// ─── Campaigns ─────────────────────────────────────────────────
+
+enum CampaignStatus {
+  draft
+  active
+  paused
+  completed
+}
+
+enum CampaignSendStatus {
+  queued
+  sent
+  failed
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  projectId      String         @map("project_id")
+  name           String
+  status         CampaignStatus @default(draft)
+  template       String         // Mustache-style: "Hola {{name}}, ..."
+  channel        String         // whatsapp | telegram | slack
+  audienceFilter Json           @map("audience_filter") // { tags: ["prospect"], role?: "customer" }
+  scheduledFor   DateTime?      @map("scheduled_for")
+  completedAt    DateTime?      @map("completed_at")
+  metadata       Json?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sends   CampaignSend[]
+
+  @@index([projectId, status])
+  @@map("campaigns")
+}
+
+model CampaignSend {
+  id         String             @id @default(cuid())
+  campaignId String             @map("campaign_id")
+  contactId  String             @map("contact_id")
+  status     CampaignSendStatus @default(queued)
+  error      String?
+  sentAt     DateTime?          @map("sent_at")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, status])
+  @@index([contactId])
+  @@map("campaign_sends")
 }

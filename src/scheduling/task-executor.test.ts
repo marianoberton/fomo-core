@@ -72,6 +72,20 @@ function createSetupResult(overrides?: Partial<ChatSetupResult>): ChatSetupResul
   };
 }
 
+function createMockSkillService(): TaskExecutorOptions['skillService'] {
+  return {
+    listTemplates: vi.fn().mockResolvedValue([]),
+    getTemplate: vi.fn().mockResolvedValue(null),
+    listInstances: vi.fn().mockResolvedValue([]),
+    getInstance: vi.fn().mockResolvedValue(null),
+    createInstance: vi.fn(),
+    createFromTemplate: vi.fn(),
+    updateInstance: vi.fn(),
+    deleteInstance: vi.fn(),
+    composeForAgent: vi.fn().mockResolvedValue({ mergedInstructions: '', mergedTools: [], mergedMcpServers: [] }),
+  };
+}
+
 function createExecutorDeps(): {
   projectRepository: ReturnType<typeof createMockProjectRepository>;
   sessionRepository: ReturnType<typeof createMockSessionRepository>;
@@ -79,6 +93,7 @@ function createExecutorDeps(): {
   executionTraceRepository: ReturnType<typeof createMockExecutionTraceRepository>;
   toolRegistry: ReturnType<typeof createMockToolRegistry>;
   mcpManager: ReturnType<typeof createMockMCPManager>;
+  skillService: ReturnType<typeof createMockSkillService>;
   prisma: TaskExecutorOptions['prisma'];
   logger: ReturnType<typeof createMockLogger>;
 } {
@@ -89,6 +104,7 @@ function createExecutorDeps(): {
     executionTraceRepository: createMockExecutionTraceRepository(),
     toolRegistry: createMockToolRegistry(),
     mcpManager: createMockMCPManager(),
+    skillService: createMockSkillService(),
     prisma: {} as TaskExecutorOptions['prisma'],
     logger: createMockLogger(),
   };

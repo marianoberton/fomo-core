@@ -84,6 +84,38 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
+    name: 'search-deals',
+    description:
+      'Search HubSpot deals by pipeline stage, inactivity period, pipeline, or owner. ' +
+      'Use this to find deals matching specific criteria (e.g. cold leads with no activity in 3+ days). ' +
+      'Results are sorted oldest-first so you can prioritize stale deals.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        stage: {
+          type: 'string',
+          description: 'Deal stage ID to filter by (e.g. "quotationsent", "negotiation", "closedlost")',
+        },
+        pipeline: {
+          type: 'string',
+          description: 'Pipeline ID to filter by (omit for all pipelines)',
+        },
+        inactiveDays: {
+          type: 'number',
+          description: 'Only return deals with no notes/activity in this many days (e.g. 3 = inactive for 3+ days)',
+        },
+        ownerId: {
+          type: 'string',
+          description: 'HubSpot owner ID — only deals assigned to this owner',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max results to return (default: 20, max: 100)',
+        },
+      },
+    },
+  },
+  {
     name: 'get-contact-deals',
     description:
       'Get all deals associated with a HubSpot contact. Returns deal name, stage, amount, and close date.',
@@ -231,6 +263,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           query: args['query'] as string | undefined,
           email: args['email'] as string | undefined,
           phone: args['phone'] as string | undefined,
+          limit: args['limit'] as number | undefined,
+        });
+        break;
+
+      case 'search-deals':
+        result = await api.searchDeals({
+          stage: args['stage'] as string | undefined,
+          pipeline: args['pipeline'] as string | undefined,
+          inactiveDays: args['inactiveDays'] as number | undefined,
+          ownerId: args['ownerId'] as string | undefined,
           limit: args['limit'] as number | undefined,
         });
         break;

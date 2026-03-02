@@ -135,7 +135,7 @@ export interface ChatSetupError {
 /** Subset of RouteDependencies required by prepareChatRun. */
 type ChatSetupDeps = Pick<
   RouteDependencies,
-  'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'longTermMemoryStore' | 'prisma' | 'logger'
+  'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'longTermMemoryStore' | 'prisma' | 'logger' | 'skillService'
 > & {
   agentRegistry?: RouteDependencies['agentRegistry'];
 };
@@ -273,6 +273,34 @@ Do not decline a request if your Manager might be able to approve it.
       }
       body.metadata['_modePromptOverrides'] = resolvedMode.promptOverrides;
       body.metadata['_modeName'] = resolvedMode.modeName;
+    }
+
+    // 2f. Compose assigned skills (merge instructions + tools + MCP)
+    if (agent.skillIds.length > 0) {
+      const composition = await deps.skillService.composeForAgent(agent.skillIds);
+
+      if (composition.mergedInstructions) {
+        if (!body.metadata) body.metadata = {};
+        body.metadata['_skillInstructions'] = composition.mergedInstructions;
+      }
+
+      if (composition.mergedTools.length > 0) {
+        agentConfig.allowedTools = [
+          ...new Set([...agentConfig.allowedTools, ...composition.mergedTools]),
+        ];
+      }
+
+      if (composition.mergedMcpServers.length > 0) {
+        // Add skill-required MCP servers that aren't already configured
+        const existingNames = new Set(
+          (agentConfig.mcpServers as Array<{ name: string }>).map((s) => s.name),
+        );
+        for (const mcpName of composition.mergedMcpServers) {
+          if (!existingNames.has(mcpName)) {
+            (agentConfig.mcpServers as Array<{ name: string }>).push({ name: mcpName } as never);
+          }
+        }
+      }
     }
   }
 
@@ -439,6 +467,12 @@ Do not decline a request if your Manager might be able to approve it.
 
   if (managerPrompt) {
     effectiveLayers.instructions.content = `${effectiveLayers.instructions.content}\n\n${managerPrompt}`;
+  }
+
+  // Append skill instructions (from step 2f)
+  const skillInstructions = body.metadata?.['_skillInstructions'] as string | undefined;
+  if (skillInstructions) {
+    effectiveLayers.instructions.content = `${effectiveLayers.instructions.content}\n\n# Skills\n\n${skillInstructions}`;
   }
 
   const systemPrompt = buildPrompt({

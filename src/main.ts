@@ -47,6 +47,15 @@ import {
   createHotelDetectLanguageTool,
   createHotelSeasonalPricingTool,
   createEscalateToHumanTool,
+  createDelegateToAgentTool,
+  createListProjectAgentsTool,
+  createStoreMemoryTool,
+  createSearchProjectMemoryTool,
+  createGetOperationsSummaryTool,
+  createGetAgentPerformanceTool,
+  createReviewAgentActivityTool,
+  createScrapeWebpageTool,
+  createTriggerCampaignTool,
 } from '@/tools/definitions/index.js';
 import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
 import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
@@ -69,6 +78,8 @@ import { createAgentChannelRouter } from '@/channels/agent-channel-router.js';
 import { createChannelIntegrationRepository } from '@/infrastructure/repositories/channel-integration-repository.js';
 import { createChannelResolver } from '@/channels/channel-resolver.js';
 import { createMCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
+import { createSkillRepository } from '@/skills/skill-repository.js';
+import { createSkillService } from '@/skills/skill-service.js';
 import { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from '@/channels/handoff.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
@@ -87,6 +98,8 @@ import {
   extractAssistantResponse,
 } from '@/api/routes/chat-setup.js';
 import type { ProjectId } from '@/core/types.js';
+import { createCampaignRunner } from '@/campaigns/campaign-runner.js';
+import type { CampaignRunner } from '@/campaigns/campaign-runner.js';
 
 const logger = createLogger();
 
@@ -124,6 +137,8 @@ async function start(): Promise<void> {
     const channelIntegrationRepository = createChannelIntegrationRepository(prisma);
     const secretRepository = createSecretRepository(prisma);
     const mcpServerRepository = createMCPServerRepository(prisma);
+    const skillRepository = createSkillRepository(prisma);
+    const skillService = createSkillService({ repository: skillRepository });
 
     // Encrypted secrets service (AES-256-GCM) — requires SECRETS_ENCRYPTION_KEY env var
     const secretService = createSecretService({ secretRepository });
@@ -174,6 +189,7 @@ async function start(): Promise<void> {
     toolRegistry.register(createDateTimeTool());
     toolRegistry.register(createJsonTransformTool());
     toolRegistry.register(createHttpRequestTool());
+    toolRegistry.register(createScrapeWebpageTool());
     toolRegistry.register(createSendNotificationTool());
     toolRegistry.register(createWebSearchTool({ secretService }));
     toolRegistry.register(createSendEmailTool({ secretService }));
@@ -189,6 +205,8 @@ async function start(): Promise<void> {
     if (embeddingGenerator) {
       longTermMemoryStore = createPrismaMemoryStore(prisma, embeddingGenerator);
       toolRegistry.register(createKnowledgeSearchTool({ store: longTermMemoryStore }));
+      toolRegistry.register(createStoreMemoryTool({ store: longTermMemoryStore }));
+      toolRegistry.register(createSearchProjectMemoryTool({ store: longTermMemoryStore }));
       knowledgeService = createKnowledgeService({ prisma, generateEmbedding: embeddingGenerator });
       logger.info('Long-term memory enabled (pgvector + OpenAI embeddings)', { component: 'main' });
     } else {
@@ -206,6 +224,7 @@ async function start(): Promise<void> {
       toolRegistry,
       mcpManager,
       longTermMemoryStore,
+      skillService,
       prisma,
       logger,
       agentRegistry: undefined as RouteDependencies['agentRegistry'] | undefined,
@@ -472,6 +491,47 @@ async function start(): Promise<void> {
 
     toolRegistry.register(createEscalateToHumanTool());
 
+    // runSubAgent — runs a subagent's full loop and returns its response.
+    // Used by the delegate-to-agent tool to execute tasks on behalf of the manager.
+    const runSubAgent = async (params: {
+      projectId: string;
+      agentName: string;
+      task: string;
+      context?: string;
+      timeoutMs?: number;
+    }): Promise<{ response: string }> => {
+      // Look up the subagent by name
+      const subAgent = await agentRegistry.getByName(params.projectId, params.agentName);
+      if (!subAgent) {
+        throw new Error(`Agent "${params.agentName}" not found in project "${params.projectId}"`);
+      }
+
+      // Create a fresh session for this delegation (tracked separately in DB)
+      const delegationSession = await sessionRepository.create({
+        projectId: params.projectId as ProjectId,
+        metadata: { isDelegated: true, parentTask: params.task.slice(0, 200) },
+      });
+
+      const task = params.context
+        ? `${params.task}\n\nAdditional context: ${params.context}`
+        : params.task;
+
+      return runAgent({
+        projectId: params.projectId as ProjectId,
+        sessionId: delegationSession.id,
+        agentId: subAgent.id,
+        userMessage: task,
+      });
+    };
+
+    toolRegistry.register(createDelegateToAgentTool({ agentRegistry, runSubAgent }));
+    toolRegistry.register(createListProjectAgentsTool({ agentRegistry }));
+
+    // Manager monitoring tools
+    toolRegistry.register(createGetOperationsSummaryTool({ prisma }));
+    toolRegistry.register(createGetAgentPerformanceTool({ prisma, agentRegistry }));
+    toolRegistry.register(createReviewAgentActivityTool({ prisma, agentRegistry }));
+
     // Handoff manager (Chatwoot human escalation)
     const handoffManager = createHandoffManager({
       config: DEFAULT_HANDOFF_CONFIG,
@@ -496,6 +556,7 @@ async function start(): Promise<void> {
     // Conditionally start Redis-dependent services (task runner + proactive messaging + webhook queue)
     let taskRunner: ReturnType<typeof createTaskRunner> | null = null;
     let proactiveMessenger: ProactiveMessenger | null = null;
+    let campaignRunner: CampaignRunner | null = null;
     let webhookQueue: WebhookQueue | null = null;
     const redisUrl = process.env['REDIS_URL'];
     if (redisUrl) {
@@ -513,6 +574,7 @@ async function start(): Promise<void> {
         executionTraceRepository,
         toolRegistry,
         mcpManager,
+        skillService,
         prisma,
         logger,
       });
@@ -534,6 +596,11 @@ async function start(): Promise<void> {
         logger,
       });
       logger.info('Proactive messenger enabled (Redis connected)', { component: 'main' });
+
+      // Campaign runner (outbound campaigns via ProactiveMessenger)
+      campaignRunner = createCampaignRunner({ prisma, proactiveMessenger, logger });
+      toolRegistry.register(createTriggerCampaignTool({ campaignRunner, prisma }));
+      logger.info('Campaign runner enabled', { component: 'main' });
 
       // Webhook queue (async webhook processing with retry)
       webhookQueue = createWebhookQueue({
@@ -574,12 +641,14 @@ async function start(): Promise<void> {
       agentRegistry,
       agentComms,
       proactiveMessenger,
+      campaignRunner,
       longTermMemoryStore,
       secretService,
       knowledgeService,
       channelResolver,
       channelIntegrationRepository,
       mcpServerRepository,
+      skillService,
       prisma,
       sessionBroadcaster,
       resumeAfterApproval,

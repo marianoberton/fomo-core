@@ -40,6 +40,8 @@ import { createAgentComms } from '@/agents/agent-comms.js';
 import { createChannelIntegrationRepository } from '@/infrastructure/repositories/channel-integration-repository.js';
 import { createMCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 import { createChannelResolver } from '@/channels/channel-resolver.js';
+import { createSkillRepository } from '@/skills/skill-repository.js';
+import { createSkillService } from '@/skills/skill-service.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import type { RouteDependencies } from '@/api/types.js';
@@ -168,9 +170,11 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     agentRegistry,
     agentComms,
     proactiveMessenger: null,
+    campaignRunner: null,
     longTermMemoryStore: null,
     secretService,
     knowledgeService: createKnowledgeService({ prisma }),
+    skillService: createSkillService({ repository: createSkillRepository(prisma) }),
     channelResolver,
     channelIntegrationRepository,
     mcpServerRepository: createMCPServerRepository(prisma),

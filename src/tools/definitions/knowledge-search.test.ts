@@ -11,6 +11,8 @@ function createMockStore(results: RetrievedMemory[] = []): LongTermMemoryStore {
   return {
     store: vi.fn(),
     retrieve: vi.fn().mockResolvedValue(results),
+    findSimilarExact: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+    updateContent: vi.fn().mockResolvedValue({ ok: true, value: undefined }),
     delete: vi.fn(),
   };
 }
@@ -18,6 +20,7 @@ function createMockStore(results: RetrievedMemory[] = []): LongTermMemoryStore {
 const sampleMemory: RetrievedMemory = {
   id: 'mem-1',
   projectId: 'test-project' as ProjectId,
+  scope: 'agent',
   category: 'fact',
   content: 'The company was founded in 2020.',
   embedding: [],

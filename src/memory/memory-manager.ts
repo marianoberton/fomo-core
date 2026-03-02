@@ -10,6 +10,8 @@
  * Layers 3-4 require external dependencies (LLM for summarization, DB for storage).
  */
 import type { MemoryConfig } from '@/core/types.js';
+import type { NexusError } from '@/core/errors.js';
+import type { Result } from '@/core/result.js';
 import type { Message } from '@/providers/types.js';
 import { createLogger } from '@/observability/logger.js';
 import type { MemoryEntry, MemoryRetrieval, RetrievedMemory, CompactionEntry } from './types.js';
@@ -26,8 +28,22 @@ export type CompactionSummarizer = (messages: Message[]) => Promise<string>;
 export interface LongTermMemoryStore {
   store(entry: Omit<MemoryEntry, 'id' | 'accessCount' | 'lastAccessedAt' | 'createdAt'>): Promise<MemoryEntry>;
   retrieve(query: MemoryRetrieval): Promise<RetrievedMemory[]>;
+  /**
+   * Find memories whose embedding is above `similarityThreshold` cosine similarity.
+   * Used for deduplication — caller checks if a near-duplicate already exists before inserting.
+   */
+  findSimilarExact(
+    projectId: string,
+    embedding: number[],
+    similarityThreshold: number,
+  ): Promise<Result<RetrievedMemory[], NexusError>>;
+  /** Update the content and re-embed an existing memory entry. */
+  updateContent(id: string, content: string, embedding: number[]): Promise<Result<void, NexusError>>;
   delete(id: string): Promise<boolean>;
 }
+
+/** Default cosine similarity threshold for deduplication. */
+const DEDUP_SIMILARITY_THRESHOLD = 0.92;
 
 export interface MemoryManagerOptions {
   memoryConfig: MemoryConfig;
@@ -35,6 +51,8 @@ export interface MemoryManagerOptions {
   tokenCounter: TokenCounter;
   compactionSummarizer?: CompactionSummarizer;
   longTermStore?: LongTermMemoryStore;
+  /** Embedding generator — needed for deduplication before store. */
+  embeddingGenerator?: (text: string) => Promise<number[]>;
 }
 
 export interface MemoryManager {
@@ -157,7 +175,7 @@ async function pruneTokenBased(
  * Create a new MemoryManager instance.
  */
 export function createMemoryManager(options: MemoryManagerOptions): MemoryManager {
-  const { memoryConfig, contextWindowSize, tokenCounter, compactionSummarizer, longTermStore } =
+  const { memoryConfig, contextWindowSize, tokenCounter, compactionSummarizer, longTermStore, embeddingGenerator } =
     options;
   const reserveTokens = memoryConfig.contextWindow.reserveTokens;
   const availableTokens = contextWindowSize - reserveTokens;
@@ -235,7 +253,13 @@ export function createMemoryManager(options: MemoryManagerOptions): MemoryManage
         return [];
       }
 
-      const results = await longTermStore.retrieve(query);
+      const results = await longTermStore.retrieve({
+        ...query,
+        decayHalfLifeDays:
+          memoryConfig.longTerm.decayEnabled
+            ? memoryConfig.longTerm.decayHalfLifeDays
+            : undefined,
+      });
 
       logger.debug('Retrieved long-term memories', {
         component: 'memory-manager',
@@ -254,12 +278,72 @@ export function createMemoryManager(options: MemoryManagerOptions): MemoryManage
         return null;
       }
 
+      // ── Semantic deduplication ──────────────────────────────
+      // Before inserting, check if a near-duplicate already exists.
+      // If so, merge the new content into the existing entry.
+      if (embeddingGenerator) {
+        try {
+          const embedding =
+            entry.embedding.length > 0
+              ? entry.embedding
+              : await embeddingGenerator(entry.content);
+
+          const similarResult = await longTermStore.findSimilarExact(
+            entry.projectId,
+            embedding,
+            DEDUP_SIMILARITY_THRESHOLD,
+          );
+
+          if (similarResult.ok && similarResult.value.length > 0) {
+            const existing = similarResult.value[0];
+            if (existing) {
+              const mergedContent = `${existing.content}\n---\n${entry.content}`;
+              const mergedEmbedding = await embeddingGenerator(mergedContent);
+              const updateResult = await longTermStore.updateContent(
+                existing.id,
+                mergedContent,
+                mergedEmbedding,
+              );
+
+              if (updateResult.ok) {
+                logger.info('Deduplicated memory — merged into existing entry', {
+                  component: 'memory-manager',
+                  existingId: existing.id,
+                  similarity: existing.similarityScore,
+                  category: entry.category,
+                });
+
+                return {
+                  ...existing,
+                  content: mergedContent,
+                  embedding: mergedEmbedding,
+                  scope: existing.scope,
+                };
+              }
+              // If update fails, fall through to insert a new entry
+              logger.warn('Dedup update failed, inserting as new entry', {
+                component: 'memory-manager',
+                existingId: existing.id,
+                error: updateResult.error.message,
+              });
+            }
+          }
+        } catch (error) {
+          // Deduplication is best-effort — if it fails, insert normally
+          logger.warn('Dedup check failed, inserting as new entry', {
+            component: 'memory-manager',
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       const stored = await longTermStore.store(entry);
 
       logger.debug('Stored long-term memory', {
         component: 'memory-manager',
         category: entry.category,
         importance: entry.importance,
+        scope: entry.scope,
       });
 
       return stored;

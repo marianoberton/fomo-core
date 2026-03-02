@@ -4,6 +4,7 @@ export type {
   MemoryCategory,
   MemoryEntry,
   MemoryRetrieval,
+  MemoryScope,
   RetrievedMemory,
 } from './types.js';
 

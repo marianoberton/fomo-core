@@ -207,7 +207,7 @@ describe('MemoryManager', () => {
     });
 
     it('returns empty when long-term is disabled', async () => {
-      const store = { store: vi.fn(), retrieve: vi.fn(), delete: vi.fn() };
+      const store = { store: vi.fn(), retrieve: vi.fn(), findSimilarExact: vi.fn().mockResolvedValue({ ok: true, value: [] }), updateContent: vi.fn().mockResolvedValue({ ok: true, value: undefined }), delete: vi.fn() };
       const mm = createMemoryManager({
         memoryConfig: makeConfig({ longTerm: { enabled: false, maxEntries: 100, retrievalTopK: 5, embeddingProvider: 'test', decayEnabled: false, decayHalfLifeDays: 30 } }),
         contextWindowSize: 4096,
@@ -239,6 +239,8 @@ describe('MemoryManager', () => {
       const store = {
         store: vi.fn(),
         retrieve: vi.fn().mockResolvedValue(mockResults),
+        findSimilarExact: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+        updateContent: vi.fn().mockResolvedValue({ ok: true, value: undefined }),
         delete: vi.fn(),
       };
 

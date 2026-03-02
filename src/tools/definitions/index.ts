@@ -26,12 +26,35 @@ export { createSendChannelMessageTool } from './send-channel-message.js';
 export type { SendChannelMessageToolOptions } from './send-channel-message.js';
 export { createReadFileTool } from './read-file.js';
 export type { ReadFileToolOptions } from './read-file.js';
+export { createScrapeWebpageTool } from './scrape-webpage.js';
 
-// Shared memory tools (internal mode)
+// Manager / orchestration tools
+export { createDelegateToAgentTool } from './delegate-to-agent.js';
+export type { DelegateToAgentToolOptions, RunSubAgentFn } from './delegate-to-agent.js';
+export { createListProjectAgentsTool } from './list-project-agents.js';
+export type { ListProjectAgentsToolOptions } from './list-project-agents.js';
+export { createGetOperationsSummaryTool } from './get-operations-summary.js';
+export type { GetOperationsSummaryToolOptions } from './get-operations-summary.js';
+export { createGetAgentPerformanceTool } from './get-agent-performance.js';
+export type { GetAgentPerformanceToolOptions } from './get-agent-performance.js';
+export { createReviewAgentActivityTool } from './review-agent-activity.js';
+export type { ReviewAgentActivityToolOptions } from './review-agent-activity.js';
+
+// Memory tools
+export { createStoreMemoryTool } from './store-memory.js';
+export type { StoreMemoryToolOptions } from './store-memory.js';
+export { createSearchProjectMemoryTool } from './search-project-memory.js';
+export type { SearchProjectMemoryToolOptions } from './search-project-memory.js';
+
+// Shared memory / session tools (internal mode)
 export { createQuerySessionsTool } from './query-sessions.js';
 export type { QuerySessionsToolOptions } from './query-sessions.js';
 export { createReadSessionHistoryTool } from './read-session-history.js';
 export type { ReadSessionHistoryToolOptions } from './read-session-history.js';
+
+// Campaign tools
+export { createTriggerCampaignTool } from './trigger-campaign.js';
+export type { TriggerCampaignToolOptions } from './trigger-campaign.js';
 
 // Vertical-specific tools
 export { createVehicleLeadScoreTool } from './vehicle-lead-score.js';

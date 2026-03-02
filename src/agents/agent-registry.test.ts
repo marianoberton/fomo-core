@@ -21,11 +21,13 @@ const mockAgent: AgentConfig = {
   },
   toolAllowlist: ['tool-1', 'tool-2'],
   mcpServers: [],
+  skillIds: [],
   channelConfig: {
     allowedChannels: ['whatsapp'],
     defaultChannel: 'whatsapp',
   },
   modes: [],
+  operatingMode: 'customer-facing',
   limits: {
     maxTurns: 10,
     maxTokensPerTurn: 4000,

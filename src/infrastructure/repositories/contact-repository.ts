@@ -27,6 +27,7 @@ function toContactModel(record: {
   timezone: string | null;
   language: string;
   role: string | null;
+  tags: string[];
   metadata: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -43,6 +44,7 @@ function toContactModel(record: {
     timezone: record.timezone ?? undefined,
     language: record.language,
     role: record.role ?? undefined,
+    tags: record.tags,
     metadata: (record.metadata as Record<string, unknown> | null) ?? undefined,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -69,6 +71,7 @@ export function createContactRepository(prisma: PrismaClient): ContactRepository
           timezone: input.timezone ?? null,
           language: input.language ?? 'es',
           role: input.role ?? null,
+          tags: input.tags ?? [],
           metadata: input.metadata as Prisma.InputJsonValue,
         },
       });
@@ -127,6 +130,7 @@ export function createContactRepository(prisma: PrismaClient): ContactRepository
           ...(input.timezone !== undefined && { timezone: input.timezone }),
           ...(input.language !== undefined && { language: input.language }),
           ...(input.role !== undefined && { role: input.role }),
+          ...(input.tags !== undefined && { tags: input.tags }),
           ...(input.metadata !== undefined && { metadata: input.metadata as Prisma.InputJsonValue }),
         },
       });

@@ -24,6 +24,7 @@ import type { ChannelResolver } from '@/channels/channel-resolver.js';
 import type { ChannelIntegrationRepository } from '@/channels/types.js';
 import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 import type { SecretService } from '@/secrets/types.js';
+import type { SkillService } from '@/skills/skill-service.js';
 import type { Logger } from '@/observability/logger.js';
 import type {
   ExecutionTrace,
@@ -362,6 +363,21 @@ export function createMockLogger(): Logger {
   };
 }
 
+/** Create a mock SkillService with all methods as vi.fn(). */
+export function createMockSkillService(): { [K in keyof SkillService]: ReturnType<typeof vi.fn> } {
+  return {
+    listTemplates: vi.fn().mockResolvedValue([]),
+    getTemplate: vi.fn().mockResolvedValue(null),
+    listInstances: vi.fn().mockResolvedValue([]),
+    getInstance: vi.fn().mockResolvedValue(null),
+    createInstance: vi.fn(),
+    createFromTemplate: vi.fn(),
+    updateInstance: vi.fn(),
+    deleteInstance: vi.fn(),
+    composeForAgent: vi.fn().mockResolvedValue({ mergedInstructions: '', mergedTools: [], mergedMcpServers: [] }),
+  };
+}
+
 /** Assemble a complete RouteDependencies with all mocks. */
 export function createMockDeps(): RouteDependencies & {
   projectRepository: ReturnType<typeof createMockProjectRepository>;
@@ -386,6 +402,7 @@ export function createMockDeps(): RouteDependencies & {
   channelResolver: ReturnType<typeof createMockChannelResolver>;
   channelIntegrationRepository: ReturnType<typeof createMockChannelIntegrationRepository>;
   mcpServerRepository: ReturnType<typeof createMockMCPServerRepository>;
+  skillService: ReturnType<typeof createMockSkillService>;
 } {
   return {
     projectRepository: createMockProjectRepository(),
@@ -407,12 +424,14 @@ export function createMockDeps(): RouteDependencies & {
     agentRegistry: createMockAgentRegistry(),
     agentComms: createMockAgentComms(),
     proactiveMessenger: null,
+    campaignRunner: null,
     longTermMemoryStore: null,
     secretService: createMockSecretService(),
     knowledgeService: null,
     channelResolver: createMockChannelResolver(),
     channelIntegrationRepository: createMockChannelIntegrationRepository(),
     mcpServerRepository: createMockMCPServerRepository(),
+    skillService: createMockSkillService(),
     prisma: {} as RouteDependencies['prisma'],
     sessionBroadcaster: { subscribe: () => () => { /* noop */ }, broadcast: () => { /* noop */ } },
     resumeAfterApproval: () => Promise.resolve(),

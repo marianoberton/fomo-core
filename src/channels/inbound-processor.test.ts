@@ -32,6 +32,7 @@ const mockContact: Contact = {
   name: 'Test User',
   language: 'es',
   phone: '+1234567890',
+  tags: [],
   createdAt: new Date(),
   updatedAt: new Date(),
 };

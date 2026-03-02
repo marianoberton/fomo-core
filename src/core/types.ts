@@ -125,6 +125,8 @@ export interface AgentConfig {
 
 export interface ExecutionContext {
   projectId: ProjectId;
+  /** ID of the agent executing this context. Used for agent-scoped memory storage. */
+  agentId?: string;
   sessionId: SessionId;
   traceId: TraceId;
   agentConfig: AgentConfig;

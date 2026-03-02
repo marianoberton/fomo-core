@@ -223,6 +223,149 @@ describe('HubSpotCRMMCPServer', () => {
     });
   });
 
+  describe('API Client — searchDeals', () => {
+    it('returns matching deals', async () => {
+      mockFetchSuccess({ total: 1, results: [dealFixture] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      const result = await api.searchDeals({ stage: 'qualifiedtobuy' });
+
+      expect(result.total).toBe(1);
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0]?.properties['dealname']).toBe('Venta Producto X');
+    });
+
+    it('posts to /crm/v3/objects/deals/search', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({});
+
+      const url = getLastFetchUrl();
+      expect(url).toContain('/crm/v3/objects/deals/search');
+
+      const opts = getLastFetchOptions();
+      expect(opts?.method).toBe('POST');
+    });
+
+    it('filters by deal stage with EQ operator', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({ stage: 'quotationsent' });
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      expect(filterGroups[0]?.filters).toContainEqual({
+        propertyName: 'dealstage',
+        operator: 'EQ',
+        value: 'quotationsent',
+      });
+    });
+
+    it('filters by pipeline', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({ pipeline: 'sales' });
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      expect(filterGroups[0]?.filters).toContainEqual({
+        propertyName: 'pipeline',
+        operator: 'EQ',
+        value: 'sales',
+      });
+    });
+
+    it('filters by inactiveDays using notes_last_updated LT', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+
+      const now = Date.now();
+      await api.searchDeals({ inactiveDays: 3 });
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      const inactiveFilter = filterGroups[0]?.filters.find((f) => f.propertyName === 'notes_last_updated');
+      expect(inactiveFilter).toBeDefined();
+      expect(inactiveFilter?.operator).toBe('LT');
+      // Value should be a timestamp roughly 3 days ago
+      const cutoff = Number(inactiveFilter?.value);
+      const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+      expect(cutoff).toBeLessThanOrEqual(now - threeDaysMs + 5000); // 5s tolerance
+      expect(cutoff).toBeGreaterThan(now - threeDaysMs - 60000); // 60s tolerance
+    });
+
+    it('filters by ownerId', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({ ownerId: 'owner-1' });
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      expect(filterGroups[0]?.filters).toContainEqual({
+        propertyName: 'hubspot_owner_id',
+        operator: 'EQ',
+        value: 'owner-1',
+      });
+    });
+
+    it('combines multiple filters with AND (single filterGroup)', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({ stage: 'negotiation', pipeline: 'default', ownerId: 'owner-1' });
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      const filterGroups = body['filterGroups'] as Array<{ filters: unknown[] }>;
+      // All filters should be in one filterGroup (ANDed)
+      expect(filterGroups).toHaveLength(1);
+      expect(filterGroups[0]?.filters).toHaveLength(3);
+    });
+
+    it('sorts by lastmodifieddate ascending', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({});
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      const sorts = body['sorts'] as Array<{ propertyName: string; direction: string }>;
+      expect(sorts[0]?.direction).toBe('ASCENDING');
+    });
+
+    it('defaults limit to 20', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({});
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      expect(body['limit']).toBe(20);
+    });
+
+    it('caps limit at 100', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({ limit: 500 });
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      expect(body['limit']).toBe(100);
+    });
+
+    it('omits filterGroups when no filters provided', async () => {
+      mockFetchSuccess({ total: 0, results: [] });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      await api.searchDeals({});
+
+      const opts = getLastFetchOptions();
+      const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
+      expect(body['filterGroups']).toBeUndefined();
+    });
+  });
+
   describe('API Client — getContactDeals', () => {
     it('returns deals for a contact', async () => {
       mockFetchSequence([
@@ -494,6 +637,7 @@ describe('HubSpotCRMMCPServer', () => {
   describe('Tool Definitions', () => {
     const expectedTools = [
       'search-contacts',
+      'search-deals',
       'get-contact-deals',
       'get-deal-detail',
       'get-company-detail',
@@ -502,8 +646,8 @@ describe('HubSpotCRMMCPServer', () => {
       'create-deal-task',
     ];
 
-    it('exposes exactly 7 tools', () => {
-      expect(expectedTools).toHaveLength(7);
+    it('exposes exactly 8 tools', () => {
+      expect(expectedTools).toHaveLength(8);
     });
 
     it('all tool names are kebab-case', () => {

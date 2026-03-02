@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { nanoid } from 'nanoid';
 
 const prisma = new PrismaClient();
@@ -156,7 +156,169 @@ async function main(): Promise<void> {
     },
   });
 
-  console.log(`  [1/5] Demo Project: ${demoId}`);
+  // Manager Agent — the owner's copilot
+  const managerToolAllowlist = [
+    'get-operations-summary',
+    'get-agent-performance',
+    'review-agent-activity',
+    'delegate-to-agent',
+    'list-project-agents',
+    'query-sessions',
+    'read-session-history',
+    'store-memory',
+    'knowledge-search',
+    'escalate-to-human',
+    'send-email',
+    'send-channel-message',
+    'send-notification',
+    'web-search',
+    'scrape-webpage',
+    'date-time',
+    'calculator',
+    'propose-scheduled-task',
+  ];
+
+  const managerIdentity = `Sos el Manager de operaciones de este proyecto. Tu rol es supervisar y coordinar todos los agentes que interactúan con clientes.
+
+Capacidades principales:
+- Monitorear el estado operativo de todos los agentes del proyecto
+- Revisar métricas de rendimiento (sesiones, mensajes, costos, errores)
+- Inspeccionar la actividad reciente de cualquier agente
+- Delegar tareas a agentes especializados
+- Revisar conversaciones de clientes para control de calidad
+- Almacenar observaciones y decisiones en memoria
+
+Hablás en español rioplatense. Sos profesional, analítico y orientado a resultados.
+Cuando el owner te pregunta algo, das respuestas claras y accionables con datos concretos.`;
+
+  const managerInstructions = `## Herramientas de Monitoreo
+
+### Resumen Operativo
+Usá \`get-operations-summary\` para obtener una visión general rápida:
+- Cantidad de agentes activos y sus estados
+- Sesiones activas por agente
+- Volúmenes de mensajes (hoy/semana)
+- Aprobaciones pendientes
+- Costos acumulados
+- Escalaciones recientes
+
+### Rendimiento por Agente
+Usá \`get-agent-performance\` cuando el owner pregunte por un agente específico:
+- Sesiones manejadas, mensajes procesados
+- Tasa de éxito de herramientas (tool calls)
+- Costo total y por sesión
+- Escalaciones al humano
+
+### Actividad Reciente
+Usá \`review-agent-activity\` para investigar qué hizo un agente:
+- Últimas sesiones con info del contacto
+- Últimas ejecuciones de herramientas con inputs/outputs
+- Errores recientes
+
+## Herramientas de Acción
+
+### Delegación
+Usá \`delegate-to-agent\` para ejecutar tareas vía subagentes. Siempre:
+1. Listeá agentes disponibles con \`list-project-agents\`
+2. Elegir al más apropiado según la tarea
+3. Proporcionar contexto suficiente en la delegación
+
+### Conversaciones
+Usá \`query-sessions\` y \`read-session-history\` para revisar conversaciones de clientes.
+Buscá patrones: quejas recurrentes, preguntas frecuentes, oportunidades perdidas.
+
+### Memoria
+Usá \`store-memory\` para recordar decisiones del owner, patrones detectados, y observaciones.
+Usá \`knowledge-search\` para recuperar contexto almacenado.
+
+## Patrones de Reporte
+
+Cuando el owner pida un reporte:
+1. Empezá con \`get-operations-summary\` para el panorama general
+2. Si hay anomalías (costos altos, muchos errores, escalaciones), profundizá con \`get-agent-performance\`
+3. Si hay un problema específico, investigá con \`review-agent-activity\`
+4. Presentá los datos de forma concisa con números y porcentajes
+5. Terminá con recomendaciones accionables
+
+## Proactividad
+
+En tareas programadas (resumen diario):
+1. Obtené el resumen operativo
+2. Compará con días anteriores (usá memoria)
+3. Destacá cambios significativos
+4. Reportá cualquier problema o patrón preocupante
+5. Sugerí acciones si corresponde`;
+
+  const managerSafety = `- Nunca reveles credenciales, API keys, ni configuración interna del sistema.
+- Nunca modifiques la configuración de agentes directamente — sugerí cambios al owner.
+- Respetá las approval gates: nunca bypasses el proceso de aprobación.
+- No compartas datos de un contacto/cliente con otro.
+- No ejecutes acciones con efectos secundarios sin confirmar con el owner primero.
+- Si detectás un patrón preocupante (costos fuera de control, errores masivos), alertá inmediatamente.
+- Nunca inventes métricas — si no tenés datos, decilo.
+- Los datos de rendimiento son para uso interno — nunca los compartas con contactos/clientes.`;
+
+  const managerAgent = await prisma.agent.create({
+    data: {
+      projectId: demoId,
+      name: 'Manager',
+      description: 'Copilot del owner — monitorea agentes, reporta métricas, delega tareas, revisa conversaciones',
+      promptConfig: {
+        identity: 'Manager de operaciones del proyecto',
+        instructions: 'Monitorear agentes, reportar métricas, delegar tareas, revisar conversaciones',
+        safety: 'Sin credenciales, sin bypass de approvals, sin inventar métricas',
+      },
+      llmConfig: {
+        provider: 'openai',
+        model: 'gpt-4o',
+        temperature: 0.3,
+      },
+      toolAllowlist: managerToolAllowlist,
+      channelConfig: { channels: ['dashboard'] },
+      modes: [
+        {
+          name: 'manager',
+          label: 'Manager Dashboard',
+          channelMapping: ['dashboard'],
+          promptOverrides: {
+            identity: managerIdentity,
+            instructions: managerInstructions,
+            safety: managerSafety,
+          },
+          toolAllowlist: managerToolAllowlist,
+        },
+      ] as Prisma.InputJsonValue,
+      operatingMode: 'manager',
+      maxTurns: 30,
+      maxTokensPerTurn: 8000,
+      budgetPerDayUsd: 20.0,
+      status: 'active',
+      metadata: { isDefaultManager: true, archetype: 'copilot' },
+    },
+  });
+
+  await prisma.scheduledTask.create({
+    data: {
+      id: nanoid(),
+      projectId: demoId,
+      name: 'Manager — Resumen diario',
+      description: 'El manager genera un resumen operativo a las 9am L-V',
+      cronExpression: '0 9 * * 1-5',
+      taskPayload: {
+        agentId: managerAgent.id,
+        message: 'Generá un resumen operativo del día anterior. Incluí: agentes activos, sesiones manejadas, mensajes totales, costos, escalaciones, y cualquier anomalía o patrón que detectes. Compará con la semana anterior si tenés datos en memoria.',
+      } as Prisma.InputJsonValue,
+      origin: 'static',
+      status: 'active',
+      maxRetries: 2,
+      timeoutMs: 300000,
+      budgetPerRunUsd: 1.5,
+      maxDurationMinutes: 10,
+      maxTurns: 15,
+    },
+  });
+
+  console.log(`  [1/6] Demo Project: ${demoId} (Manager: ${managerAgent.id})`);
 
   // ═══════════════════════════════════════════════════════════════
   // 2. FERRETERÍA MAYORISTA (catalog-search, calculator, notifications)
@@ -250,7 +412,7 @@ async function main(): Promise<void> {
     },
   });
 
-  console.log(`  [2/5] Ferretería Mayorista: ${ferreteriaId}`);
+  console.log(`  [2/6] Ferretería Mayorista: ${ferreteriaId}`);
 
   // ═══════════════════════════════════════════════════════════════
   // 3. CONCESIONARIA DE VEHÍCULOS (lead scoring, follow-ups)
@@ -350,7 +512,7 @@ async function main(): Promise<void> {
     },
   });
 
-  console.log(`  [3/5] Concesionaria Automotriz: ${concesionariaId}`);
+  console.log(`  [3/6] Concesionaria Automotriz: ${concesionariaId}`);
 
   // ═══════════════════════════════════════════════════════════════
   // 4. HOTEL BOUTIQUE (multi-idioma, reservas, concierge)
@@ -450,7 +612,7 @@ async function main(): Promise<void> {
     },
   });
 
-  console.log(`  [4/5] Hotel Boutique: ${hotelId}`);
+  console.log(`  [4/6] Hotel Boutique: ${hotelId}`);
 
   // ═══════════════════════════════════════════════════════════════
   // 5. FOMO PLATFORM ASSISTANT (MCP: CRM + Tasks via Fomo Platform)
@@ -585,7 +747,218 @@ async function main(): Promise<void> {
     },
   });
 
-  console.log(`  [5/5] Fomo Platform Assistant: ${fomoId}`);
+  console.log(`  [5/6] Fomo Platform Assistant: ${fomoId}`);
+
+  // ═══════════════════════════════════════════════════════════════
+  // 6. MARKET PAPER (HubSpot CRM + WhatsApp outbound reactivation)
+  // ═══════════════════════════════════════════════════════════════
+
+  const marketPaperId = nanoid();
+  await prisma.project.create({
+    data: {
+      id: marketPaperId,
+      name: 'Market Paper',
+      description: 'Reactivación de leads fríos por WhatsApp — fabricante de papel cartón a medida (B2B). Busca Seguimiento -14, 3 msgs/hora, intervalo 3 días.',
+      environment: 'development',
+      owner: 'admin',
+      tags: ['vertical', 'manufacturing', 'b2b', 'hubspot', 'outbound'],
+      configJson: {
+        projectId: marketPaperId,
+        agentRole: 'sales-reactivation',
+        provider: {
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          apiKeyEnvVar: 'OPENAI_API_KEY',
+          temperature: 0.5,
+        },
+        failover: defaultFailover,
+        allowedTools: [
+          'send-channel-message',
+          'store-memory',
+          'escalate-to-human',
+          'propose-scheduled-task',
+          'date-time',
+          'mcp:hubspot-crm:search-contacts',
+          'mcp:hubspot-crm:search-deals',
+          'mcp:hubspot-crm:get-contact-deals',
+          'mcp:hubspot-crm:get-deal-detail',
+          'mcp:hubspot-crm:get-company-detail',
+          'mcp:hubspot-crm:update-deal-stage',
+          'mcp:hubspot-crm:add-deal-note',
+          'mcp:hubspot-crm:create-deal-task',
+        ],
+        mcpServers: [
+          {
+            name: 'hubspot-crm',
+            transport: 'stdio',
+            command: 'node',
+            args: ['dist/mcp/servers/hubspot-crm/index.js'],
+            env: { HUBSPOT_ACCESS_TOKEN: 'HUBSPOT_ACCESS_TOKEN' },
+          },
+        ],
+        memoryConfig: {
+          ...defaultMemoryConfig,
+          longTerm: {
+            ...defaultMemoryConfig.longTerm,
+            enabled: true,
+            maxEntries: 500,
+            retrievalTopK: 5,
+            decayEnabled: true,
+            decayHalfLifeDays: 60,
+          },
+        },
+        costConfig: { ...defaultCostConfig, dailyBudgetUSD: 15, monthlyBudgetUSD: 300 },
+        maxTurnsPerSession: 50,
+        maxConcurrentSessions: 10,
+      },
+      status: 'active',
+    },
+  });
+
+  await createPromptLayers(
+    marketPaperId,
+    [
+      'Sos el asistente comercial de Market Paper, una fábrica de papel cartón a medida.',
+      'Tu rol es recontactar clientes que recibieron presupuestos pero no respondieron.',
+      'Hablás en español rioplatense, tono profesional pero cercano, amable y sincero.',
+      'Nunca decís que sos una IA — hablás como un asistente del equipo comercial.',
+      'Te presentás como "Market Paper" o con nombre propio si corresponde (ej: "Soy Laura de Market Paper").',
+    ].join('\n'),
+    [
+      '## MODO CAMPAÑA (tarea programada)',
+      'Cuando recibás el mensaje "ejecutar campaña de reactivación":',
+      '1. Buscá en HubSpot deals en stage "Seguimiento -14" (menos de 14 días sin actividad).',
+      '2. Seleccioná hasta 3 deals, los más antiguos primero (máximo 3 mensajes por corrida para evitar baneos WAHA).',
+      '3. Para cada deal:',
+      '   a. Obtené el detalle con get-deal-detail (producto, monto, PDF presupuesto, contacto).',
+      '   b. Obtené el teléfono del contacto (buscá con search-contacts si no está en el deal).',
+      '   c. Componé un mensaje personalizado mencionando el producto específico cotizado (ej: "cajas tipo X").',
+      '   d. Envialo por WhatsApp con send-channel-message (envios espaciados, máximo 3/hora).',
+      '   e. Creá una nota en HubSpot: "[Reactivación WA - Intento 1/1] Mensaje: [preview]".',
+      '   f. Guardá en memoria: deal ID, producto, contacto, fecha, status (esperando respuesta).',
+      '4. Al finalizar, resumí: cuántos enviados, montos totales, y si hubo errores.',
+      '',
+      'REGLAS DE CAMPAÑA:',
+      '- Máximo 3 mensajes por corrida (1 hora).',
+      '- NO recontactar deals que ya tienen nota de reactivación de los últimos 3 días.',
+      '- Si no tiene teléfono: registrá nota "Sin teléfono para reactivación" y skipeá.',
+      '- Si lead responde después de 3 días sin contacto: cambiarlo a stage "Seguimiento +14".',
+      '',
+      '## MODO CONVERSACIÓN (cuando el lead responde por WhatsApp)',
+      'Cuando un contacto te escriba:',
+      '1. Buscá en memoria el contexto: product, monto, URL PDF presupuesto, fecha de envío.',
+      '2. Respondé de forma natural, referenciando lo que sabés (ej: "sobre las cajas tipo bandeja que te presupuestamos...").',
+      '3. Tu objetivo: entender si sigue interesado y por qué no avanzó.',
+      '4. Si muestra interés → escalate-to-human. Antes: nota en HubSpot ("Lead interesado en: ...") + tarea para vendedora.',
+      '5. Si tiene objeciones (precio, especificaciones, timing) → recabá info. Guardá en memoria y nota HubSpot.',
+      '6. Si dice "no me interesa" → cordial despedida, actualizar stage a "Cierre perdido" con motivo en nota.',
+      '7. Si dice "ahora no, en X meses" → usa propose-scheduled-task para re-contactar en esa fecha.',
+      '',
+      'NUNCA:',
+      '- Prometas descuentos sin consultarlo con el vendedor.',
+      '- Des precios que no estén en el deal.',
+      '- Insistas si ya dijo que no.',
+    ].join('\n'),
+    [
+      'No compartir información de otros clientes.',
+      'No inventar precios, plazos ni especificaciones técnicas.',
+      'Si el contacto pide algo técnico fuera de tu conocimiento, derivá al vendedor.',
+      'Si detectás hostilidad o spam, no respondas y creá nota en HubSpot.',
+      'Nunca reveles que sos una IA ni menciones "sistema", "agente" o "bot".',
+    ].join('\n'),
+  );
+
+  const reactivadorTools = [
+    'send-channel-message',
+    'store-memory',
+    'escalate-to-human',
+    'propose-scheduled-task',
+    'date-time',
+    'mcp:hubspot-crm:search-contacts',
+    'mcp:hubspot-crm:search-deals',
+    'mcp:hubspot-crm:get-contact-deals',
+    'mcp:hubspot-crm:get-deal-detail',
+    'mcp:hubspot-crm:get-company-detail',
+    'mcp:hubspot-crm:update-deal-stage',
+    'mcp:hubspot-crm:add-deal-note',
+    'mcp:hubspot-crm:create-deal-task',
+  ];
+
+  await prisma.agent.create({
+    data: {
+      projectId: marketPaperId,
+      name: 'Reactivadora Market Paper',
+      description: 'Recontacta leads con presupuestos sin respuesta por WhatsApp. Busca Seguimiento -14, envía 3 msgs/hora, conversa con contexto, handoff a vendedora.',
+      promptConfig: {
+        identity: 'Asistente comercial de Market Paper — fabricante de papel cartón a medida',
+        instructions: 'Campaña de reactivación (3 msgs/hora) + conversación contextual con leads fríos',
+        safety: 'No prometer descuentos sin vendedora, no inventar precios/specs, info privada de deals',
+      },
+      toolAllowlist: reactivadorTools,
+      mcpServers: [
+        {
+          name: 'hubspot-crm',
+          transport: 'stdio',
+          command: 'node',
+          args: ['dist/mcp/servers/hubspot-crm/index.js'],
+          env: { HUBSPOT_ACCESS_TOKEN: 'HUBSPOT_ACCESS_TOKEN' },
+        },
+      ],
+      channelConfig: { channels: ['whatsapp-waha'] },
+      modes: [
+        {
+          name: 'customer-facing',
+          label: 'Conversación con leads',
+          channelMapping: ['whatsapp-waha'],
+          promptOverrides: {
+            instructions: 'Estás respondiendo a un lead que escribió por WhatsApp. Consultá memoria para contexto del deal.',
+          },
+        },
+      ],
+      operatingMode: 'customer-facing',
+      maxTurns: 50,
+      maxTokensPerTurn: 4000,
+      budgetPerDayUsd: 15.0,
+      status: 'active',
+    },
+  });
+
+  // Scheduled task: hourly lead reactivation campaign (3 msgs per run, 9am–5pm)
+  await prisma.scheduledTask.create({
+    data: {
+      id: nanoid(),
+      projectId: marketPaperId,
+      name: 'Reactivación horaria — Market Paper',
+      description: 'Busca deals en Seguimiento -14 y envía hasta 3 msgs de reactivación por WhatsApp cada hora (L-V 9–17h)',
+      cronExpression: '0 9-17 * * 1-5',
+      taskPayload: {
+        message: 'Ejecutar campaña de reactivación. Buscá deals en HubSpot stage "Seguimiento -14" (sin actividad hace 3+ días) y enviá hasta 3 mensajes personalizados por WhatsApp.',
+      },
+      origin: 'static',
+      status: 'active',
+      maxRetries: 2,
+      timeoutMs: 600000,
+      budgetPerRunUsd: 2.0,
+      maxDurationMinutes: 15,
+      maxTurns: 50,
+    },
+  });
+
+  // Channel integration: WhatsApp-WAHA for outbound reactivation
+  await prisma.channelIntegration.create({
+    data: {
+      projectId: marketPaperId,
+      provider: 'whatsapp-waha',
+      config: {
+        wahaUrl: process.env.WAHA_DEFAULT_URL ?? 'http://localhost:3003',
+        sessionName: 'default',
+        webhookPath: `/api/v1/channels/whatsapp-waha/${marketPaperId}/webhook`,
+      },
+      status: 'active',
+    },
+  });
+
+  console.log(`  [6/6] Market Paper (Reactivación): ${marketPaperId}`);
 
   // ═══════════════════════════════════════════════════════════════
   // MCP SERVER TEMPLATES (global catalog)
@@ -778,17 +1151,290 @@ async function main(): Promise<void> {
   console.log('    - RESEND_API_KEY + RESEND_FROM_EMAIL (send-email)');
 
   // ═══════════════════════════════════════════════════════════════
+  // SKILL TEMPLATES
+  // ═══════════════════════════════════════════════════════════════
+
+  const skillTemplates = [
+    {
+      name: 'lead-scoring',
+      displayName: 'Lead Scoring',
+      description: 'Evaluate buying intent and qualify leads based on conversation signals',
+      category: 'sales',
+      instructionsFragment: `Cuando un potencial cliente contacte, evaluá su intención de compra considerando estos criterios:
+- **Presupuesto**: ¿Mencionó un rango de precios o tiene capacidad de pago?
+- **Urgencia**: ¿Necesita el producto/servicio pronto o está explorando?
+- **Autoridad**: ¿Es quien toma la decisión de compra?
+- **Necesidad**: ¿Tiene un problema concreto que resolver?
+
+Usá la herramienta de lead scoring para calcular un puntaje. Si el puntaje supera {{threshold}}, notificá al equipo de ventas inmediatamente.
+Registrá cada evaluación para seguimiento futuro.`,
+      requiredTools: ['vehicle-lead-score', 'catalog-search', 'send-notification'],
+      requiredMcpServers: [],
+      parametersSchema: {
+        type: 'object',
+        properties: {
+          threshold: { type: 'number', default: 70, description: 'Puntaje mínimo para notificar al equipo' },
+        },
+      },
+      tags: ['sales', 'automotive', 'qualification'],
+      icon: 'Target',
+      isOfficial: true,
+    },
+    {
+      name: 'appointment-scheduling',
+      displayName: 'Appointment Scheduling',
+      description: 'Help customers book visits, test drives, and appointments',
+      category: 'sales',
+      instructionsFragment: `Ayudá a los clientes a agendar citas siguiendo este flujo:
+1. Preguntá qué tipo de cita necesitan (visita, test drive, consulta, etc.)
+2. Ofrecé opciones de fecha y hora dentro del horario de atención: {{businessHours}}
+3. Confirmá nombre, teléfono y email del cliente
+4. Creá la tarea programada con recordatorio
+5. Enviá confirmación al cliente
+
+Zona horaria: {{timezone}}. Siempre confirmá la cita antes de finalizarla.`,
+      requiredTools: ['date-time', 'propose-scheduled-task', 'send-notification'],
+      requiredMcpServers: [],
+      parametersSchema: {
+        type: 'object',
+        properties: {
+          timezone: { type: 'string', default: 'America/Argentina/Buenos_Aires', description: 'Zona horaria' },
+          businessHours: { type: 'string', default: 'Lunes a Viernes 9:00-18:00, Sábados 9:00-13:00', description: 'Horario de atención' },
+        },
+      },
+      tags: ['sales', 'scheduling'],
+      icon: 'CalendarCheck',
+      isOfficial: true,
+    },
+    {
+      name: 'catalog-browsing',
+      displayName: 'Product Catalog',
+      description: 'Search products, suggest complements, and take orders',
+      category: 'sales',
+      instructionsFragment: `Sos un experto en el catálogo de productos. Cuando un cliente pregunte:
+- Buscá en el catálogo usando términos relevantes
+- Mostrá los resultados de forma clara: nombre, precio, disponibilidad
+- Sugerí productos complementarios cuando sea apropiado
+- Si el cliente quiere comprar, guialo por el proceso de pedido
+- Siempre confirmá cantidades y precios antes de procesar
+
+Moneda: {{currency}}. Pedido mínimo: {{minOrder}}.`,
+      requiredTools: ['catalog-search', 'catalog-order'],
+      requiredMcpServers: [],
+      parametersSchema: {
+        type: 'object',
+        properties: {
+          currency: { type: 'string', default: 'ARS', description: 'Moneda' },
+          minOrder: { type: 'string', default: 'Sin mínimo', description: 'Pedido mínimo' },
+        },
+      },
+      tags: ['sales', 'ecommerce', 'catalog'],
+      icon: 'ShoppingBag',
+      isOfficial: true,
+    },
+    {
+      name: 'follow-up-automation',
+      displayName: 'Follow-up Automation',
+      description: 'Automated follow-up sequences for leads and customers',
+      category: 'operations',
+      instructionsFragment: `Gestioná el seguimiento automático de leads y clientes:
+- Después de cada interacción importante, programá un seguimiento
+- Revisá el historial de seguimientos pendientes
+- Cuando se active un seguimiento, contactá al cliente con un mensaje personalizado
+- Si el cliente no responde después de {{maxAttempts}} intentos, escalá al equipo
+
+Intervalo entre seguimientos: {{intervalDays}} días.`,
+      requiredTools: ['vehicle-check-followup', 'send-channel-message', 'propose-scheduled-task'],
+      requiredMcpServers: [],
+      parametersSchema: {
+        type: 'object',
+        properties: {
+          maxAttempts: { type: 'number', default: 3, description: 'Intentos máximos de contacto' },
+          intervalDays: { type: 'number', default: 3, description: 'Días entre cada seguimiento' },
+        },
+      },
+      tags: ['operations', 'follow-up', 'automation'],
+      icon: 'RefreshCw',
+      isOfficial: true,
+    },
+    {
+      name: 'knowledge-base',
+      displayName: 'Knowledge Base',
+      description: 'Answer questions from documents and knowledge base',
+      category: 'support',
+      instructionsFragment: `Tenés acceso a la base de conocimiento del negocio. Cuando te pregunten algo:
+1. Buscá en la base de conocimiento usando búsqueda semántica
+2. Si encontrás información relevante, respondé basándote en ella
+3. Citá la fuente cuando sea posible
+4. Si no encontrás la respuesta, decilo honestamente y ofrecé alternativas
+5. Podés leer archivos adjuntos para obtener más contexto
+
+Nunca inventes información que no esté respaldada por la base de conocimiento.`,
+      requiredTools: ['knowledge-search', 'read-file'],
+      requiredMcpServers: [],
+      parametersSchema: null,
+      tags: ['support', 'knowledge', 'faq'],
+      icon: 'BookOpen',
+      isOfficial: true,
+    },
+    {
+      name: 'email-communication',
+      displayName: 'Email Communication',
+      description: 'Send professional emails on behalf of the business',
+      category: 'communication',
+      instructionsFragment: `Podés enviar emails profesionales en nombre del negocio.
+- Usá un tono {{tone}} y profesional
+- Incluí saludo personalizado con el nombre del destinatario
+- Estructura clara: saludo, cuerpo, despedida
+- Firmá como "{{senderName}}"
+- Nunca envíes emails sin confirmar el contenido con el usuario primero si es la primera vez`,
+      requiredTools: ['send-email', 'date-time'],
+      requiredMcpServers: [],
+      parametersSchema: {
+        type: 'object',
+        properties: {
+          tone: { type: 'string', default: 'cordial', description: 'Tono de los emails (cordial, formal, casual)' },
+          senderName: { type: 'string', default: 'El equipo', description: 'Nombre del remitente' },
+        },
+      },
+      tags: ['communication', 'email'],
+      icon: 'Mail',
+      isOfficial: true,
+    },
+    {
+      name: 'web-research',
+      displayName: 'Web Research',
+      description: 'Search the web and fetch data from APIs',
+      category: 'operations',
+      instructionsFragment: `Podés buscar información en la web y consultar APIs externas.
+- Usá búsqueda web para información actualizada
+- Podés hacer requests HTTP a APIs públicas o autorizadas
+- Siempre verificá la fuente de la información
+- Resumí los hallazgos de forma clara y concisa
+- Si necesitás datos sensibles de una API, asegurate de tener las credenciales configuradas`,
+      requiredTools: ['web-search', 'http-request'],
+      requiredMcpServers: [],
+      parametersSchema: null,
+      tags: ['operations', 'research', 'web'],
+      icon: 'Globe',
+      isOfficial: true,
+    },
+    {
+      name: 'multi-agent-coordination',
+      displayName: 'Agent Coordination',
+      description: 'Manager skill: coordinate sub-agents, review conversations, delegate tasks',
+      category: 'operations',
+      instructionsFragment: `Sos el coordinador de un equipo de agentes. Tus capacidades:
+- **Delegar tareas**: Usá delegate-to-agent para asignar tareas a agentes especializados
+- **Listar agentes**: Consultá qué agentes están disponibles en el proyecto
+- **Revisar conversaciones**: Leé el historial de sesiones para entender el contexto
+- **Supervisar**: Monitoreá las conversaciones activas y detectá problemas
+
+Principios:
+1. Delegá al agente más apropiado según la tarea
+2. Proporcioná contexto suficiente al delegar
+3. Si ningún agente puede manejar la tarea, resolvela vos mismo
+4. Reportá problemas o patrones que detectes`,
+      requiredTools: ['delegate-to-agent', 'list-project-agents', 'query-sessions', 'read-session-history'],
+      requiredMcpServers: [],
+      parametersSchema: null,
+      tags: ['operations', 'manager', 'coordination'],
+      icon: 'Crown',
+      isOfficial: true,
+    },
+    {
+      name: 'crm-integration',
+      displayName: 'CRM Integration',
+      description: 'Connect to CRM systems for customer data and pipeline management',
+      category: 'sales',
+      instructionsFragment: `Tenés acceso al CRM del negocio via MCP. Podés:
+- Buscar y consultar datos de clientes
+- Ver el pipeline de oportunidades
+- Actualizar el estado de deals
+- Agregar notas a contactos y oportunidades
+- Crear tareas de seguimiento en el CRM
+
+Siempre actualizá el CRM después de interacciones importantes con clientes.
+Respetá la privacidad: nunca compartas datos de un cliente con otro.`,
+      requiredTools: ['http-request'],
+      requiredMcpServers: ['hubspot-crm'],
+      parametersSchema: null,
+      tags: ['sales', 'crm', 'hubspot'],
+      icon: 'Users',
+      isOfficial: true,
+    },
+    {
+      name: 'seasonal-pricing',
+      displayName: 'Seasonal Pricing',
+      description: 'Dynamic pricing based on season and demand',
+      category: 'operations',
+      instructionsFragment: `Gestioná precios dinámicos basados en temporada y demanda:
+- Consultá la herramienta de pricing estacional para obtener tarifas actualizadas
+- Aplicá los ajustes de temporada automáticamente
+- Informá al cliente sobre promociones o tarifas especiales vigentes
+- Si el cliente pregunta por descuentos fuera de temporada, ofrecé alternativas
+
+Temporada alta: {{highSeason}}. Temporada baja: {{lowSeason}}.`,
+      requiredTools: ['hotel-seasonal-pricing', 'date-time'],
+      requiredMcpServers: [],
+      parametersSchema: {
+        type: 'object',
+        properties: {
+          highSeason: { type: 'string', default: 'Diciembre-Marzo', description: 'Meses de temporada alta' },
+          lowSeason: { type: 'string', default: 'Abril-Noviembre', description: 'Meses de temporada baja' },
+        },
+      },
+      tags: ['operations', 'hotel', 'pricing'],
+      icon: 'DollarSign',
+      isOfficial: true,
+    },
+  ];
+
+  for (const tpl of skillTemplates) {
+    await prisma.skillTemplate.upsert({
+      where: { name: tpl.name },
+      update: {
+        displayName: tpl.displayName,
+        description: tpl.description,
+        category: tpl.category,
+        instructionsFragment: tpl.instructionsFragment,
+        requiredTools: tpl.requiredTools,
+        requiredMcpServers: tpl.requiredMcpServers,
+        parametersSchema: tpl.parametersSchema ?? Prisma.JsonNull,
+        tags: tpl.tags,
+        icon: tpl.icon,
+        isOfficial: tpl.isOfficial,
+      },
+      create: {
+        name: tpl.name,
+        displayName: tpl.displayName,
+        description: tpl.description,
+        category: tpl.category,
+        instructionsFragment: tpl.instructionsFragment,
+        requiredTools: tpl.requiredTools,
+        requiredMcpServers: tpl.requiredMcpServers,
+        parametersSchema: tpl.parametersSchema ?? Prisma.JsonNull,
+        tags: tpl.tags,
+        icon: tpl.icon,
+        isOfficial: tpl.isOfficial,
+      },
+    });
+  }
+  console.log(`  ${skillTemplates.length} skill templates seeded`);
+
+  // ═══════════════════════════════════════════════════════════════
   // Summary
   // ═══════════════════════════════════════════════════════════════
 
   console.log('\nSeed completed successfully!');
-  console.log('  5 projects, 4 agents, 15 prompt layers, 1 scheduled task, 8 MCP templates');
+  console.log('  6 projects, 5 agents, 18 prompt layers, 2 scheduled tasks, 12 MCP templates, 10 skill templates');
   console.log('\nProjects:');
   console.log(`  1. Demo Project        — ${demoId} (basic tools)`);
   console.log(`  2. Ferretería Mayorista — ${ferreteriaId} (catalog + sales)`);
   console.log(`  3. Concesionaria Auto  — ${concesionariaId} (leads + test drives)`);
   console.log(`  4. Hotel Boutique      — ${hotelId} (multilingual concierge)`);
   console.log(`  5. Fomo Assistant      — ${fomoId} (MCP: CRM + Tasks)`);
+  console.log(`  6. Market Paper        — ${marketPaperId} (HubSpot + WhatsApp reactivation)`);
 }
 
 main()

@@ -256,6 +256,7 @@ export function scheduledTaskRoutes(
         executionTraceRepository: opts.executionTraceRepository,
         toolRegistry: opts.toolRegistry,
         mcpManager: opts.mcpManager,
+        skillService: opts.skillService,
         prisma: opts.prisma,
         logger: opts.logger,
       });

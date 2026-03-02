@@ -17,6 +17,15 @@ export type AgentMessageId = Brand<string, 'AgentMessageId'>;
 
 export type AgentStatus = 'active' | 'paused' | 'disabled';
 
+// ─── Agent Operating Mode ────────────────────────────────────────
+
+/** The operating mode determines the agent's role in the system. */
+export type AgentOperatingMode =
+  | 'customer-facing' // Talks directly to end customers via channels
+  | 'internal'        // Background worker (scheduled tasks, data processing)
+  | 'copilot'         // Assists the Fomo team via dashboard chat
+  | 'manager';        // Orchestrates other agents; can use delegate-to-agent tool
+
 // ─── Agent Limits ────────────────────────────────────────────────
 
 /** Resource limits for an agent. */
@@ -105,6 +114,10 @@ export interface AgentConfig {
   channelConfig: ChannelConfig;
   /** Operating modes. Empty array means single-mode (legacy) agent using base config. */
   modes: AgentMode[];
+  /** The agent's role in the system. Defaults to 'customer-facing'. */
+  operatingMode: AgentOperatingMode;
+  /** Assigned SkillInstance IDs. Skills compose instructions + tools at chat time. */
+  skillIds: string[];
   limits: AgentLimits;
   managerAgentId?: string | null;
   status: AgentStatus;
@@ -125,6 +138,8 @@ export interface CreateAgentInput {
   mcpServers?: MCPServerConfig[];
   channelConfig?: ChannelConfig;
   modes?: AgentMode[];
+  operatingMode?: AgentOperatingMode;
+  skillIds?: string[];
   limits?: Partial<AgentLimits>;
   managerAgentId?: string | null;
   metadata?: Record<string, unknown>;
@@ -142,6 +157,8 @@ export interface UpdateAgentInput {
   mcpServers?: MCPServerConfig[];
   channelConfig?: ChannelConfig;
   modes?: AgentMode[];
+  operatingMode?: AgentOperatingMode;
+  skillIds?: string[];
   limits?: Partial<AgentLimits>;
   managerAgentId?: string | null;
   metadata?: Record<string, unknown>;
