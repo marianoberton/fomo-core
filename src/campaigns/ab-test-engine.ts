@@ -152,7 +152,7 @@ export async function getVariantMetrics(
   } | undefined;
 
   // Load all sends for this campaign
-  const sends = await (prisma.campaignSend as { findMany: (args: unknown) => Promise<Array<{ variantId: string | null; status: string }>> }).findMany({
+  const sends = await prisma.campaignSend.findMany({
     where: { campaignId },
     select: { variantId: true, status: true },
   });
