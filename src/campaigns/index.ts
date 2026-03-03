@@ -7,11 +7,11 @@ export type {
   AudienceFilter,
   Campaign,
   CampaignSend,
+  CampaignReply,
+  CampaignMetrics,
   CampaignExecutionResult,
   CampaignVariant,
   ABTestConfig,
-  CampaignReply,
-  CampaignMetrics,
   CampaignVariantMetrics,
   ABTestResult,
 } from './types.js';
@@ -29,3 +29,10 @@ export {
   getVariantMetrics,
   checkAndSelectWinner,
 } from './ab-test-engine.js';
+
+export {
+  markCampaignReply,
+  markConversion,
+  getCampaignMetrics,
+} from './campaign-tracker.js';
+export type { MarkReplyOptions } from './campaign-tracker.js';

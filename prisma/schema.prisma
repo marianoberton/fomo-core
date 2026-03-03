@@ -595,6 +595,8 @@ enum CampaignSendStatus {
   queued
   sent
   failed
+  replied
+  converted
 }
 
 model Campaign {
@@ -628,10 +630,27 @@ model CampaignSend {
   sentAt     DateTime?          @map("sent_at")
   createdAt  DateTime           @default(now()) @map("created_at")
 
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  reply    CampaignReply?
 
   @@index([campaignId, status])
   @@index([campaignId, variantId])
   @@index([contactId])
   @@map("campaign_sends")
+}
+
+model CampaignReply {
+  id               String   @id @default(cuid())
+  campaignSendId   String   @unique @map("campaign_send_id")
+  contactId        String   @map("contact_id")
+  sessionId        String   @map("session_id")
+  repliedAt        DateTime @map("replied_at")
+  messageCount     Int      @default(1) @map("message_count")
+  converted        Boolean  @default(false)
+  conversionNote   String?  @map("conversion_note")
+
+  campaignSend CampaignSend @relation(fields: [campaignSendId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("campaign_replies")
 }
