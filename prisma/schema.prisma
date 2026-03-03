@@ -623,6 +623,7 @@ model CampaignSend {
   campaignId String             @map("campaign_id")
   contactId  String             @map("contact_id")
   status     CampaignSendStatus @default(queued)
+  variantId  String?            @map("variant_id") // null if not an A/B test
   error      String?
   sentAt     DateTime?          @map("sent_at")
   createdAt  DateTime           @default(now()) @map("created_at")
@@ -630,6 +631,7 @@ model CampaignSend {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId, status])
+  @@index([campaignId, variantId])
   @@index([contactId])
   @@map("campaign_sends")
 }
