@@ -5,12 +5,15 @@
 import type { ApprovalId, ProjectId, SessionId, ToolCallId } from '@/core/types.js';
 import { createLogger } from '@/observability/logger.js';
 import { nanoid } from 'nanoid';
-import type { ApprovalRequest, ApprovalStatus, ApprovalStore } from './types.js';
+import type { ApprovalConfig, ApprovalRequest, ApprovalStatus, ApprovalStore } from './types.js';
 
 const logger = createLogger({ name: 'approval-gate' });
 
 /** Callback notified when an approval is requested. */
 export type ApprovalNotifier = (request: ApprovalRequest) => Promise<void>;
+
+/** Callback for sending reminder notifications before timeout. */
+export type ReminderNotifier = (approvalId: ApprovalId, minutesLeft: number) => Promise<void>;
 
 export interface ApprovalGateOptions {
   /** How long approvals are valid before expiring (ms). Default: 5 minutes. */
@@ -19,6 +22,22 @@ export interface ApprovalGateOptions {
   notifier?: ApprovalNotifier;
   /** Optional injected store. Defaults to in-memory. */
   store?: ApprovalStore;
+  /**
+   * Timeout configuration for automatic resolution when no human responds.
+   * Can be sourced from project.config at runtime.
+   * If not set, approvals simply expire (no automatic action taken).
+   */
+  timeoutConfig?: ApprovalConfig;
+  /**
+   * Optional callback invoked when a reminder fires before timeout.
+   * Use with createTelegramReminderSender or a custom implementation.
+   */
+  reminderNotifier?: ReminderNotifier;
+  /**
+   * Optional callback invoked when an approval is escalated due to timeout.
+   * Receives the full ApprovalRequest for external routing.
+   */
+  onEscalate?: (request: ApprovalRequest) => Promise<void>;
 }
 
 export interface ApprovalGate {
@@ -112,6 +131,22 @@ export function createInMemoryApprovalStore(): ApprovalStore {
 export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate {
   const expirationMs = options?.expirationMs ?? 5 * 60 * 1000;
   const store = options?.store ?? createInMemoryApprovalStore();
+  const timeoutConfig = options?.timeoutConfig;
+  const DEFAULT_TIMEOUT_MS = 600_000; // 10 minutes
+
+  // ─── Timer tracking (in-memory only — not persisted across restarts) ──
+  // NOTE: If the process restarts while approvals are pending, these timers
+  // are lost. The approval will still expire via expiresAt, but no automatic
+  // action (auto-approve/deny/escalate) will occur until a background job is added.
+  const pendingTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
+
+  function cancelTimers(approvalId: ApprovalId): void {
+    const timers = pendingTimers.get(approvalId);
+    if (timers) {
+      for (const t of timers) clearTimeout(t);
+      pendingTimers.delete(approvalId);
+    }
+  }
 
   function checkExpiration(request: ApprovalRequest): ApprovalRequest {
     if (request.status === 'pending' && new Date() >= request.expiresAt) {
@@ -129,6 +164,120 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
       await store.update(approvalId, checked);
     }
     return checked;
+  }
+
+  async function handleTimeout(approvalId: ApprovalId): Promise<void> {
+    if (!timeoutConfig) return;
+
+    const current = await store.get(approvalId);
+    if (!current || current.status !== 'pending') {
+      // Already resolved — nothing to do
+      return;
+    }
+
+    cancelTimers(approvalId);
+
+    const { onTimeout, escalateTo } = timeoutConfig;
+
+    if (onTimeout === 'auto-approve') {
+      const resolved: ApprovalRequest = {
+        ...current,
+        status: 'approved',
+        resolvedAt: new Date(),
+        resolvedBy: 'system:timeout',
+        resolutionNote: 'Auto-approved by timeout policy',
+      };
+      await store.update(approvalId, resolved);
+      logger.warn('Approval AUTO-APPROVED by timeout policy', {
+        component: 'approval-gate',
+        approvalId,
+        toolId: current.toolId,
+        projectId: current.projectId,
+        timeoutMs: timeoutConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      });
+    } else if (onTimeout === 'auto-deny') {
+      const resolved: ApprovalRequest = {
+        ...current,
+        status: 'denied',
+        resolvedAt: new Date(),
+        resolvedBy: 'system:timeout',
+        resolutionNote: 'Auto-denied by timeout policy',
+      };
+      await store.update(approvalId, resolved);
+      logger.warn('Approval AUTO-DENIED by timeout policy', {
+        component: 'approval-gate',
+        approvalId,
+        toolId: current.toolId,
+        projectId: current.projectId,
+        timeoutMs: timeoutConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      });
+    } else if (onTimeout === 'escalate') {
+      const resolved: ApprovalRequest = {
+        ...current,
+        status: 'denied',
+        resolvedAt: new Date(),
+        resolvedBy: 'system:timeout',
+        resolutionNote: `Escalated due to timeout${escalateTo ? ` → ${escalateTo}` : ''}`,
+      };
+      await store.update(approvalId, resolved);
+      logger.warn('Approval ESCALATED due to timeout', {
+        component: 'approval-gate',
+        approvalId,
+        toolId: current.toolId,
+        projectId: current.projectId,
+        escalateTo,
+        timeoutMs: timeoutConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      });
+      // Emit escalation event via optional callback
+      if (options?.onEscalate) {
+        await options.onEscalate(resolved).catch((err: unknown) => {
+          logger.error('onEscalate callback failed', {
+            component: 'approval-gate',
+            approvalId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
+    }
+  }
+
+  function scheduleTimers(request: ApprovalRequest): void {
+    if (!timeoutConfig) return;
+
+    const timeoutMs = timeoutConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    // Reminder timer
+    if (timeoutConfig.reminderMs !== undefined && timeoutConfig.reminderMs < timeoutMs) {
+      const reminderDelay = timeoutMs - timeoutConfig.reminderMs;
+      const minutesLeft = Math.round(timeoutConfig.reminderMs / 60_000);
+      const reminderTimer = setTimeout(() => {
+        if (options?.reminderNotifier) {
+          options.reminderNotifier(request.id, minutesLeft).catch((err: unknown) => {
+            logger.error('reminderNotifier failed', {
+              component: 'approval-gate',
+              approvalId: request.id,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
+      }, reminderDelay);
+      timers.push(reminderTimer);
+    }
+
+    // Timeout timer
+    const timeoutTimer = setTimeout(() => {
+      handleTimeout(request.id).catch((err: unknown) => {
+        logger.error('handleTimeout failed', {
+          component: 'approval-gate',
+          approvalId: request.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }, timeoutMs);
+    timers.push(timeoutTimer);
+
+    pendingTimers.set(request.id, timers);
   }
 
   return {
@@ -163,6 +312,9 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
         await options.notifier(request);
       }
 
+      // Start timeout/reminder timers after notifier fires
+      scheduleTimers(request);
+
       return request;
     },
 
@@ -183,6 +335,9 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
         });
         return checked;
       }
+
+      // Cancel pending timers before resolving
+      cancelTimers(approvalId);
 
       const resolved: ApprovalRequest = {
         ...checked,
