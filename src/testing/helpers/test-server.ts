@@ -43,6 +43,7 @@ import { createChannelResolver } from '@/channels/channel-resolver.js';
 import { createSkillRepository } from '@/skills/skill-repository.js';
 import { createSkillService } from '@/skills/skill-service.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
+import { registerAuthMiddleware } from '@/api/auth-middleware.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import type { RouteDependencies } from '@/api/types.js';
 
@@ -52,6 +53,11 @@ export interface TestServerOptions {
   prisma: PrismaClient;
   /** Whether to use mock LLM providers (default: true). */
   mockProviders?: boolean;
+  /**
+   * API key to enforce on /api/v1/* routes (matches NEXUS_API_KEY).
+   * Defaults to empty string = auth disabled (backward compat with existing tests).
+   */
+  apiKey?: string;
 }
 
 /**
@@ -62,7 +68,7 @@ export interface TestServerOptions {
  * @returns Fastify server instance.
  */
 export async function createTestServer(options: TestServerOptions): Promise<FastifyInstance> {
-  const { prisma } = options;
+  const { prisma, apiKey = '' } = options;
 
   const logger = createLogger();
 
@@ -190,6 +196,7 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
   // Register routes under /api/v1 prefix (matches production setup)
   await server.register(
     async (prefixed) => {
+      registerAuthMiddleware(prefixed, apiKey, logger);
       await prefixed.register(registerRoutes, deps);
     },
     { prefix: '/api/v1' },

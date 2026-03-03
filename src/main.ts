@@ -85,6 +85,7 @@ import { createSkillRepository } from '@/skills/skill-repository.js';
 import { createSkillService } from '@/skills/skill-service.js';
 import { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from '@/channels/handoff.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
+import { registerAuthMiddleware } from '@/api/auth-middleware.js';
 import { registerRoutes } from '@/api/routes/index.js';
 import { chatwootWebhookRoutes } from '@/api/routes/chatwoot-webhook.js';
 import { channelWebhookRoutes } from '@/api/routes/channel-webhooks.js';
@@ -664,6 +665,9 @@ async function start(): Promise<void> {
     // Register API routes under /api/v1 prefix
     await server.register(
       async (prefixed) => {
+        // Auth middleware — validates Bearer token on all routes except /api/v1/webhooks/*
+        registerAuthMiddleware(prefixed, process.env['NEXUS_API_KEY'] ?? '', logger);
+
         await prefixed.register(registerRoutes, deps);
 
         // Chatwoot webhook routes (separate from generic routes — needs extra deps)
