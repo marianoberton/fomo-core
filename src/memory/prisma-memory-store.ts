@@ -181,22 +181,43 @@ export function createPrismaMemoryStore(
 
       const whereClause = Prisma.join(conditions, ' AND ');
 
-      // Build score expression — apply temporal decay when configured.
-      // Decay formula: score = cosine_similarity * EXP(-λ * age_days)
-      // where λ = ln(2) / half_life_days (score halves every half_life_days days).
+      // Build score expression — apply temporal decay, access_count boost, and category weights.
+      //
+      // Full formula:
+      //   base      = cosine_similarity
+      //   decayed   = base * EXP(-λ * age_days)          [if decayHalfLifeDays set]
+      //   boosted   = decayed * (1 + LN(1 + access_count) * 0.1)
+      //   final     = boosted * category_weight           [if categoryWeights set]
+      //
+      // access_count boost: frequently-retrieved memories rank higher.
+      // LN(1+n)*0.1 gives ~+7% at n=1, ~+16% at n=5, ~+23% at n=10 (logarithmic, bounded).
       let scoreExpr: Prisma.Sql;
       let orderExpr: Prisma.Sql;
+
+      const cosineSimilarity = Prisma.sql`(1 - (embedding <=> ${vectorLiteral}::vector(1536)))`;
+      const accessBoost = Prisma.sql`(1.0 + LN(1.0 + access_count) * 0.1)`;
+
+      // ── Category weight CASE expression ──────────────────────
+      // Build dynamically from the provided weights map; default to 1.0.
+      let categoryWeightExpr: Prisma.Sql;
+      if (query.categoryWeights && Object.keys(query.categoryWeights).length > 0) {
+        const cases = Object.entries(query.categoryWeights).map(
+          ([cat, w]) => Prisma.sql`WHEN ${cat} THEN ${w as number}::float8`,
+        );
+        categoryWeightExpr = Prisma.sql`CASE category ${Prisma.join(cases, ' ')} ELSE 1.0 END`;
+      } else {
+        categoryWeightExpr = Prisma.sql`1.0`;
+      }
 
       if (query.decayHalfLifeDays && query.decayHalfLifeDays > 0) {
         const lambda = Math.log(2) / query.decayHalfLifeDays;
         // EXP(-λ * age_days) where age_days = seconds_since_created / 86400
         const decayExpr = Prisma.sql`EXP(${-lambda}::float8 * EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400.0)`;
-        const cosineSimilarity = Prisma.sql`(1 - (embedding <=> ${vectorLiteral}::vector(1536)))`;
-        scoreExpr = Prisma.sql`${cosineSimilarity} * ${decayExpr}`;
-        orderExpr = Prisma.sql`${cosineSimilarity} * ${decayExpr} DESC`;
+        scoreExpr = Prisma.sql`${cosineSimilarity} * ${decayExpr} * ${accessBoost} * ${categoryWeightExpr}`;
+        orderExpr = Prisma.sql`${cosineSimilarity} * ${decayExpr} * ${accessBoost} * ${categoryWeightExpr} DESC`;
       } else {
-        scoreExpr = Prisma.sql`1 - (embedding <=> ${vectorLiteral}::vector(1536))`;
-        orderExpr = Prisma.sql`embedding <=> ${vectorLiteral}::vector(1536)`;
+        scoreExpr = Prisma.sql`${cosineSimilarity} * ${accessBoost} * ${categoryWeightExpr}`;
+        orderExpr = Prisma.sql`${cosineSimilarity} * ${accessBoost} * ${categoryWeightExpr} DESC`;
       }
 
       const results = await prisma.$queryRaw<RawMemoryRow[]>`
@@ -211,15 +232,21 @@ export function createPrismaMemoryStore(
         LIMIT ${query.topK}
       `;
 
-      // Update access counts for retrieved memories
+      // Fire-and-forget: increment access_count for all returned memories.
+      // Non-blocking — retrieval speed is not affected by this update.
       if (results.length > 0) {
-        const ids = results.map((r) => r.id);
-        await prisma.$executeRaw`
+        const ids = results.map((r: RawMemoryRow) => r.id);
+        prisma.$executeRaw`
           UPDATE memory_entries
           SET access_count = access_count + 1,
               last_accessed_at = NOW()
           WHERE id = ANY(${ids}::text[])
-        `;
+        `.catch((err: unknown) => {
+          logger.warn('Failed to update access_count', {
+            component: 'prisma-memory-store',
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
       }
 
       logger.debug('Retrieved memories', {
