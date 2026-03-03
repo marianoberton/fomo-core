@@ -60,6 +60,14 @@ export interface MemoryRetrieval {
    * so recent memories rank higher. Omit to use flat cosine similarity.
    */
   decayHalfLifeDays?: number;
+  /**
+   * Per-category score multipliers applied after similarity + decay.
+   * Allows callers to boost or suppress specific categories depending on context.
+   * Example: { preference: 1.3, decision: 1.2 } at session start to surface
+   * user prefs and past decisions first.
+   * Categories omitted default to 1.0 (no boost).
+   */
+  categoryWeights?: Partial<Record<MemoryCategory, number>>;
 }
 
 export interface RetrievedMemory extends MemoryEntry {
