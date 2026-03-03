@@ -16,3 +16,6 @@ export type {
 export { createSkillRepository } from './skill-repository.js';
 export { createSkillService } from './skill-service.js';
 export type { SkillService } from './skill-service.js';
+
+export { OFFICIAL_SKILL_TEMPLATES, getOfficialTemplates } from './official-templates.js';
+export { seedOfficialTemplates } from './seed-templates.js';
