@@ -62,6 +62,9 @@ export type { ReadSessionHistoryToolOptions } from './read-session-history.js';
 export { createTriggerCampaignTool } from './trigger-campaign.js';
 export type { TriggerCampaignToolOptions } from './trigger-campaign.js';
 
+// Generic contact scoring
+export { createContactScoreTool } from './contact-score.js';
+
 // Vertical-specific tools
 export { createVehicleLeadScoreTool } from './vehicle-lead-score.js';
 export { createVehicleCheckFollowupTool } from './vehicle-check-followup.js';
