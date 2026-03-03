@@ -247,6 +247,101 @@ export async function sendTelegramMessage(
   }
 }
 
+// ─── Reminder Sender ─────────────────────────────────────────────
+
+export interface TelegramReminderSenderConfig {
+  secretService: SecretService;
+  logger: Logger;
+}
+
+/**
+ * Creates a ReminderNotifier compatible with ApprovalGateOptions.reminderNotifier.
+ *
+ * Looks up the pending approval's projectId to resolve the right Telegram credentials.
+ * Requires a getProjectId function to map approvalId → projectId.
+ */
+export function createTelegramReminderSender(
+  config: TelegramReminderSenderConfig & {
+    /** Resolve the projectId for a given approvalId (needed to fetch secrets). */
+    getProjectId: (approvalId: string) => Promise<string | undefined>;
+  },
+): (approvalId: string, minutesLeft: number) => Promise<void> {
+  const { secretService, logger, getProjectId } = config;
+
+  return async (approvalId: string, minutesLeft: number): Promise<void> => {
+    const projectId = await getProjectId(approvalId);
+    if (!projectId) {
+      logger.warn('sendReminder: could not resolve projectId for approval', {
+        component: 'telegram-approval-notifier',
+        approvalId,
+      });
+      return;
+    }
+
+    let botToken: string;
+    let ownerChatId: string;
+    try {
+      botToken = await secretService.get(projectId, TELEGRAM_SECRET_KEYS.botToken);
+      ownerChatId = await secretService.get(projectId, TELEGRAM_SECRET_KEYS.approvalChatId);
+    } catch {
+      logger.warn('sendReminder: Telegram not configured for project', {
+        component: 'telegram-approval-notifier',
+        projectId,
+        approvalId,
+      });
+      return;
+    }
+
+    await sendApprovalReminder(botToken, ownerChatId, approvalId, minutesLeft, logger);
+  };
+}
+
+/**
+ * Send a reminder message for a pending approval.
+ * Called by the reminder timer before the timeout fires.
+ */
+export async function sendApprovalReminder(
+  botToken: string,
+  chatId: string | number,
+  approvalId: string,
+  minutesLeft: number,
+  logger?: Logger,
+): Promise<void> {
+  const text =
+    `⏰ *Recordatorio:* hay una aprobación pendiente que vence en *${minutesLeft} minuto${minutesLeft !== 1 ? 's' : ''}*.\n` +
+    `ID: \`${approvalId}\`\n` +
+    `_Respondé a tiempo para evitar que se aplique la política de timeout automática._`;
+
+  const baseUrl = `https://api.telegram.org/bot${botToken}`;
+  try {
+    const response = await fetch(`${baseUrl}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' }),
+    });
+    const data = (await response.json()) as TelegramApiResponse;
+    if (!data.ok) {
+      logger?.warn('sendApprovalReminder: Telegram API error', {
+        component: 'telegram-approval-notifier',
+        approvalId,
+        error: data.description,
+      });
+    } else {
+      logger?.info('Approval reminder sent', {
+        component: 'telegram-approval-notifier',
+        approvalId,
+        minutesLeft,
+      });
+    }
+  } catch (error) {
+    logger?.error('sendApprovalReminder: fetch failed', {
+      component: 'telegram-approval-notifier',
+      approvalId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
 // ─── Internal ────────────────────────────────────────────────────
 
 /** Escape underscores to prevent accidental italic formatting in Telegram Markdown. */
