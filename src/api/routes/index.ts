@@ -32,6 +32,7 @@ import { operationsSummaryRoutes } from './operations-summary.js';
 import { skillRoutes } from './skills.js';
 import { campaignRoutes } from './campaigns.js';
 import { verticalRoutes } from './verticals.js';
+import { workforceMetricsRoutes } from './workforce-metrics.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -64,6 +65,7 @@ export async function registerRoutes(
   await fastify.register(proactiveRoutes, deps);
   await fastify.register(skillRoutes, deps);
   campaignRoutes(fastify, deps);
+  workforceMetricsRoutes(fastify, deps);
   operationsSummaryRoutes(fastify, deps);
   verticalRoutes(fastify, deps);
   mcpServerRoutes(fastify, { mcpServerRepository: deps.mcpServerRepository, logger: deps.logger });
