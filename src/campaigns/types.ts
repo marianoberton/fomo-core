@@ -46,28 +46,17 @@ export interface ABTestConfig {
   winnerMetric: 'reply_rate' | 'conversion_rate';
 }
 
-// ─── Metrics (Bloque 2) ─────────────────────────────────────────
+// ─── A/B Variant Metrics ────────────────────────────────────────
 
-export interface CampaignReply {
-  id: string;
+export interface CampaignVariantMetrics {
   campaignId: CampaignId;
-  contactId: ContactId;
-  campaignSendId: CampaignSendId;
-  repliedAt: Date;
-}
-
-export interface CampaignMetrics {
-  campaignId: CampaignId;
-  totalSent: number;
-  totalReplies: number;
-  replyRate: number;       // 0-1
-  conversionRate: number;  // 0-1
-}
-
-export interface CampaignVariantMetrics extends CampaignMetrics {
   variantId: string;
   variantName: string;
   weight: number;
+  totalSent: number;
+  totalReplies: number;
+  replyRate: number;
+  conversionRate: number;
 }
 
 export interface ABTestResult {

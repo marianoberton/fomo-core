@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import type { ExecutionContext } from '@/core/types.js';
+import type { ExecutionContext, ProjectId } from '@/core/types.js';
 import type { Result } from '@/core/result.js';
 import { ok, err } from '@/core/result.js';
 import { ToolExecutionError } from '@/core/errors.js';
@@ -117,7 +117,8 @@ export function createContactScoreTool(): ExecutableTool {
       const scoringCtx: ContactScoringContext = {
         contact: {
           id: contact.id,
-          projectId: contact.projectId,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          projectId: contact.projectId as ProjectId,
           name: contact.name,
           displayName: contact.displayName ?? undefined,
           phone: contact.phone ?? undefined,

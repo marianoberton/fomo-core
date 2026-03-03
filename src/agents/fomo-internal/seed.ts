@@ -14,8 +14,8 @@
 import { FOMO_INTERNAL_AGENTS, FOMO_PROJECT_ID } from './agents.config.js';
 
 async function main() {
-  const API_BASE = process.env.FOMO_API_URL ?? 'http://localhost:3002';
-  const API_KEY  = process.env.FOMO_API_KEY ?? '';
+  const API_BASE = process.env['FOMO_API_URL'] ?? 'http://localhost:3002';
+  const API_KEY  = process.env['FOMO_API_KEY'] ?? '';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

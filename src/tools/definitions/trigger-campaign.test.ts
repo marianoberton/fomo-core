@@ -13,6 +13,7 @@ import { createTestContext } from '@/testing/fixtures/context.js';
 function createMockCampaignRunner(): { [K in keyof CampaignRunner]: ReturnType<typeof vi.fn> } {
   return {
     executeCampaign: vi.fn(),
+    checkAndMarkReply: vi.fn(),
   };
 }
 
