@@ -1,0 +1,69 @@
+{
+  "id": "clinica",
+  "name": "Clínica / Consultorio / Centro de salud",
+  "description": "Vertical para clínicas médicas, consultorios, centros de salud y servicios médicos.",
+  "industry": "salud",
+  "identityFragment": "Sos el asistente virtual de {businessName}. Tu rol es ayudar a los pacientes y sus familias con información sobre turnos, especialidades disponibles, ubicación y consultas administrativas. Respondés con profesionalismo, calidez y respeto. IMPORTANTE: No das diagnósticos ni consejos médicos — siempre derivás al profesional de salud.",
+  "instructionsFragment": "## Protocolo de atención - {businessName}\n- Horario de atención: {businessHours}\n- Especialidades disponibles: {specialties}\n- Para urgencias, indicá siempre: {emergencyInstructions}\n- Para sacar turno: {appointmentInstructions}\n- Coberuras médicas aceptadas: {insurancePlans}\n- NUNCA des diagnósticos, interpretés resultados de análisis ni recomiendes medicamentos\n- Si el paciente menciona síntomas graves o urgentes, derivá inmediatamente a urgencias o al 107/911\n- Toda consulta médica debe derivarse al profesional correspondiente\n- Política de cancelación: {cancellationPolicy}",
+  "tools": [
+    {
+      "toolId": "knowledge-search",
+      "displayName": "Información de la clínica",
+      "description": "Busca información sobre especialidades, profesionales, ubicación y servicios",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    },
+    {
+      "toolId": "contact-update",
+      "displayName": "Registrar solicitud de turno",
+      "description": "Registra datos del paciente para gestión de turnos",
+      "defaultEnabled": true,
+      "riskLevel": "medium"
+    }
+  ],
+  "parametersSchema": {
+    "businessName": {
+      "type": "string",
+      "label": "Nombre de la clínica",
+      "required": true
+    },
+    "businessHours": {
+      "type": "string",
+      "label": "Horario de atención",
+      "description": "Ej: Lunes a viernes 8-20hs, Sábados 8-13hs",
+      "required": true
+    },
+    "specialties": {
+      "type": "string",
+      "label": "Especialidades médicas",
+      "description": "Lista de especialidades disponibles",
+      "required": true
+    },
+    "emergencyInstructions": {
+      "type": "string",
+      "label": "Instrucciones de urgencia",
+      "description": "Qué hacer en caso de urgencia médica",
+      "default": "Llamar al 107 (SAME) o dirigirse a la guardia más cercana",
+      "required": true
+    },
+    "appointmentInstructions": {
+      "type": "string",
+      "label": "Cómo sacar turno",
+      "description": "Instrucciones para sacar turno",
+      "required": true
+    },
+    "insurancePlans": {
+      "type": "string",
+      "label": "Coberturas aceptadas",
+      "description": "Obras sociales y prepagas que se aceptan",
+      "required": false
+    },
+    "cancellationPolicy": {
+      "type": "string",
+      "label": "Política de cancelación",
+      "default": "Cancelar con al menos 24 horas de anticipación",
+      "required": false
+    }
+  },
+  "recommendedSkillTags": ["salud", "turnos", "atencion-pacientes", "administrativo"]
+}

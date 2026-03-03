@@ -1,0 +1,92 @@
+{
+  "id": "educacion",
+  "name": "Academia / Instituto educativo",
+  "description": "Vertical para academias, institutos, centros de capacitación y espacios educativos.",
+  "industry": "educacion",
+  "identityFragment": "Sos el asistente virtual de {businessName}, un {institutionType}. Tu rol es orientar a estudiantes y futuros alumnos sobre cursos disponibles, inscripciones, modalidades de cursada y dudas administrativas. Respondés con calidez, motivando a las personas en su camino de aprendizaje.",
+  "instructionsFragment": "## Protocolo de atención - {businessName}\n- Horario de secretaría: {businessHours}\n- Modalidades disponibles: {modalities}\n- Para inscripciones: {enrollmentProcess}\n- Becas y descuentos disponibles: {scholarships}\n- Certificaciones que otorgamos: {certifications}\n- Requisitos de ingreso: {entryRequirements}\n- Formas de pago de cuotas: {paymentMethods}\n- Si el alumno tiene dudas sobre el contenido de una materia, derivalo al docente correspondiente\n- Para consultas sobre equivalencias de materias, derivar a secretaría académica\n- Próximos inicios: {upcomingStarts}",
+  "tools": [
+    {
+      "toolId": "catalog-search",
+      "displayName": "Buscar cursos y carreras",
+      "description": "Busca cursos, carreras y programas disponibles",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    },
+    {
+      "toolId": "knowledge-search",
+      "displayName": "Info académica",
+      "description": "Información sobre planes de estudio, requisitos y procesos",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    },
+    {
+      "toolId": "contact-update",
+      "displayName": "Registrar interesado",
+      "description": "Registra datos de alumno interesado en inscribirse",
+      "defaultEnabled": true,
+      "riskLevel": "medium"
+    }
+  ],
+  "parametersSchema": {
+    "businessName": {
+      "type": "string",
+      "label": "Nombre del instituto",
+      "required": true
+    },
+    "institutionType": {
+      "type": "enum",
+      "label": "Tipo de institución",
+      "options": ["academia", "instituto", "centro de capacitación", "escuela de idiomas", "universidad", "colegio técnico"],
+      "default": "instituto",
+      "required": true
+    },
+    "businessHours": {
+      "type": "string",
+      "label": "Horario de secretaría",
+      "required": true
+    },
+    "modalities": {
+      "type": "string",
+      "label": "Modalidades disponibles",
+      "description": "Ej: Presencial, online sincrónico, online asincrónico",
+      "required": true
+    },
+    "enrollmentProcess": {
+      "type": "string",
+      "label": "Proceso de inscripción",
+      "required": true
+    },
+    "scholarships": {
+      "type": "string",
+      "label": "Becas y descuentos",
+      "default": "Consultá con secretaría sobre becas y planes de financiamiento disponibles",
+      "required": false
+    },
+    "certifications": {
+      "type": "string",
+      "label": "Certificaciones que otorga",
+      "description": "Títulos, certificados o diplomas que emite la institución",
+      "required": false
+    },
+    "entryRequirements": {
+      "type": "string",
+      "label": "Requisitos de ingreso",
+      "default": "Sin requisitos previos para la mayoría de los cursos",
+      "required": false
+    },
+    "paymentMethods": {
+      "type": "string",
+      "label": "Formas de pago",
+      "default": "Cuotas mensuales por transferencia, débito automático o efectivo",
+      "required": false
+    },
+    "upcomingStarts": {
+      "type": "string",
+      "label": "Próximos inicios",
+      "description": "Fechas de inicio de nuevas cohortes",
+      "required": false
+    }
+  },
+  "recommendedSkillTags": ["educacion", "inscripciones", "cursos", "alumnos", "academico"]
+}
