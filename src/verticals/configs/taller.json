@@ -1,0 +1,87 @@
+{
+  "id": "taller",
+  "name": "Taller mecánico / Servicios técnicos",
+  "description": "Vertical para talleres mecánicos, electricistas, plomeros, y técnicos de servicios en general.",
+  "industry": "servicios-tecnicos",
+  "identityFragment": "Sos el asistente virtual de {businessName}, un {businessType}. Ayudás a los clientes con información sobre servicios disponibles, presupuestos, turnos y seguimiento de trabajos. Respondés con conocimiento técnico pero en lenguaje claro y accesible.",
+  "instructionsFragment": "## Protocolo de atención - {businessName}\n- Horario: {businessHours}\n- Zona de cobertura: {serviceArea}\n- Para dar presupuestos: {quotingProcess}\n- Servicios que ofrecemos: {services}\n- Tiempo estimado de diagnóstico: {diagnosticTime}\n- Para retirar vehículo/equipo siempre pedí el número de orden de trabajo\n- Si el cliente pregunta por repuestos, aclarales que los precios pueden variar según disponibilidad\n- Garantía de los trabajos: {warrantyPolicy}\n- Formas de pago: {paymentMethods}",
+  "tools": [
+    {
+      "toolId": "knowledge-search",
+      "displayName": "Información de servicios",
+      "description": "Busca información sobre servicios, precios referenciales y tiempos",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    },
+    {
+      "toolId": "contact-update",
+      "displayName": "Registrar consulta",
+      "description": "Registra datos del cliente y descripción del problema",
+      "defaultEnabled": true,
+      "riskLevel": "medium"
+    },
+    {
+      "toolId": "catalog-search",
+      "displayName": "Buscar servicios y precios",
+      "description": "Lista de servicios disponibles con precios estimados",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    }
+  ],
+  "parametersSchema": {
+    "businessName": {
+      "type": "string",
+      "label": "Nombre del taller",
+      "required": true
+    },
+    "businessType": {
+      "type": "enum",
+      "label": "Tipo de negocio",
+      "options": ["taller mecánico", "taller eléctrico", "servicio técnico", "plomería", "electricidad", "climatización"],
+      "default": "taller mecánico",
+      "required": true
+    },
+    "businessHours": {
+      "type": "string",
+      "label": "Horario de atención",
+      "required": true
+    },
+    "serviceArea": {
+      "type": "string",
+      "label": "Zona de cobertura",
+      "description": "Barrios o zonas donde trabajan",
+      "required": false
+    },
+    "services": {
+      "type": "string",
+      "label": "Servicios disponibles",
+      "description": "Lista de servicios principales",
+      "required": true
+    },
+    "quotingProcess": {
+      "type": "string",
+      "label": "Proceso de presupuesto",
+      "default": "Traé el vehículo/equipo para diagnóstico sin cargo y te damos presupuesto en el día",
+      "required": false
+    },
+    "diagnosticTime": {
+      "type": "string",
+      "label": "Tiempo de diagnóstico",
+      "default": "24-48 horas hábiles",
+      "required": false
+    },
+    "warrantyPolicy": {
+      "type": "string",
+      "label": "Política de garantía",
+      "default": "3 meses de garantía en mano de obra y repuestos instalados",
+      "required": false
+    },
+    "paymentMethods": {
+      "type": "string",
+      "label": "Formas de pago",
+      "default": "Efectivo, transferencia bancaria y tarjetas de débito/crédito",
+      "required": false
+    }
+  },
+  "recommendedSkillTags": ["mecanica", "servicios-tecnicos", "presupuestos", "ordenes-trabajo"]
+}

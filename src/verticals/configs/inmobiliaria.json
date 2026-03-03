@@ -1,0 +1,85 @@
+{
+  "id": "inmobiliaria",
+  "name": "Agencia inmobiliaria",
+  "description": "Vertical para agencias inmobiliarias, brokers y asesores de bienes raíces.",
+  "industry": "inmuebles",
+  "identityFragment": "Sos el asistente virtual de {businessName}, una agencia inmobiliaria. Tu rol es ayudar a compradores, vendedores e inquilinos a encontrar la propiedad ideal, entender los procesos de compra/venta/alquiler y conectarlos con el asesor adecuado. Respondés con conocimiento del mercado inmobiliario local y orientás a cada cliente según su necesidad.",
+  "instructionsFragment": "## Protocolo de atención - {businessName}\n- Horario de oficina: {businessHours}\n- Zonas en las que operamos: {operatingZones}\n- Tipos de operaciones: {operationTypes}\n- Para visitas a propiedades: siempre coordinar con un asesor, no dar direcciones exactas sin confirmación\n- Si el cliente quiere tasar su propiedad: {valuationProcess}\n- Documentación básica para alquiler: {rentalRequirements}\n- Documentación básica para compra/venta: {purchaseRequirements}\n- Comisiones: {commissionInfo}\n- Para propiedades de inversión, mencioná el rendimiento promedio de la zona: {averageYield}",
+  "tools": [
+    {
+      "toolId": "catalog-search",
+      "displayName": "Buscar propiedades",
+      "description": "Busca propiedades disponibles según filtros del cliente",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    },
+    {
+      "toolId": "knowledge-search",
+      "displayName": "Info del mercado y procesos",
+      "description": "Información sobre el mercado inmobiliario, documentación y procesos",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    },
+    {
+      "toolId": "contact-update",
+      "displayName": "Registrar lead inmobiliario",
+      "description": "Registra datos del cliente interesado y sus preferencias",
+      "defaultEnabled": true,
+      "riskLevel": "medium"
+    }
+  ],
+  "parametersSchema": {
+    "businessName": {
+      "type": "string",
+      "label": "Nombre de la inmobiliaria",
+      "required": true
+    },
+    "businessHours": {
+      "type": "string",
+      "label": "Horario de oficina",
+      "required": true
+    },
+    "operatingZones": {
+      "type": "string",
+      "label": "Zonas de operación",
+      "description": "Barrios o zonas donde opera la inmobiliaria",
+      "required": true
+    },
+    "operationTypes": {
+      "type": "string",
+      "label": "Tipos de operaciones",
+      "default": "Alquiler, venta y administración de propiedades",
+      "required": false
+    },
+    "valuationProcess": {
+      "type": "string",
+      "label": "Proceso de tasación",
+      "default": "Enviá fotos y datos de tu propiedad y un asesor te contacta para tasación sin cargo",
+      "required": false
+    },
+    "rentalRequirements": {
+      "type": "string",
+      "label": "Requisitos para alquilar",
+      "description": "Documentación necesaria para alquiler",
+      "required": false
+    },
+    "purchaseRequirements": {
+      "type": "string",
+      "label": "Requisitos para compra/venta",
+      "description": "Documentación necesaria para operaciones de compraventa",
+      "required": false
+    },
+    "commissionInfo": {
+      "type": "string",
+      "label": "Información de comisiones",
+      "required": false
+    },
+    "averageYield": {
+      "type": "string",
+      "label": "Rendimiento promedio de inversión",
+      "description": "Rentabilidad estimada para propiedades de inversión en la zona",
+      "required": false
+    }
+  },
+  "recommendedSkillTags": ["inmuebles", "alquiler", "venta", "tasacion", "leads-inmobiliarios"]
+}

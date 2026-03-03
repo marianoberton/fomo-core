@@ -1,0 +1,84 @@
+{
+  "id": "restaurante",
+  "name": "Restaurante / Bar / Delivery",
+  "description": "Vertical para restaurantes, bares, cafeterías y negocios de delivery de comida.",
+  "industry": "gastronomia",
+  "identityFragment": "Sos el asistente virtual de {businessName}, un {businessType} ubicado en {businessAddress}. Tu rol es ayudar a los clientes con información del menú, reservas, pedidos y consultas generales. Respondé siempre de forma amable, rápida y con conocimiento del negocio.",
+  "instructionsFragment": "## Reglas del restaurante\n- Horario de atención: {businessHours}\n- Para reservas de más de {maxReservationSize} personas, siempre derivá al teléfono o coordiná con el encargado\n- Si el cliente pregunta por ingredientes o alérgenos, buscá en la base de conocimiento antes de responder\n- Para pedidos de delivery, indicá siempre el tiempo estimado ({deliveryTime} minutos) y el mínimo de pedido (${minOrderAmount})\n- No confirmes disponibilidad de productos sin verificar en el sistema\n- Si el cliente quiere hacer una queja, respondé con empatía y ofrecé soluciones concretas\n- Promociones activas: {activePromotions}",
+  "tools": [
+    {
+      "toolId": "knowledge-search",
+      "displayName": "Buscar en menú y FAQs",
+      "description": "Busca información en el menú, ingredientes, alérgenos y preguntas frecuentes",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    },
+    {
+      "toolId": "catalog-search",
+      "displayName": "Buscar platos disponibles",
+      "description": "Busca platos y bebidas disponibles con precios actualizados",
+      "defaultEnabled": true,
+      "riskLevel": "low"
+    },
+    {
+      "toolId": "contact-update",
+      "displayName": "Registrar reserva",
+      "description": "Registra datos de reserva o pedido del cliente",
+      "defaultEnabled": true,
+      "riskLevel": "medium"
+    }
+  ],
+  "parametersSchema": {
+    "businessName": {
+      "type": "string",
+      "label": "Nombre del negocio",
+      "description": "Nombre del restaurante o bar",
+      "required": true
+    },
+    "businessType": {
+      "type": "enum",
+      "label": "Tipo de negocio",
+      "options": ["restaurante", "bar", "cafetería", "pizzería", "parrilla", "delivery"],
+      "default": "restaurante",
+      "required": true
+    },
+    "businessAddress": {
+      "type": "string",
+      "label": "Dirección",
+      "description": "Dirección física del local",
+      "required": false
+    },
+    "businessHours": {
+      "type": "string",
+      "label": "Horario de atención",
+      "description": "Ej: Lunes a viernes 12-15hs y 20-23hs, Sábados 20-24hs",
+      "required": true
+    },
+    "deliveryTime": {
+      "type": "number",
+      "label": "Tiempo estimado de delivery (minutos)",
+      "default": 45,
+      "required": false
+    },
+    "minOrderAmount": {
+      "type": "number",
+      "label": "Monto mínimo de pedido",
+      "default": 2000,
+      "required": false
+    },
+    "maxReservationSize": {
+      "type": "number",
+      "label": "Máximo de personas para reserva online",
+      "default": 8,
+      "required": false
+    },
+    "activePromotions": {
+      "type": "string",
+      "label": "Promociones activas",
+      "description": "Descripciones de promociones vigentes",
+      "default": "Sin promociones activas por el momento",
+      "required": false
+    }
+  },
+  "recommendedSkillTags": ["gastronomia", "reservas", "delivery", "menu", "atencion-cliente"]
+}
