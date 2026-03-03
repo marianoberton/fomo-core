@@ -12,7 +12,7 @@ export type CampaignSendId = string & { readonly __brand: 'CampaignSendId' };
 // ─── Enums ──────────────────────────────────────────────────────
 
 export type CampaignStatus = 'draft' | 'active' | 'paused' | 'completed';
-export type CampaignSendStatus = 'queued' | 'sent' | 'failed';
+export type CampaignSendStatus = 'queued' | 'sent' | 'failed' | 'replied' | 'converted';
 export type CampaignChannel = 'whatsapp' | 'telegram' | 'slack';
 
 // ─── Audience Filter ────────────────────────────────────────────
@@ -53,6 +53,42 @@ export interface CampaignSend {
   error?: string;
   sentAt?: Date;
   createdAt: Date;
+}
+
+// ─── Reply & Metrics ────────────────────────────────────────────
+
+/** Record of a contact replying to a campaign message. */
+export interface CampaignReply {
+  id: string;
+  campaignSendId: CampaignSendId;
+  contactId: ContactId;
+  /** Session where the contact replied. */
+  sessionId: string;
+  repliedAt: Date;
+  /** Number of messages exchanged in the session. */
+  messageCount: number;
+  /** Whether the agent marked this as a conversion. */
+  converted: boolean;
+  /** Type of conversion (purchase, inquiry, etc.). */
+  conversionNote?: string;
+}
+
+/** Aggregated metrics for a campaign. */
+export interface CampaignMetrics {
+  campaignId: CampaignId;
+  totalSent: number;
+  totalFailed: number;
+  totalReplied: number;
+  totalConverted: number;
+  /** totalReplied / totalSent (0-1). */
+  replyRate: number;
+  /** totalConverted / totalSent (0-1). */
+  conversionRate: number;
+  /** Average milliseconds until first reply, or null if no replies yet. */
+  avgResponseTimeMs: number | null;
+  breakdown: {
+    byDay: Array<{ date: string; sent: number; replied: number; converted: number }>;
+  };
 }
 
 // ─── Execution Result ───────────────────────────────────────────

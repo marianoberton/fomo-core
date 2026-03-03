@@ -18,6 +18,7 @@ import type {
   CampaignExecutionResult,
   AudienceFilter,
 } from './types.js';
+import { markCampaignReply } from './campaign-tracker.js';
 
 // ─── Error ──────────────────────────────────────────────────────
 
@@ -47,6 +48,18 @@ export interface CampaignRunnerDeps {
 export interface CampaignRunner {
   /** Execute a campaign: filter audience, interpolate template, send messages. */
   executeCampaign(campaignId: string): Promise<Result<CampaignExecutionResult, NexusError>>;
+  /**
+   * Check whether a contact has a recent 'sent' CampaignSend (within 7 days)
+   * for any campaign in the project, and mark it as 'replied' if so.
+   *
+   * Intended to be called by the InboundProcessor when a contact sends a message.
+   * Returns the updated send ID, or null if no eligible send was found.
+   */
+  checkAndMarkReply(
+    projectId: ProjectId,
+    contactId: ContactId,
+    sessionId: string,
+  ): Promise<string | null>;
 }
 
 // ─── Template Interpolation ─────────────────────────────────────
@@ -247,6 +260,47 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
       });
 
       return ok(result);
+    },
+
+    async checkAndMarkReply(
+      projectId: ProjectId,
+      contactId: ContactId,
+      sessionId: string,
+    ): Promise<string | null> {
+      // Find any campaign send in 'sent' status for this contact within the
+      // last 7 days, across all campaigns that belong to the project.
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+      const send = await prisma.campaignSend.findFirst({
+        where: {
+          contactId,
+          status: 'sent',
+          sentAt: { gte: sevenDaysAgo },
+          campaign: { projectId },
+        },
+        orderBy: { sentAt: 'desc' },
+      });
+
+      if (!send) return null;
+
+      const result = await markCampaignReply(
+        prisma,
+        send.campaignId as CampaignId,
+        contactId,
+        sessionId,
+      );
+
+      if (!result) return null;
+
+      logger.info('Campaign reply auto-marked', {
+        component: 'campaign-runner',
+        campaignSendId: result.campaignSend.id,
+        contactId,
+        sessionId,
+        projectId,
+      });
+
+      return result.campaignSend.id;
     },
   };
 }

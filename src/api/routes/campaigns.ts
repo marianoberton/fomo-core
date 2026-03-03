@@ -13,6 +13,8 @@ import type { Prisma } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
+import { getCampaignMetrics } from '@/campaigns/campaign-tracker.js';
+import type { CampaignId } from '@/campaigns/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -200,6 +202,28 @@ export function campaignRoutes(
       });
 
       await sendSuccess(reply, updated);
+    },
+  );
+
+  // GET /projects/:projectId/campaigns/:id/metrics
+  fastify.get(
+    '/projects/:projectId/campaigns/:id/metrics',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, projectId: true },
+      });
+
+      if (!campaign || campaign.projectId !== request.params.projectId) {
+        await sendNotFound(reply, 'Campaign', request.params.id);
+        return;
+      }
+
+      const metrics = await getCampaignMetrics(prisma, campaign.id as CampaignId);
+      await sendSuccess(reply, metrics);
     },
   );
 
