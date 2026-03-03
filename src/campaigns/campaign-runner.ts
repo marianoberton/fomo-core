@@ -17,7 +17,9 @@ import type {
   CampaignChannel,
   CampaignExecutionResult,
   AudienceFilter,
+  ABTestConfig,
 } from './types.js';
+import { selectVariant } from './ab-test-engine.js';
 
 // ─── Error ──────────────────────────────────────────────────────
 
@@ -171,17 +173,30 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
           continue;
         }
 
+        // Determine template (A/B test or default)
+        const abConfig = (campaign.metadata as Record<string, unknown> | null)?.['abTest'] as ABTestConfig | undefined;
+        const abEnabled = abConfig?.enabled && abConfig.variants && abConfig.variants.length > 0;
+        let templateToUse = campaign.template;
+        let chosenVariantId: string | null = null;
+
+        if (abEnabled) {
+          const variant = selectVariant(abConfig!.variants, contact.id);
+          templateToUse = variant.template;
+          chosenVariantId = variant.id;
+        }
+
         // Create send record
-        const sendRecord = await prisma.campaignSend.create({
+        const sendRecord = await (prisma.campaignSend as { create: (args: unknown) => Promise<{ id: string }> }).create({
           data: {
             campaignId,
             contactId: contact.id,
             status: 'queued',
+            ...(chosenVariantId !== null && { variantId: chosenVariantId }),
           },
         });
 
         // Interpolate and send
-        const message = interpolateTemplate(campaign.template, {
+        const message = interpolateTemplate(templateToUse, {
           name: contact.name,
           displayName: contact.displayName ?? undefined,
           phone: contact.phone ?? undefined,
@@ -195,7 +210,11 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
             channel: channel as ChannelType,
             recipientIdentifier: recipient,
             content: message,
-            metadata: { campaignId, campaignName: campaign.name },
+            metadata: {
+              campaignId,
+              campaignName: campaign.name,
+              ...(chosenVariantId !== null && { variantId: chosenVariantId }),
+            },
           });
 
           if (result.success) {

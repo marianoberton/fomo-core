@@ -25,6 +25,59 @@ export interface AudienceFilter {
   role?: string;
 }
 
+// ─── A/B Testing ────────────────────────────────────────────────
+
+export interface CampaignVariant {
+  id: string;
+  campaignId: CampaignId;
+  name: string;           // 'Variante A', 'Variante B'
+  template: string;       // Mustache-style message alternative
+  weight: number;         // % of traffic (0-100). Weights must sum to 100
+  isControl: boolean;     // original/control variant
+  createdAt: Date;
+}
+
+export interface ABTestConfig {
+  enabled: boolean;
+  variants: CampaignVariant[];
+  /** Declare winner automatically after N hours */
+  autoSelectWinnerAfterHours?: number;
+  /** Metric used to declare winner */
+  winnerMetric: 'reply_rate' | 'conversion_rate';
+}
+
+// ─── Metrics (Bloque 2) ─────────────────────────────────────────
+
+export interface CampaignReply {
+  id: string;
+  campaignId: CampaignId;
+  contactId: ContactId;
+  campaignSendId: CampaignSendId;
+  repliedAt: Date;
+}
+
+export interface CampaignMetrics {
+  campaignId: CampaignId;
+  totalSent: number;
+  totalReplies: number;
+  replyRate: number;       // 0-1
+  conversionRate: number;  // 0-1
+}
+
+export interface CampaignVariantMetrics extends CampaignMetrics {
+  variantId: string;
+  variantName: string;
+  weight: number;
+}
+
+export interface ABTestResult {
+  campaignId: CampaignId;
+  variants: CampaignVariantMetrics[];
+  winner: string | null;          // variantId of winner, null if none yet
+  winnerSelectedAt: Date | null;
+  confidence: number;             // 0-1, statistical significance
+}
+
 // ─── Domain Types ───────────────────────────────────────────────
 
 export interface Campaign {
@@ -38,6 +91,8 @@ export interface Campaign {
   channel: CampaignChannel;
   /** Audience selection criteria. */
   audienceFilter: AudienceFilter;
+  /** A/B test configuration. */
+  abTest?: ABTestConfig;
   scheduledFor?: Date;
   completedAt?: Date;
   metadata?: Record<string, unknown>;
@@ -50,6 +105,8 @@ export interface CampaignSend {
   campaignId: CampaignId;
   contactId: ContactId;
   status: CampaignSendStatus;
+  /** variantId used for A/B test sends, null if not an A/B test */
+  variantId?: string | null;
   error?: string;
   sentAt?: Date;
   createdAt: Date;

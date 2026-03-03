@@ -13,6 +13,8 @@ import type { Prisma } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
+import { getVariantMetrics, calculateWinner } from '../../campaigns/ab-test-engine.js';
+import type { CampaignId, ABTestResult } from '../../campaigns/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -200,6 +202,46 @@ export function campaignRoutes(
       });
 
       await sendSuccess(reply, updated);
+    },
+  );
+
+  // GET /projects/:projectId/campaigns/:id/ab-results
+  fastify.get(
+    '/projects/:projectId/campaigns/:id/ab-results',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: request.params.id },
+      });
+
+      if (!campaign || campaign.projectId !== request.params.projectId) {
+        await sendNotFound(reply, 'Campaign', request.params.id);
+        return;
+      }
+
+      const campaignId = campaign.id as CampaignId;
+      const variantMetrics = await getVariantMetrics(prisma, campaignId);
+      const { winner, confidence } = calculateWinner(variantMetrics);
+
+      // Pull winner metadata if already persisted
+      const meta = campaign.metadata as Record<string, unknown> | null;
+      const abMeta = meta?.['abTest'] as Record<string, unknown> | undefined;
+      const persistedWinner = (abMeta?.['winner'] as string | undefined) ?? winner;
+      const winnerSelectedAt = abMeta?.['winnerSelectedAt']
+        ? new Date(abMeta['winnerSelectedAt'] as string)
+        : null;
+
+      const result: ABTestResult = {
+        campaignId,
+        variants: variantMetrics,
+        winner: persistedWinner ?? null,
+        winnerSelectedAt,
+        confidence,
+      };
+
+      await sendSuccess(reply, result);
     },
   );
 
