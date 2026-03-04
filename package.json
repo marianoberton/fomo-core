@@ -23,6 +23,7 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:templates": "tsx prisma/seed-templates.ts",
     "db:seed:fomo": "tsx prisma/seed-fomo.ts",
     "chat": "tsx src/cli/chat.ts",
     "add-model": "tsx scripts/add-model.ts",
