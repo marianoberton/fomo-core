@@ -41,6 +41,8 @@ export interface MemoryEntry {
 export interface MemoryRetrieval {
   query: string;
   topK: number;
+  /** Project to search within. Required for correct isolation. */
+  projectId?: ProjectId;
   minImportance?: number;
   categories?: MemoryCategory[];
   /** If provided, search only within this session. Null = project-wide. */

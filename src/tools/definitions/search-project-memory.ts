@@ -109,6 +109,7 @@ export function createSearchProjectMemoryTool(
         const memories = await store.retrieve({
           query: parsed.query,
           topK: parsed.topK,
+          projectId: context.projectId,
           scope: 'project',
           categories: parsed.categories,
           minImportance: parsed.minImportance,

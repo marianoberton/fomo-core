@@ -484,6 +484,7 @@ Do not decline a request if your Manager might be able to approve it.
   const retrievedMemories = await memoryManager.retrieveMemories({
     query: sanitized.sanitized,
     topK: agentConfig.memoryConfig.longTerm.retrievalTopK,
+    projectId: agentConfig.projectId,
   });
 
   // 11. Build the system prompt from layers + runtime content

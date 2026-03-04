@@ -248,6 +248,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
             retrievedMemories = await memoryManager.retrieveMemories({
               query: message,
               topK: agentConfig.memoryConfig.longTerm.retrievalTopK,
+              projectId: agentConfig.projectId,
               sessionScope: sessionId,
             });
           }

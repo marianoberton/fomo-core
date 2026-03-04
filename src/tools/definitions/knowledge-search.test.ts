@@ -135,6 +135,7 @@ describe('knowledge-search', () => {
       expect(store.retrieve).toHaveBeenCalledWith({
         query: 'when was the company founded?',
         topK: 5,
+        projectId: context.projectId,
         minImportance: undefined,
         categories: undefined,
       });
@@ -166,6 +167,7 @@ describe('knowledge-search', () => {
       expect(store.retrieve).toHaveBeenCalledWith({
         query: 'test',
         topK: 3,
+        projectId: context.projectId,
         minImportance: 0.8,
         categories: ['decision'],
       });

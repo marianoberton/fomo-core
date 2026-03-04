@@ -139,7 +139,17 @@ export function createPrismaMemoryStore(
     },
 
     async retrieve(query: MemoryRetrieval): Promise<RetrievedMemory[]> {
-      const queryEmbedding = await generateEmbedding(query.query);
+      let queryEmbedding: number[];
+      try {
+        queryEmbedding = await generateEmbedding(query.query);
+      } catch (error) {
+        logger.error('Failed to generate query embedding', {
+          component: 'prisma-memory-store',
+          query: query.query.slice(0, 200),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return [];
+      }
       const vectorLiteral = toVectorLiteral(queryEmbedding);
 
       // Build dynamic WHERE conditions
@@ -147,6 +157,11 @@ export function createPrismaMemoryStore(
         Prisma.sql`embedding IS NOT NULL`,
         Prisma.sql`(expires_at IS NULL OR expires_at > NOW())`,
       ];
+
+      // ── Project isolation ─────────────────────────────────────
+      if (query.projectId) {
+        conditions.push(Prisma.sql`project_id = ${query.projectId}`);
+      }
 
       // ── Scope filtering ──────────────────────────────────────
       // 'agent'  → only this agent's memories (requires agentId)

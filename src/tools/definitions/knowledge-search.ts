@@ -76,6 +76,7 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
         const retrieved = await store.retrieve({
           query: parsed.query,
           topK: parsed.topK,
+          projectId: context.projectId,
           minImportance: parsed.minImportance,
           categories: parsed.categories as MemoryCategory[] | undefined,
         });
