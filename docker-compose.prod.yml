@@ -47,6 +47,10 @@ services:
       LOG_LEVEL: info
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       FILE_STORAGE_PATH: /app/data/files
+      SECRETS_ENCRYPTION_KEY: ${SECRETS_ENCRYPTION_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      NEXUS_API_KEY: ${NEXUS_API_KEY:-}
     volumes:
       - filedata:/app/data/files
     depends_on:
