@@ -43,6 +43,7 @@ export interface AgentLLMConfig {
   model?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  apiKeyEnvVar?: string;
 }
 
 // ─── MCP Server Config ───────────────────────────────────────────
