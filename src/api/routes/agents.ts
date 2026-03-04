@@ -43,6 +43,7 @@ const llmConfigSchema = z.object({
   model: z.string().min(1).optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxOutputTokens: z.number().int().positive().optional(),
+  apiKeyEnvVar: z.string().min(1).optional(),
 });
 
 const agentModeSchema = z.object({
