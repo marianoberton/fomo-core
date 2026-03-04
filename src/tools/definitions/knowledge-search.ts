@@ -73,24 +73,25 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
       const parsed = inputSchema.parse(input);
 
       try {
-        logger.info('Knowledge search starting', {
-          component: 'knowledge-search',
-          projectId: context.projectId,
-          agentId: context.agentId,
-          traceId: context.traceId,
-          query: parsed.query,
-          topK: parsed.topK,
-          minImportance: parsed.minImportance,
-          categories: parsed.categories,
-        });
-
-        const retrieved = await store.retrieve({
+        const retrievalParams = {
           query: parsed.query,
           topK: parsed.topK,
           projectId: context.projectId,
           minImportance: parsed.minImportance,
           categories: parsed.categories as MemoryCategory[] | undefined,
+        };
+
+        logger.info('Knowledge search starting', {
+          component: 'knowledge-search',
+          projectId: context.projectId,
+          agentId: context.agentId,
+          traceId: context.traceId,
+          storeExists: !!store,
+          storeType: typeof store,
+          retrievalParams: JSON.stringify(retrievalParams),
         });
+
+        const retrieved = await store.retrieve(retrievalParams);
 
         const results = retrieved.map((entry) => ({
           content: entry.content,
@@ -103,10 +104,12 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
         logger.info('Knowledge search completed', {
           component: 'knowledge-search',
           projectId: context.projectId,
+          agentId: context.agentId,
           traceId: context.traceId,
-          query: parsed.query,
-          topK: parsed.topK,
           resultsCount: results.length,
+          firstResultPreview: results.length > 0
+            ? { category: results[0]?.category, similarity: results[0]?.similarity, content: results[0]?.content.slice(0, 100) }
+            : null,
         });
 
         return ok({

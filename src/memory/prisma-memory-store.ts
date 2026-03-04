@@ -152,6 +152,28 @@ export function createPrismaMemoryStore(
       }
       const vectorLiteral = toVectorLiteral(queryEmbedding);
 
+      // Diagnostic: count matching entries for this project
+      const countResult = await prisma.$queryRaw<[{ total: bigint; with_embedding: bigint }]>`
+        SELECT
+          COUNT(*)::bigint AS total,
+          COUNT(CASE WHEN embedding IS NOT NULL THEN 1 END)::bigint AS with_embedding
+        FROM memory_entries
+        WHERE project_id = ${query.projectId ?? ''}
+      `;
+      const counts = countResult[0];
+
+      logger.info('retrieve() called', {
+        component: 'prisma-memory-store',
+        projectId: query.projectId ?? 'NOT SET',
+        scope: query.scope ?? 'NOT SET',
+        agentId: query.agentId ?? 'NOT SET',
+        topK: query.topK,
+        embeddingLength: queryEmbedding.length,
+        embeddingFirst3: queryEmbedding.slice(0, 3),
+        dbTotalEntries: counts ? Number(counts.total) : -1,
+        dbWithEmbedding: counts ? Number(counts.with_embedding) : -1,
+      });
+
       // Build dynamic WHERE conditions
       const conditions: Prisma.Sql[] = [
         Prisma.sql`embedding IS NOT NULL`,
@@ -264,13 +286,16 @@ export function createPrismaMemoryStore(
         });
       }
 
-      logger.debug('Retrieved memories', {
+      logger.info('retrieve() completed', {
         component: 'prisma-memory-store',
-        query: query.query,
-        scope: query.scope,
-        agentId: query.agentId,
-        topK: query.topK,
+        projectId: query.projectId ?? 'NOT SET',
+        scope: query.scope ?? 'NOT SET',
+        agentId: query.agentId ?? 'NOT SET',
+        conditionsCount: conditions.length,
         resultsCount: results.length,
+        firstResult: results.length > 0
+          ? { id: results[0]?.id, scope: results[0]?.scope, similarity: results[0]?.similarity_score, content: results[0]?.content.slice(0, 80) }
+          : null,
       });
 
       return results.map(rowToRetrievedMemory);
