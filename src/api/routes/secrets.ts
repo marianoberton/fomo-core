@@ -50,12 +50,12 @@ export function secretRoutes(fastify: FastifyInstance, deps: RouteDependencies):
         logger.info('Secret set', { component: 'secrets-routes', projectId, key: body.key });
         await sendSuccess(reply, metadata, 201);
       } catch (err) {
-        logger.error('Error setting secret', {
-          component: 'secrets-routes',
-          err,
-          errorType: typeof err,
-          errorConstructor: (err as { constructor?: { name?: string } })?.constructor?.name,
-        });
+        // eslint-disable-next-line no-console
+        console.error('SECRET ERROR:', err);
+        // eslint-disable-next-line no-console
+        console.error('SECRET ERROR TYPE:', typeof err);
+        // eslint-disable-next-line no-console
+        console.error('SECRET ERROR STR:', String(err));
         throw err;
       }
     },
