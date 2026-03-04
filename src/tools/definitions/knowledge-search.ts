@@ -76,6 +76,7 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
         logger.info('Knowledge search starting', {
           component: 'knowledge-search',
           projectId: context.projectId,
+          agentId: context.agentId,
           traceId: context.traceId,
           query: parsed.query,
           topK: parsed.topK,
