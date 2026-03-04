@@ -5,6 +5,7 @@
  *
  * EXEMPT routes (they carry their own auth — HMAC signatures, Telegram tokens, etc.):
  *   - /api/v1/webhooks/*    (channel webhooks, Chatwoot, Telegram approval)
+ *   - /api/v1/ws            (WebSocket — browsers cannot send Authorization headers on upgrade)
  *
  * Configuration:
  *   NEXUS_API_KEY env var — if absent, auth is DISABLED with a loud warning.
@@ -19,8 +20,9 @@ import { timingSafeEqual as cryptoTimingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { Logger } from '@/observability/logger.js';
 
-/** Paths (without /api/v1 prefix) that skip API key validation. */
+/** Path prefixes/exact paths that skip API key validation. */
 const WEBHOOK_PREFIX = '/api/v1/webhooks/';
+const WS_PATH = '/api/v1/ws';
 
 /**
  * Register the Bearer-token auth hook on the given Fastify scope.
@@ -45,7 +47,7 @@ export function registerAuthMiddleware(
     return;
   }
 
-  logger.info('API key authentication enabled for /api/v1/* (webhooks exempt)', {
+  logger.info('API key authentication enabled for /api/v1/* (webhooks + ws exempt)', {
     component: 'auth-middleware',
   });
 
@@ -55,7 +57,8 @@ export function registerAuthMiddleware(
       const pathname = request.url.split('?')[0] ?? '';
 
       // Webhooks carry their own HMAC / provider-specific auth — skip Bearer check.
-      if (pathname.startsWith(WEBHOOK_PREFIX)) {
+      // WebSocket upgrade requests also skip: browsers cannot send Authorization on WS handshake.
+      if (pathname.startsWith(WEBHOOK_PREFIX) || pathname === WS_PATH || pathname.startsWith(`${WS_PATH}?`)) {
         return;
       }
 
