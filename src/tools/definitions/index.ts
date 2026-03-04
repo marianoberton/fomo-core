@@ -65,6 +65,10 @@ export type { TriggerCampaignToolOptions } from './trigger-campaign.js';
 // Generic contact scoring
 export { createContactScoreTool } from './contact-score.js';
 
+// CRM integrations
+export { createTwentyCrmTool } from './create-twenty-lead.js';
+export type { TwentyCrmToolOptions } from './create-twenty-lead.js';
+
 // Vertical-specific tools
 export { createVehicleLeadScoreTool } from './vehicle-lead-score.js';
 export { createVehicleCheckFollowupTool } from './vehicle-check-followup.js';
