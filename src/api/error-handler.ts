@@ -93,6 +93,8 @@ export function registerErrorHandler(fastify: FastifyInstance): void {
     const stack = error instanceof Error ? error.stack : undefined;
     logger.error('Unhandled error in request', {
       component: 'error-handler',
+      errorType: typeof error,
+      errorConstructor: (error as { constructor?: { name?: string } })?.constructor?.name,
       error: message,
       stack,
     });

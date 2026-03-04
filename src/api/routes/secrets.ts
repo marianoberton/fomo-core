@@ -44,12 +44,20 @@ export function secretRoutes(fastify: FastifyInstance, deps: RouteDependencies):
     '/projects/:projectId/secrets',
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
-      const body = SetSecretSchema.parse(request.body);
-
-      const metadata = await secretService.set(projectId, body.key, body.value, body.description);
-
-      logger.info('Secret set', { component: 'secrets-routes', projectId, key: body.key });
-      await sendSuccess(reply, metadata, 201);
+      try {
+        const body = SetSecretSchema.parse(request.body);
+        const metadata = await secretService.set(projectId, body.key, body.value, body.description);
+        logger.info('Secret set', { component: 'secrets-routes', projectId, key: body.key });
+        await sendSuccess(reply, metadata, 201);
+      } catch (err) {
+        logger.error('Error setting secret', {
+          component: 'secrets-routes',
+          err,
+          errorType: typeof err,
+          errorConstructor: (err as { constructor?: { name?: string } })?.constructor?.name,
+        });
+        throw err;
+      }
     },
   );
 
