@@ -38,6 +38,9 @@ services:
     restart: unless-stopped
     ports:
       - "3002:3002"
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql://nexus:${DB_PASSWORD}@postgres:5432/nexus_core?schema=public
       REDIS_URL: redis://redis:6379
@@ -51,6 +54,12 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       NEXUS_API_KEY: ${NEXUS_API_KEY:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
     volumes:
       - filedata:/app/data/files
     depends_on:
