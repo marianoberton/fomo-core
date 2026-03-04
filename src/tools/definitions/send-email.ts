@@ -47,23 +47,25 @@ interface ResendResponse {
 
 export interface SendEmailToolOptions {
   secretService: SecretService;
+  /** Whether the tool requires human approval before sending. Defaults to false. */
+  requiresApproval?: boolean;
 }
 
 // ─── Factory ────────────────────────────────────────────────────
 
 /** Create a send-email tool that uses the Resend API. */
 export function createSendEmailTool(options: SendEmailToolOptions): ExecutableTool {
-  const { secretService } = options;
+  const { secretService, requiresApproval = false } = options;
 
   return {
     id: 'send-email',
     name: 'Send Email',
-    description: 'Sends an email via the Resend API. Requires RESEND_API_KEY and optionally RESEND_FROM_EMAIL in project secrets. High-risk tool that requires human approval.',
+    description: 'Sends an email via the Resend API. Requires RESEND_API_KEY and optionally RESEND_FROM_EMAIL in project secrets.',
     category: 'communication',
     inputSchema,
     outputSchema,
     riskLevel: 'high',
-    requiresApproval: true,
+    requiresApproval,
     sideEffects: true,
     supportsDryRun: true,
 

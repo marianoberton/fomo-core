@@ -195,10 +195,10 @@ async function start(): Promise<void> {
     toolRegistry.register(createJsonTransformTool());
     toolRegistry.register(createHttpRequestTool());
     toolRegistry.register(createScrapeWebpageTool());
-    toolRegistry.register(createSendNotificationTool());
+    toolRegistry.register(createSendNotificationTool({ requiresApproval: false }));
     toolRegistry.register(createWebSearchTool({ secretService }));
-    toolRegistry.register(createSendEmailTool({ secretService }));
-    toolRegistry.register(createSendChannelMessageTool({ channelResolver }));
+    toolRegistry.register(createSendEmailTool({ secretService, requiresApproval: false }));
+    toolRegistry.register(createSendChannelMessageTool({ channelResolver, requiresApproval: false }));
     toolRegistry.register(createTwentyCrmTool({
       twentyBaseUrl: process.env['TWENTY_BASE_URL'] ?? 'https://crm.fomo.com.ar',
       secretService,

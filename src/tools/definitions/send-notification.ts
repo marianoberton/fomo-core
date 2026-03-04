@@ -31,6 +31,8 @@ export interface NotificationSender {
 export interface SendNotificationToolOptions {
   /** Custom notification sender. If not provided, uses default webhook sender. */
   sender?: NotificationSender;
+  /** Whether the tool requires human approval before sending. Defaults to false. */
+  requiresApproval?: boolean;
 }
 
 // ─── SSRF Protection (shared logic) ────────────────────────────
@@ -117,19 +119,19 @@ const outputSchema = z.object({
 /** Create a send-notification tool for delivering messages via configured channels. */
 export function createSendNotificationTool(options?: SendNotificationToolOptions): ExecutableTool {
   const sender = options?.sender ?? createDefaultWebhookSender();
+  const requiresApproval = options?.requiresApproval ?? false;
 
   return {
     id: 'send-notification',
     name: 'Send Notification',
     description:
       'Send a notification via a configured channel. Currently supports webhook (HTTP POST). ' +
-      'This is a high-risk tool that requires human approval before execution. ' +
       'Provide a target URL, subject, and message body.',
     category: 'communication',
     inputSchema,
     outputSchema,
     riskLevel: 'high',
-    requiresApproval: true,
+    requiresApproval,
     sideEffects: true,
     supportsDryRun: true,
 

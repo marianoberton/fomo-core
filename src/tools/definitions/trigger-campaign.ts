@@ -35,6 +35,8 @@ const outputSchema = z.object({
 export interface TriggerCampaignToolOptions {
   campaignRunner: CampaignRunner;
   prisma: PrismaClient;
+  /** Whether the tool requires human approval before triggering. Defaults to false. */
+  requiresApproval?: boolean;
 }
 
 // ─── Factory ────────────────────────────────────────────────────
@@ -43,20 +45,19 @@ export interface TriggerCampaignToolOptions {
 export function createTriggerCampaignTool(
   options: TriggerCampaignToolOptions,
 ): ExecutableTool {
-  const { campaignRunner, prisma } = options;
+  const { campaignRunner, prisma, requiresApproval = false } = options;
 
   return {
     id: 'trigger-campaign',
     name: 'Trigger Campaign',
     description:
       'Executes an outbound campaign: filters contacts by audience criteria, ' +
-      'interpolates the message template, and sends via the configured channel. ' +
-      'High-risk tool — requires human approval before execution.',
+      'interpolates the message template, and sends via the configured channel.',
     category: 'communication',
     inputSchema,
     outputSchema,
     riskLevel: 'high',
-    requiresApproval: true,
+    requiresApproval,
     sideEffects: true,
     supportsDryRun: true,
 

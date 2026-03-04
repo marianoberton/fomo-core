@@ -41,6 +41,8 @@ const outputSchema = z.object({
 
 export interface SendChannelMessageToolOptions {
   channelResolver: ChannelResolver;
+  /** Whether the tool requires human approval before sending. Defaults to false. */
+  requiresApproval?: boolean;
 }
 
 // ─── Factory ────────────────────────────────────────────────────
@@ -49,17 +51,17 @@ export interface SendChannelMessageToolOptions {
 export function createSendChannelMessageTool(
   options: SendChannelMessageToolOptions,
 ): ExecutableTool {
-  const { channelResolver } = options;
+  const { channelResolver, requiresApproval = false } = options;
 
   return {
     id: 'send-channel-message',
     name: 'Send Channel Message',
-    description: 'Sends a message through a per-project channel adapter (WhatsApp, Telegram, Slack, Chatwoot). Requires the target channel to be configured as an integration for the project. Medium-risk tool that requires human approval.',
+    description: 'Sends a message through a per-project channel adapter (WhatsApp, Telegram, Slack, Chatwoot). Requires the target channel to be configured as an integration for the project.',
     category: 'communication',
     inputSchema,
     outputSchema,
     riskLevel: 'medium',
-    requiresApproval: true,
+    requiresApproval,
     sideEffects: true,
     supportsDryRun: true,
 
