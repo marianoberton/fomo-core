@@ -24,6 +24,7 @@ import {
   computeHash,
 } from '@/prompts/index.js';
 import { resolveAgentMode } from '@/agents/mode-resolver.js';
+import type { AgentPromptConfig } from '@/agents/types.js';
 import type { RouteDependencies } from '../types.js';
 
 // ─── Defaults ───────────────────────────────────────────────────
@@ -181,6 +182,7 @@ export async function prepareChatRun(
   const agentConfig = { ...DEFAULT_AGENT_CONFIG, ...project.config, projectId: project.id };
 
   // 2b. If agentId provided, load agent and apply LLM config override
+  let agentPromptConfig: AgentPromptConfig | undefined;
   if (body.agentId && deps.agentRegistry) {
     const agent = await deps.agentRegistry.get(body.agentId as unknown as import('@/agents/types.js').AgentId);
     if (!agent) {
@@ -275,6 +277,11 @@ Do not decline a request if your Manager might be able to approve it.
       body.metadata['_modeName'] = resolvedMode.modeName;
     }
 
+    // 2e. Capture agent-level prompt config for use in step 4
+    if (agent.promptConfig.identity && agent.promptConfig.instructions && agent.promptConfig.safety) {
+      agentPromptConfig = agent.promptConfig;
+    }
+
     // 2f. Compose assigned skills (merge instructions + tools + MCP)
     if (agent.skillIds.length > 0) {
       const composition = await deps.skillService.composeForAgent(agent.skillIds);
@@ -325,15 +332,48 @@ Do not decline a request if your Manager might be able to approve it.
   }
 
   // 4. Resolve active prompt layers
-  const layersResult = await resolveActiveLayers(project.id, promptLayerRepository);
-  if (!layersResult.ok) {
-    return err({
-      code: 'NO_ACTIVE_PROMPT',
-      message: layersResult.error.message,
-      statusCode: 400,
-    });
+  // If the agent has its own prompts, use them directly without requiring DB layers.
+  let layers: import('@/prompts/types.js').ResolvedPromptLayers;
+  if (agentPromptConfig) {
+    const syntheticBase = {
+      projectId: project.id,
+      version: 1,
+      isActive: true,
+      createdAt: new Date(),
+      createdBy: 'agent',
+      changeReason: 'agent-prompt',
+    };
+    layers = {
+      identity: {
+        ...syntheticBase,
+        id: `${body.agentId}:identity` as import('@/core/types.js').PromptLayerId,
+        layerType: 'identity' as const,
+        content: agentPromptConfig.identity,
+      },
+      instructions: {
+        ...syntheticBase,
+        id: `${body.agentId}:instructions` as import('@/core/types.js').PromptLayerId,
+        layerType: 'instructions' as const,
+        content: agentPromptConfig.instructions,
+      },
+      safety: {
+        ...syntheticBase,
+        id: `${body.agentId}:safety` as import('@/core/types.js').PromptLayerId,
+        layerType: 'safety' as const,
+        content: agentPromptConfig.safety,
+      },
+    };
+  } else {
+    const layersResult = await resolveActiveLayers(project.id, promptLayerRepository);
+    if (!layersResult.ok) {
+      return err({
+        code: 'NO_ACTIVE_PROMPT',
+        message: layersResult.error.message,
+        statusCode: 400,
+      });
+    }
+    layers = layersResult.value;
   }
-  const layers = layersResult.value;
 
   // 5. Load conversation history
   const storedMessages = await sessionRepository.getMessages(sessionId);
