@@ -35,6 +35,7 @@ import {
   createWebSearchTool,
   createSendEmailTool,
   createSendChannelMessageTool,
+  createTwentyCrmTool,
   createReadFileTool,
   createQuerySessionsTool,
   createReadSessionHistoryTool,
@@ -198,6 +199,10 @@ async function start(): Promise<void> {
     toolRegistry.register(createWebSearchTool({ secretService }));
     toolRegistry.register(createSendEmailTool({ secretService }));
     toolRegistry.register(createSendChannelMessageTool({ channelResolver }));
+    toolRegistry.register(createTwentyCrmTool({
+      twentyBaseUrl: process.env['TWENTY_BASE_URL'] ?? 'https://crm.fomo.com.ar',
+      secretService,
+    }));
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));
     const mcpManager = createMCPManager();
