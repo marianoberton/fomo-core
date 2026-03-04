@@ -503,7 +503,8 @@ model MCPServerInstance {
   transport      String   // stdio | sse
   command        String?
   args           String[]
-  envSecretKeys  Json?    @map("env_secret_keys") // { "API_KEY": "ODOO_API_KEY" }
+  envSecretKeys  Json?    @map("env_secret_keys") // { "API_KEY": "ODOO_API_KEY" } — references process.env var names
+  envVars        Json?    @map("env_vars")         // { "API_KEY": "actual-value" } — direct values passed to subprocess
   url            String?
   toolPrefix     String?  @map("tool_prefix")
   status         String   @default("active") // active | paused | error

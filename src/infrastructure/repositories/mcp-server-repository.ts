@@ -36,6 +36,8 @@ export interface MCPServerInstance {
   command?: string;
   args: string[];
   envSecretKeys?: Record<string, string>;
+  /** Direct key=value env vars passed to the subprocess (actual values, not process.env references). */
+  envVars?: Record<string, string>;
   url?: string;
   toolPrefix?: string;
   status: string;
@@ -68,6 +70,7 @@ export interface CreateInstanceInput {
   command?: string;
   args?: string[];
   envSecretKeys?: Record<string, string>;
+  envVars?: Record<string, string>;
   url?: string;
   toolPrefix?: string;
 }
@@ -79,6 +82,7 @@ export interface UpdateInstanceInput {
   command?: string;
   args?: string[];
   envSecretKeys?: Record<string, string>;
+  envVars?: Record<string, string>;
   url?: string;
   toolPrefix?: string;
   status?: string;
@@ -150,6 +154,7 @@ type InstanceRecord = {
   command: string | null;
   args: string[];
   envSecretKeys: unknown;
+  envVars: unknown;
   url: string | null;
   toolPrefix: string | null;
   status: string;
@@ -169,6 +174,7 @@ function toInstance(rec: InstanceRecord): MCPServerInstance {
     command: rec.command ?? undefined,
     args: rec.args,
     envSecretKeys: (rec.envSecretKeys as Record<string, string> | null) ?? undefined,
+    envVars: (rec.envVars as Record<string, string> | null) ?? undefined,
     url: rec.url ?? undefined,
     toolPrefix: rec.toolPrefix ?? undefined,
     status: rec.status,
@@ -277,6 +283,7 @@ export function createMCPServerRepository(prisma: PrismaClient): MCPServerReposi
           command: input.command ?? null,
           args: input.args ?? [],
           envSecretKeys: input.envSecretKeys ? (input.envSecretKeys as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+          envVars: input.envVars ? (input.envVars as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
           url: input.url ?? null,
           toolPrefix: input.toolPrefix ?? null,
           status: 'active',
@@ -295,6 +302,11 @@ export function createMCPServerRepository(prisma: PrismaClient): MCPServerReposi
       if (input.envSecretKeys !== undefined) {
         data['envSecretKeys'] = input.envSecretKeys
           ? (input.envSecretKeys as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull;
+      }
+      if (input.envVars !== undefined) {
+        data['envVars'] = input.envVars
+          ? (input.envVars as unknown as Prisma.InputJsonValue)
           : Prisma.JsonNull;
       }
       if (input.url !== undefined) data['url'] = input.url;

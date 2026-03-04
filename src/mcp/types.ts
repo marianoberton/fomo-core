@@ -15,8 +15,10 @@ export interface MCPServerConfig {
   command?: string;
   /** For stdio: arguments for the command (e.g. ["-y", "@anthropic/mcp-google-calendar"]). */
   args?: string[];
-  /** For stdio: env var NAMES to resolve and pass to the subprocess. */
+  /** For stdio: env var NAMES to resolve and pass to the subprocess (indirection via process.env). */
   env?: Record<string, string>;
+  /** For stdio: direct key=value env vars passed to the subprocess (actual values, no indirection). */
+  envVars?: Record<string, string>;
   /** For sse: URL of the MCP server (e.g. "http://localhost:8080/mcp"). */
   url?: string;
   /** Namespace prefix for tool IDs. Defaults to server name. */

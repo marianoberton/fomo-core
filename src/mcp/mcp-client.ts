@@ -159,7 +159,8 @@ function createTransport(config: MCPServerConfig): StdioClientTransport | SSECli
       return new StdioClientTransport({
         command: config.command,
         args: config.args,
-        env: { ...process.env as Record<string, string>, ...env },
+        // Merge: process.env → resolved env var references → direct envVars values
+        env: { ...process.env as Record<string, string>, ...env, ...(config.envVars ?? {}) },
         stderr: 'pipe',
       });
     }

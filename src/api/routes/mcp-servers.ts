@@ -19,6 +19,8 @@ const createInstanceSchema = z.object({
   command: z.string().optional(),
   args: z.array(z.string()).optional(),
   envSecretKeys: z.record(z.string()).optional(),
+  /** Direct key=value pairs passed to subprocess (actual values, not process.env references). */
+  envVars: z.record(z.string()).optional(),
   url: z.string().optional(),
   toolPrefix: z.string().max(50).optional(),
 });
@@ -30,6 +32,8 @@ const updateInstanceSchema = z.object({
   command: z.string().optional(),
   args: z.array(z.string()).optional(),
   envSecretKeys: z.record(z.string()).optional(),
+  /** Direct key=value pairs passed to subprocess (actual values, not process.env references). */
+  envVars: z.record(z.string()).optional(),
   url: z.string().optional(),
   toolPrefix: z.string().max(50).optional(),
   status: z.enum(['active', 'paused', 'error']).optional(),
