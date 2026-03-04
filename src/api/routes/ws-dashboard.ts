@@ -106,6 +106,12 @@ function mapEvent(event: AgentStreamEvent, traceId: string): NexusEventBase | nu
         action: event.input,
       };
 
+    case 'message_queued':
+      return {
+        type: 'message.queued',
+        position: event.position,
+      };
+
     case 'turn_complete':
       // No dashboard equivalent — skip
       return null;
@@ -163,6 +169,8 @@ function setupDashboardSocket(
   let unsubscribeBroadcast: (() => void) | null = null;
   // Track approval IDs resolved by THIS WS connection to avoid broadcast duplicates
   let dashboardResolvedApprovalId: string | null = null;
+  // FIFO queue for messages that arrive while a run is in progress
+  const messageQueue: MessageSendMessage[] = [];
 
   const sendEvent = (event: NexusEventBase): void => {
     // 1 === WebSocket.OPEN
@@ -174,6 +182,58 @@ function setupDashboardSocket(
   const sendError = (code: string, message: string): void => {
     sendEvent({ type: 'error', code, message });
   };
+
+  /** Execute a single message.send and drain the queue on completion. */
+  function runMessage(msg: MessageSendMessage): void {
+    running = true;
+    traceId = `trace-${Date.now()}`;
+    const messageAbort = new AbortController();
+    const onClose = (): void => {
+      messageAbort.abort();
+    };
+    socket.on('close', onClose);
+
+    const wrappedSend = (event: AgentStreamEvent): void => {
+      if (event.type === 'agent_start') {
+        traceId = event.traceId;
+      }
+      const mapped = mapEvent(event, traceId);
+      if (mapped) {
+        sendEvent(mapped);
+      }
+    };
+
+    handleChatStreamMessage(
+      {
+        projectId,
+        sessionId: sessionId!,
+        agentId: agentId ?? undefined,
+        sourceChannel: msg.sourceChannel ?? sourceChannel ?? undefined,
+        contactRole: msg.contactRole ?? contactRole ?? undefined,
+        message: msg.content,
+      },
+      deps,
+      wrappedSend,
+      messageAbort.signal,
+    )
+      .catch((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : 'Unexpected error';
+        sendError('INTERNAL_ERROR', errMsg);
+      })
+      .finally(() => {
+        running = false;
+        socket.removeListener('close', onClose);
+        drainQueue();
+      });
+  }
+
+  /** Process the next queued message, if any. */
+  function drainQueue(): void {
+    const next = messageQueue.shift();
+    if (next && sessionId) {
+      runMessage(next);
+    }
+  }
 
   socket.on('message', (data: Buffer) => {
     let msg: DashboardInboundMessage;
@@ -262,50 +322,13 @@ function setupDashboardSocket(
           return;
         }
         if (running) {
-          sendError('BUSY', 'Agent run already in progress');
+          // Queue the message instead of rejecting it
+          messageQueue.push(msg);
+          sendEvent({ type: 'message.queued', position: messageQueue.length });
           return;
         }
 
-        running = true;
-        traceId = `trace-${Date.now()}`;
-        const messageAbort = new AbortController();
-        const onClose = (): void => {
-          messageAbort.abort();
-        };
-        socket.on('close', onClose);
-
-        const wrappedSend = (event: AgentStreamEvent): void => {
-          // Capture traceId from agent_start
-          if (event.type === 'agent_start') {
-            traceId = event.traceId;
-          }
-          const mapped = mapEvent(event, traceId);
-          if (mapped) {
-            sendEvent(mapped);
-          }
-        };
-
-        handleChatStreamMessage(
-          {
-            projectId,
-            sessionId,
-            agentId: agentId ?? undefined,
-            sourceChannel: msg.sourceChannel ?? sourceChannel ?? undefined,
-            contactRole: msg.contactRole ?? contactRole ?? undefined,
-            message: msg.content,
-          },
-          deps,
-          wrappedSend,
-          messageAbort.signal,
-        )
-          .catch((err: unknown) => {
-            const errMsg = err instanceof Error ? err.message : 'Unexpected error';
-            sendError('INTERNAL_ERROR', errMsg);
-          })
-          .finally(() => {
-            running = false;
-            socket.removeListener('close', onClose);
-          });
+        runMessage(msg);
         break;
       }
 

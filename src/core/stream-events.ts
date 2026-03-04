@@ -15,6 +15,7 @@ export type AgentStreamEvent =
   | TurnCompleteEvent
   | AgentCompleteEvent
   | ApprovalRequestedEvent
+  | MessageQueuedEvent
   | StreamErrorEvent;
 
 /** An approval is requested by a tool. */
@@ -72,6 +73,12 @@ export interface AgentCompleteEvent {
     readonly costUSD: number;
   };
   readonly status: string;
+}
+
+/** A message was queued because an agent run is already in progress. */
+export interface MessageQueuedEvent {
+  readonly type: 'message_queued';
+  readonly position: number;
 }
 
 /** An error occurred during the agent run. */

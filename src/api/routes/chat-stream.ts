@@ -118,6 +118,7 @@ interface ChatSocket {
 /** Set up event handlers on a single WebSocket connection. */
 function setupSocket(socket: ChatSocket, deps: RouteDependencies): void {
   let running = false;
+  const messageQueue: ChatRequestBody[] = [];
 
   const send = (event: AgentStreamEvent): void => {
     // 1 === WebSocket.OPEN
@@ -126,12 +127,32 @@ function setupSocket(socket: ChatSocket, deps: RouteDependencies): void {
     }
   };
 
-  socket.on('message', (data: Buffer) => {
-    if (running) {
-      send({ type: 'error', code: 'BUSY', message: 'Agent run already in progress' });
-      return;
-    }
+  /** Execute a single chat message and drain the queue on completion. */
+  function runMessage(body: ChatRequestBody): void {
+    running = true;
+    const messageAbort = new AbortController();
+    const onClose = (): void => {
+      messageAbort.abort();
+    };
+    socket.on('close', onClose);
 
+    handleChatStreamMessage(body, deps, send, messageAbort.signal)
+      .catch((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : 'Unexpected error';
+        send({ type: 'error', code: 'INTERNAL_ERROR', message: errMsg });
+      })
+      .finally(() => {
+        running = false;
+        socket.removeListener('close', onClose);
+        // Drain next queued message
+        const next = messageQueue.shift();
+        if (next) {
+          runMessage(next);
+        }
+      });
+  }
+
+  socket.on('message', (data: Buffer) => {
     let body: ChatRequestBody;
     try {
       const text = data.toString('utf-8');
@@ -142,22 +163,13 @@ function setupSocket(socket: ChatSocket, deps: RouteDependencies): void {
       return;
     }
 
-    running = true;
-    const messageAbort = new AbortController();
-    const onClose = (): void => {
-      messageAbort.abort();
-    };
-    socket.on('close', onClose);
+    if (running) {
+      messageQueue.push(body);
+      send({ type: 'message_queued', position: messageQueue.length });
+      return;
+    }
 
-    handleChatStreamMessage(body, deps, send, messageAbort.signal)
-      .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : 'Unexpected error';
-        send({ type: 'error', code: 'INTERNAL_ERROR', message: msg });
-      })
-      .finally(() => {
-        running = false;
-        socket.removeListener('close', onClose);
-      });
+    runMessage(body);
   });
 
   socket.on('error', (err: Error) => {

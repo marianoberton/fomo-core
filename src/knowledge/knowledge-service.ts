@@ -88,12 +88,13 @@ export function createKnowledgeService(options: KnowledgeServiceOptions): Knowle
       // No embedding generator — store as text-only (embedding column stays NULL)
       await prisma.$executeRaw`
         INSERT INTO memory_entries (
-          id, project_id, session_id, category, content, embedding,
+          id, project_id, session_id, scope, category, content, embedding,
           importance, access_count, last_accessed_at, created_at, expires_at, metadata
         ) VALUES (
           ${id},
           ${projectId},
           NULL,
+          'project',
           ${category},
           ${content},
           NULL,
@@ -113,12 +114,13 @@ export function createKnowledgeService(options: KnowledgeServiceOptions): Knowle
 
     await prisma.$executeRaw`
       INSERT INTO memory_entries (
-        id, project_id, session_id, category, content, embedding,
+        id, project_id, session_id, scope, category, content, embedding,
         importance, access_count, last_accessed_at, created_at, expires_at, metadata
       ) VALUES (
         ${id},
         ${projectId},
         NULL,
+        'project',
         ${category},
         ${content},
         ${vectorLiteral}::vector(1536),
@@ -169,6 +171,7 @@ export function createKnowledgeService(options: KnowledgeServiceOptions): Knowle
 
       const conditions: Prisma.Sql[] = [
         Prisma.sql`project_id = ${params.projectId}`,
+        Prisma.sql`scope = 'project'`,
       ];
 
       if (params.category) {
