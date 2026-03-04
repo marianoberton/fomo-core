@@ -73,6 +73,16 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
       const parsed = inputSchema.parse(input);
 
       try {
+        logger.info('Knowledge search starting', {
+          component: 'knowledge-search',
+          projectId: context.projectId,
+          traceId: context.traceId,
+          query: parsed.query,
+          topK: parsed.topK,
+          minImportance: parsed.minImportance,
+          categories: parsed.categories,
+        });
+
         const retrieved = await store.retrieve({
           query: parsed.query,
           topK: parsed.topK,
@@ -89,7 +99,7 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
           metadata: entry.metadata,
         }));
 
-        logger.debug('Knowledge search completed', {
+        logger.info('Knowledge search completed', {
           component: 'knowledge-search',
           projectId: context.projectId,
           traceId: context.traceId,
