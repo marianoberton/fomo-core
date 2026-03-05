@@ -92,3 +92,4 @@ export { createGoogleCalendarReadTool } from './google-calendar-read.js';
 export { createLicitacionesSearchTool } from './licitaciones-search.js';
 export { createLicitacionesDetailTool } from './licitaciones-detail.js';
 export { createLicitacionesDocumentTool } from './licitaciones-document.js';
+export { createExcelAnalyzeTool } from './excel-analyze.js';

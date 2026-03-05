@@ -50,6 +50,7 @@ import {
   createLicitacionesSearchTool,
   createLicitacionesDetailTool,
   createLicitacionesDocumentTool,
+  createExcelAnalyzeTool,
   createTwentyUpsertTool,
   createTwentySearchTool,
   createReadFileTool,
@@ -520,6 +521,7 @@ async function start(): Promise<void> {
       logger,
     });
     toolRegistry.register(createReadFileTool({ fileService }));
+    toolRegistry.register(createExcelAnalyzeTool({ fileService }));
 
     // Shared memory tools (for internal mode — query customer conversations)
     toolRegistry.register(createQuerySessionsTool({ prisma }));
