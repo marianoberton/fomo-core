@@ -88,3 +88,4 @@ export { createNotionCreateTaskTool } from './notion-create-task.js';
 export { createGmailSendTool } from './gmail-send.js';
 export { createGoogleCalendarEventTool } from './google-calendar-event.js';
 export { createGmailReadTool } from './gmail-read.js';
+export { createGoogleCalendarReadTool } from './google-calendar-read.js';

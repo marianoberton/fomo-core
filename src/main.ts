@@ -46,6 +46,7 @@ import {
   createGmailSendTool,
   createGoogleCalendarEventTool,
   createGmailReadTool,
+  createGoogleCalendarReadTool,
   createTwentyUpsertTool,
   createTwentySearchTool,
   createReadFileTool,
@@ -240,6 +241,7 @@ async function start(): Promise<void> {
     toolRegistry.register(createGmailSendTool({ secretService }));
     toolRegistry.register(createGoogleCalendarEventTool({ secretService }));
     toolRegistry.register(createGmailReadTool({ secretService }));
+    toolRegistry.register(createGoogleCalendarReadTool({ secretService }));
 
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));
