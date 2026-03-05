@@ -11,12 +11,13 @@ import type { ExecutableTool, ToolResult } from '@/tools/types.js';
 import type { OdooToolOptions } from './odoo-get-debts.js';
 
 const inputSchema = z.object({
-  invoiceId:   z.union([z.number(), z.array(z.number())]).describe('ID o array de IDs de facturas en Odoo'),
-  amount:      z.number().optional().describe('Monto pagado (total entre todas las facturas)'),
-  paymentDate: z.string().optional().describe('Fecha del pago (YYYY-MM-DD). Default: hoy'),
-  memo:        z.string().optional().describe('Nota del pago'),
-  isPromise:   z.boolean().default(false).describe('Si true, solo registra promesa de pago como nota'),
-  promiseDate: z.string().optional().describe('Fecha prometida de pago. Solo si isPromise=true'),
+  clientEmail:  z.string().optional().describe('Email del cliente — Lucas busca sus facturas automáticamente'),
+  clientName:   z.string().optional().describe('Nombre del cliente — alternativa al email'),
+  amount:       z.number().optional().describe('Monto pagado (total)'),
+  paymentDate:  z.string().optional().describe('Fecha del pago (YYYY-MM-DD). Default: hoy'),
+  memo:         z.string().optional().describe('Nota del pago'),
+  isPromise:    z.boolean().default(false).describe('Si true, registra promesa de pago como nota'),
+  promiseDate:  z.string().optional().describe('Fecha prometida YYYY-MM-DD. Solo si isPromise=true'),
 });
 
 async function odooAuth(baseUrl: string, db: string, user: string, password: string) {
@@ -62,9 +63,12 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) return err(new ToolExecutionError('odoo-register-payment', parsed.error.message));
 
-      const { invoiceId: invoiceIdRaw, amount, paymentDate, memo, isPromise, promiseDate } = parsed.data;
-      const invoiceIds = Array.isArray(invoiceIdRaw) ? invoiceIdRaw : [invoiceIdRaw];
+      const { clientEmail, clientName, amount, paymentDate, memo, isPromise, promiseDate } = parsed.data;
       const { projectId } = context;
+
+      if (!clientEmail && !clientName) {
+        return err(new ToolExecutionError('odoo-register-payment', 'Se requiere clientEmail o clientName'));
+      }
 
       const odooUser = await options.secretService.get(projectId, 'ODOO_USER');
       const odooPass = await options.secretService.get(projectId, 'ODOO_PASSWORD');
@@ -77,6 +81,30 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
       try {
         const session = await odooAuth(odooUrl, odooDB, odooUser, odooPass);
         const today = new Date().toISOString().split('T')[0]!;
+
+        // Buscar facturas del cliente por email o nombre
+        let partnerFilter: unknown[] = [];
+        if (clientEmail) {
+          const ids = await odooCall(odooUrl, session, 'res.partner', 'search', [[['email', '=', clientEmail]]]) as number[];
+          if (!ids.length) throw new Error(`Cliente con email ${clientEmail} no encontrado`);
+          partnerFilter = [['partner_id', 'in', ids]];
+        } else {
+          const ids = await odooCall(odooUrl, session, 'res.partner', 'search', [[['name', 'ilike', clientName]]]) as number[];
+          if (!ids.length) throw new Error(`Cliente ${clientName} no encontrado`);
+          partnerFilter = [['partner_id', 'in', ids]];
+        }
+
+        const today2 = new Date().toISOString().split('T')[0]!;
+        const overdueInvoices = await odooCall(odooUrl, session, 'account.move', 'search_read', [[
+          ['move_type', '=', 'out_invoice'],
+          ['payment_state', 'in', ['not_paid', 'partial']],
+          ['state', '=', 'posted'],
+          ['invoice_date_due', '<=', today2],
+          ...partnerFilter,
+        ]], { fields: ['id', 'partner_id', 'amount_residual'], limit: 20 }) as Array<{ id: number; partner_id: [number, string]; amount_residual: number }>;
+
+        if (!overdueInvoices.length) throw new Error('No se encontraron facturas vencidas para este cliente');
+        const invoiceIds = overdueInvoices.map(i => i.id);
 
         // Promesa de pago — nota en todas las facturas
         if (isPromise) {
@@ -94,13 +122,8 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
         const journals = await odooCall(odooUrl, session, 'account.journal', 'search', [[['type', 'in', ['bank', 'cash']]]]) as number[];
         if (!journals.length) throw new Error('No hay journal de banco/caja configurado');
 
-        const invoices = await odooCall(odooUrl, session, 'account.move', 'read', [invoiceIds], {
-          fields: ['partner_id', 'amount_residual'],
-        }) as Array<{ partner_id: [number, string]; amount_residual: number }>;
-        if (!invoices.length) throw new Error(`Facturas ${invoiceIds.join(',')} no encontradas`);
-
-        const totalResidual = invoices.reduce((s, i) => s + i.amount_residual, 0);
-        const invoice = invoices[0]!;
+        const totalResidual = overdueInvoices.reduce((s, i) => s + i.amount_residual, 0);
+        const invoice = overdueInvoices[0]!;
 
         const paymentId = await odooCall(odooUrl, session, 'account.payment', 'create', [{
           payment_type: 'inbound',
