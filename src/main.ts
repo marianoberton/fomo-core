@@ -41,6 +41,7 @@ import {
   createOdooRegisterPaymentTool,
   createNotifyOwnerTool,
   createMpCreatePaymentLinkTool,
+  createWahaSendMessageTool,
   createTwentyUpsertTool,
   createTwentySearchTool,
   createReadFileTool,
@@ -230,6 +231,7 @@ async function start(): Promise<void> {
       secretService,
       coreBaseUrl: process.env['CORE_BASE_URL'] ?? 'https://core.fomo.com.ar',
     }));
+    toolRegistry.register(createWahaSendMessageTool({ secretService }));
 
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));
