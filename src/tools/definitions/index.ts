@@ -81,3 +81,4 @@ export { createHotelDetectLanguageTool } from './hotel-detect-language.js';
 export { createHotelSeasonalPricingTool } from './hotel-seasonal-pricing.js';
 export { createOdooGetDebtsTool } from './odoo-get-debts.js';
 export { createOdooRegisterPaymentTool } from './odoo-register-payment.js';
+export { createNotifyOwnerTool } from './notify-owner.js';

@@ -39,6 +39,7 @@ import {
   createTwentyUpdateTool,
   createOdooGetDebtsTool,
   createOdooRegisterPaymentTool,
+  createNotifyOwnerTool,
   createTwentyUpsertTool,
   createTwentySearchTool,
   createReadFileTool,
@@ -223,6 +224,7 @@ async function start(): Promise<void> {
     const odooBaseUrl = process.env['ODOO_BASE_URL'] ?? 'https://odoo.fomo.com.ar';
     toolRegistry.register(createOdooGetDebtsTool({ odooBaseUrl, secretService }));
     toolRegistry.register(createOdooRegisterPaymentTool({ odooBaseUrl, secretService }));
+    toolRegistry.register(createNotifyOwnerTool({ secretService }));
 
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));
