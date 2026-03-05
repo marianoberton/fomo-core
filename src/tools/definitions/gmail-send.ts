@@ -39,14 +39,21 @@ async function getAccessToken(clientId: string, clientSecret: string, refreshTok
   return data.access_token;
 }
 
+function encodeSubject(subject: string): string {
+  // RFC 2047 encoded-word for UTF-8 subjects
+  return `=?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`;
+}
+
 function buildRawEmail(from: string, to: string, subject: string, body: string): string {
   const email = [
     `From: ${from}`,
     `To: ${to}`,
-    `Subject: ${subject}`,
-    `Content-Type: text/plain; charset=utf-8`,
+    `Subject: ${encodeSubject(subject)}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/plain; charset=UTF-8`,
+    `Content-Transfer-Encoding: base64`,
     ``,
-    body,
+    Buffer.from(body, 'utf-8').toString('base64'),
   ].join('\r\n');
   return Buffer.from(email).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
