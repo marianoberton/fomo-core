@@ -96,11 +96,16 @@ async function findCompany(
   headers: TwentyHeaders,
   name: string,
 ): Promise<string | null> {
-  const encoded = encodeURIComponent(JSON.stringify({ name: { like: `%${name}%` } }));
-  const res = await twentyRequest(baseUrl, headers, 'GET', `/companies?filter=${encoded}&limit=1`);
+  // Twenty REST API v2 uses filter=field[op]:value format
+  const filter = encodeURIComponent(`name[like]:%${name}%`);
+  const res = await twentyRequest(baseUrl, headers, 'GET', `/companies?filter=${filter}&limit=1`);
   if (!res.ok) return null;
-  const body = res.data as { data?: { companies?: { edges?: Array<{ node: { id: string } }> } } };
-  return body?.data?.companies?.edges?.[0]?.node?.id ?? null;
+  // Response is a plain array (not edges-based)
+  const body = res.data as { data?: { companies?: Array<{ id: string }> | { edges?: Array<{ node: { id: string } }> } } };
+  const companies = body?.data?.companies;
+  if (!companies) return null;
+  if (Array.isArray(companies)) return companies[0]?.id ?? null;
+  return companies.edges?.[0]?.node?.id ?? null;
 }
 
 /** Crea una empresa. Retorna el ID. */
@@ -125,13 +130,14 @@ async function findPerson(
   headers: TwentyHeaders,
   email: string,
 ): Promise<string | null> {
-  const encoded = encodeURIComponent(
-    JSON.stringify({ emails: { primaryEmail: { eq: email } } }),
-  );
-  const res = await twentyRequest(baseUrl, headers, 'GET', `/people?filter=${encoded}&limit=1`);
+  const filter = encodeURIComponent(`emails.primaryEmail[eq]:${email}`);
+  const res = await twentyRequest(baseUrl, headers, 'GET', `/people?filter=${filter}&limit=1`);
   if (!res.ok) return null;
-  const body = res.data as { data?: { people?: { edges?: Array<{ node: { id: string } }> } } };
-  return body?.data?.people?.edges?.[0]?.node?.id ?? null;
+  const body = res.data as { data?: { people?: Array<{ id: string }> | { edges?: Array<{ node: { id: string } }> } } };
+  const people = body?.data?.people;
+  if (!people) return null;
+  if (Array.isArray(people)) return people[0]?.id ?? null;
+  return people.edges?.[0]?.node?.id ?? null;
 }
 
 /** Crea un contacto vinculado a una empresa. Retorna el ID. */
