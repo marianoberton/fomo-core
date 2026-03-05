@@ -84,3 +84,4 @@ export { createOdooRegisterPaymentTool } from './odoo-register-payment.js';
 export { createNotifyOwnerTool } from './notify-owner.js';
 export { createMpCreatePaymentLinkTool } from './mp-create-payment-link.js';
 export { createWahaSendMessageTool } from './waha-send-message.js';
+export { createNotionCreateTaskTool } from './notion-create-task.js';

@@ -42,6 +42,7 @@ import {
   createNotifyOwnerTool,
   createMpCreatePaymentLinkTool,
   createWahaSendMessageTool,
+  createNotionCreateTaskTool,
   createTwentyUpsertTool,
   createTwentySearchTool,
   createReadFileTool,
@@ -232,6 +233,7 @@ async function start(): Promise<void> {
       coreBaseUrl: process.env['CORE_BASE_URL'] ?? 'https://core.fomo.com.ar',
     }));
     toolRegistry.register(createWahaSendMessageTool({ secretService }));
+    toolRegistry.register(createNotionCreateTaskTool({ secretService }));
 
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));
