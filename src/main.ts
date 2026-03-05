@@ -47,6 +47,9 @@ import {
   createGoogleCalendarEventTool,
   createGmailReadTool,
   createGoogleCalendarReadTool,
+  createLicitacionesSearchTool,
+  createLicitacionesDetailTool,
+  createLicitacionesDocumentTool,
   createTwentyUpsertTool,
   createTwentySearchTool,
   createReadFileTool,
@@ -242,6 +245,9 @@ async function start(): Promise<void> {
     toolRegistry.register(createGoogleCalendarEventTool({ secretService }));
     toolRegistry.register(createGmailReadTool({ secretService }));
     toolRegistry.register(createGoogleCalendarReadTool({ secretService }));
+    toolRegistry.register(createLicitacionesSearchTool({ secretService }));
+    toolRegistry.register(createLicitacionesDetailTool({ secretService }));
+    toolRegistry.register(createLicitacionesDocumentTool({ secretService }));
 
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));

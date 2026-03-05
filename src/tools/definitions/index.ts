@@ -89,3 +89,6 @@ export { createGmailSendTool } from './gmail-send.js';
 export { createGoogleCalendarEventTool } from './google-calendar-event.js';
 export { createGmailReadTool } from './gmail-read.js';
 export { createGoogleCalendarReadTool } from './google-calendar-read.js';
+export { createLicitacionesSearchTool } from './licitaciones-search.js';
+export { createLicitacionesDetailTool } from './licitaciones-detail.js';
+export { createLicitacionesDocumentTool } from './licitaciones-document.js';
