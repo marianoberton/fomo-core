@@ -108,6 +108,7 @@ export interface AgentConfig {
   projectId: ProjectId;
   name: string;
   description?: string;
+  metadata?: Record<string, unknown>;
   promptConfig: AgentPromptConfig;
   llmConfig?: AgentLLMConfig;
   toolAllowlist: string[];

@@ -183,8 +183,10 @@ export async function prepareChatRun(
 
   // 2b. If agentId provided, load agent and apply LLM config override
   let agentPromptConfig: AgentPromptConfig | undefined;
+  let agentRecord: import('@/agents/types.js').AgentConfig | null = null;
   if (body.agentId && deps.agentRegistry) {
     const agent = await deps.agentRegistry.get(body.agentId as unknown as import('@/agents/types.js').AgentId);
+    agentRecord = agent;
     if (!agent) {
       return err({
         code: 'NOT_FOUND',
@@ -381,6 +383,19 @@ Do not decline a request if your Manager might be able to approve it.
     role: m.role as Message['role'],
     content: m.content,
   }));
+
+  // 5b. Welcome message — if session is new (no prior messages) and agent has a welcomeMessage in metadata,
+  // inject it as the first assistant message so the model "continues" from that opening.
+  const welcomeMessage = agentRecord?.metadata?.['welcomeMessage'] as string | undefined;
+  if (welcomeMessage && conversationHistory.length === 0) {
+    // Persist as assistant message so it appears in session history
+    await sessionRepository.addMessage(sessionId, {
+      role: 'assistant',
+      content: welcomeMessage,
+    });
+    // Also inject into in-memory history for this turn
+    conversationHistory.push({ role: 'assistant', content: welcomeMessage });
+  }
 
   // 6. Resolve LLM providers (primary + optional fallback)
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition

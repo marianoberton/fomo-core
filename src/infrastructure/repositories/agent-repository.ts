@@ -60,6 +60,7 @@ function toAgentConfig(record: AgentRecord): AgentConfig {
     },
     status: rec.status as AgentStatus,
     managerAgentId: rec.managerAgentId,
+    metadata: (rec as AgentRecord & { metadata?: unknown }).metadata as Record<string, unknown> | undefined,
     createdAt: rec.createdAt,
     updatedAt: rec.updatedAt,
   };
