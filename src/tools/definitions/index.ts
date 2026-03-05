@@ -67,6 +67,7 @@ export { createContactScoreTool } from './contact-score.js';
 
 // CRM integrations
 export { createTwentyCrmTool } from './create-twenty-lead.js';
+export { createTwentyUpdateTool } from './update-twenty-lead.js';
 export type { TwentyCrmToolOptions } from './create-twenty-lead.js';
 
 // Vertical-specific tools

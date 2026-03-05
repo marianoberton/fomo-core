@@ -36,6 +36,7 @@ import {
   createSendEmailTool,
   createSendChannelMessageTool,
   createTwentyCrmTool,
+  createTwentyUpdateTool,
   createReadFileTool,
   createQuerySessionsTool,
   createReadSessionHistoryTool,
@@ -200,6 +201,10 @@ async function start(): Promise<void> {
     toolRegistry.register(createSendEmailTool({ secretService, requiresApproval: false }));
     toolRegistry.register(createSendChannelMessageTool({ channelResolver, requiresApproval: false }));
     toolRegistry.register(createTwentyCrmTool({
+      twentyBaseUrl: process.env['TWENTY_BASE_URL'] ?? 'https://crm.fomo.com.ar',
+      secretService,
+    }));
+    toolRegistry.register(createTwentyUpdateTool({
       twentyBaseUrl: process.env['TWENTY_BASE_URL'] ?? 'https://crm.fomo.com.ar',
       secretService,
     }));
