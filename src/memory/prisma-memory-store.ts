@@ -195,7 +195,9 @@ export function createPrismaMemoryStore(
       // If neither scope nor agentId → return everything for the project (no extra filter)
 
       if (query.sessionScope) {
-        conditions.push(Prisma.sql`session_id = ${query.sessionScope}`);
+        conditions.push(
+          Prisma.sql`(session_id = ${query.sessionScope} OR (scope = 'project' AND session_id IS NULL))`,
+        );
       }
 
       if (query.minImportance !== undefined) {
