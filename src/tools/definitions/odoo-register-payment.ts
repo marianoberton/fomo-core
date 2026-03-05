@@ -68,18 +68,19 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
       const odooUser = await options.secretService.get(projectId, 'ODOO_USER');
       const odooPass = await options.secretService.get(projectId, 'ODOO_PASSWORD');
       const odooDB   = await options.secretService.get(projectId, 'ODOO_DB');
+      const odooUrl  = (await options.secretService.get(projectId, 'ODOO_BASE_URL')) ?? options.odooBaseUrl;
       if (!odooUser || !odooPass || !odooDB) {
         return err(new ToolExecutionError('odoo-register-payment', 'Faltan credenciales Odoo'));
       }
 
       try {
-        const session = await odooAuth(options.odooBaseUrl, odooDB, odooUser, odooPass);
+        const session = await odooAuth(odooUrl, odooDB, odooUser, odooPass);
         const today = new Date().toISOString().split('T')[0]!;
 
         // Promesa de pago — solo nota en la factura
         if (isPromise) {
           const note = `[PROMESA DE PAGO] Cliente prometió abonar el ${promiseDate ?? 'sin fecha'}. ${memo ?? ''}`.trim();
-          await odooCall(options.odooBaseUrl, session, 'account.move', 'write', [[invoiceId], { narration: note }]);
+          await odooCall(odooUrl, session, 'account.move', 'write', [[invoiceId], { narration: note }]);
           return ok({
             success: true,
             output: { message: `Promesa registrada para el ${promiseDate ?? 'sin fecha'}`, invoiceId },
@@ -89,16 +90,16 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
 
         if (!amount) return err(new ToolExecutionError('odoo-register-payment', 'Se requiere amount para registrar un pago'));
 
-        const journals = await odooCall(options.odooBaseUrl, session, 'account.journal', 'search', [[['type', 'in', ['bank', 'cash']]]]) as number[];
+        const journals = await odooCall(odooUrl, session, 'account.journal', 'search', [[['type', 'in', ['bank', 'cash']]]]) as number[];
         if (!journals.length) throw new Error('No hay journal de banco/caja configurado');
 
-        const invoices = await odooCall(options.odooBaseUrl, session, 'account.move', 'read', [[invoiceId]], {
+        const invoices = await odooCall(odooUrl, session, 'account.move', 'read', [[invoiceId]], {
           fields: ['partner_id', 'amount_residual'],
         }) as Array<{ partner_id: [number, string]; amount_residual: number }>;
         if (!invoices.length) throw new Error(`Factura ${invoiceId} no encontrada`);
         const invoice = invoices[0]!;
 
-        const paymentId = await odooCall(options.odooBaseUrl, session, 'account.payment', 'create', [{
+        const paymentId = await odooCall(odooUrl, session, 'account.payment', 'create', [{
           payment_type: 'inbound',
           partner_type: 'customer',
           partner_id:   invoice.partner_id[0],
@@ -108,7 +109,7 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
           memo:         memo ?? 'Pago registrado por Lucas (agente de cobranzas)',
         }]) as number;
 
-        await odooCall(options.odooBaseUrl, session, 'account.payment', 'action_post', [[paymentId]]);
+        await odooCall(odooUrl, session, 'account.payment', 'action_post', [[paymentId]]);
 
         const isPartial = amount < invoice.amount_residual;
         const remaining = invoice.amount_residual - amount;

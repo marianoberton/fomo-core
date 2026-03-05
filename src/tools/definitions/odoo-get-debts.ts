@@ -71,22 +71,23 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
       const odooUser = await options.secretService.get(projectId, 'ODOO_USER');
       const odooPass = await options.secretService.get(projectId, 'ODOO_PASSWORD');
       const odooDB   = await options.secretService.get(projectId, 'ODOO_DB');
+      const odooUrl  = (await options.secretService.get(projectId, 'ODOO_BASE_URL')) ?? options.odooBaseUrl;
       if (!odooUser || !odooPass || !odooDB) {
         return err(new ToolExecutionError('odoo-get-debts', 'Faltan credenciales Odoo (ODOO_USER, ODOO_PASSWORD, ODOO_DB)'));
       }
 
       try {
-        const session = await odooAuth(options.odooBaseUrl, odooDB, odooUser, odooPass);
+        const session = await odooAuth(odooUrl, odooDB, odooUser, odooPass);
         const today   = new Date().toISOString().split('T')[0]!;
         const in7days = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]!;
 
         let partnerFilter: unknown[] = [];
         if (email) {
-          const ids = await odooCall(options.odooBaseUrl, session, 'res.partner', 'search', [[['email', '=', email]]]) as number[];
+          const ids = await odooCall(odooUrl, session, 'res.partner', 'search', [[['email', '=', email]]]) as number[];
           if (!ids.length) return ok({ success: true, output: { debts: [], message: 'No se encontró cliente con ese email' }, durationMs: Date.now() - start });
           partnerFilter = [['partner_id', 'in', ids]];
         } else if (companyName) {
-          const ids = await odooCall(options.odooBaseUrl, session, 'res.partner', 'search', [[['name', 'ilike', companyName]]]) as number[];
+          const ids = await odooCall(odooUrl, session, 'res.partner', 'search', [[['name', 'ilike', companyName]]]) as number[];
           if (!ids.length) return ok({ success: true, output: { debts: [], message: 'No se encontró empresa con ese nombre' }, durationMs: Date.now() - start });
           partnerFilter = [['partner_id', 'in', ids]];
         }
@@ -99,7 +100,7 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
           ...partnerFilter,
         ];
 
-        const invoices = await odooCall(options.odooBaseUrl, session, 'account.move', 'search_read', [domain], {
+        const invoices = await odooCall(odooUrl, session, 'account.move', 'search_read', [domain], {
           fields: ['id', 'name', 'partner_id', 'invoice_date_due', 'amount_total', 'amount_residual', 'payment_state', 'narration'],
           order: 'invoice_date_due asc',
           limit: 20,
@@ -110,7 +111,7 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
         }
 
         const partnerIds = [...new Set(invoices.map(i => i.partner_id[0]))];
-        const partners = await odooCall(options.odooBaseUrl, session, 'res.partner', 'search_read', [[['id', 'in', partnerIds]]], {
+        const partners = await odooCall(odooUrl, session, 'res.partner', 'search_read', [[['id', 'in', partnerIds]]], {
           fields: ['id', 'name', 'phone', 'email', 'comment'],
         }) as Array<{ id: number; name: string; phone: string; email: string; comment: string }>;
         const partnerMap = Object.fromEntries(partners.map(p => [p.id, p]));

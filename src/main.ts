@@ -220,7 +220,7 @@ async function start(): Promise<void> {
       twentyBaseUrl: process.env['TWENTY_BASE_URL'] ?? 'https://crm.fomo.com.ar',
       secretService,
     }));
-    const odooBaseUrl = process.env['ODOO_BASE_URL'] ?? 'http://odoo.fomo.com.ar';
+    const odooBaseUrl = process.env['ODOO_BASE_URL'] ?? 'https://odoo.fomo.com.ar';
     toolRegistry.register(createOdooGetDebtsTool({ odooBaseUrl, secretService }));
     toolRegistry.register(createOdooRegisterPaymentTool({ odooBaseUrl, secretService }));
 
