@@ -162,16 +162,8 @@ export function createPrismaMemoryStore(
       `;
       const counts = countResult[0];
 
-      logger.info('retrieve() called', {
+      logger.info(`retrieve() called: projectId=${query.projectId ?? 'NONE'}, scope=${query.scope ?? 'NONE'}, agentId=${query.agentId ?? 'NONE'}, topK=${query.topK}, dbTotal=${Number(counts?.total ?? 0)}, dbWithEmb=${Number(counts?.with_embedding ?? 0)}, embLen=${queryEmbedding.length}`, {
         component: 'prisma-memory-store',
-        projectId: query.projectId ?? 'NOT SET',
-        scope: query.scope ?? 'NOT SET',
-        agentId: query.agentId ?? 'NOT SET',
-        topK: query.topK,
-        embeddingLength: queryEmbedding.length,
-        embeddingFirst3: queryEmbedding.slice(0, 3),
-        dbTotalEntries: counts ? Number(counts.total) : -1,
-        dbWithEmbedding: counts ? Number(counts.with_embedding) : -1,
       });
 
       // Build dynamic WHERE conditions
@@ -286,16 +278,8 @@ export function createPrismaMemoryStore(
         });
       }
 
-      logger.info('retrieve() completed', {
+      logger.info(`retrieve() completed: ${results.length} results, conditions=${conditions.length}, projectId=${query.projectId ?? 'NONE'}, firstResult=${results[0]?.content.slice(0, 50) ?? 'NONE'}`, {
         component: 'prisma-memory-store',
-        projectId: query.projectId ?? 'NOT SET',
-        scope: query.scope ?? 'NOT SET',
-        agentId: query.agentId ?? 'NOT SET',
-        conditionsCount: conditions.length,
-        resultsCount: results.length,
-        firstResult: results.length > 0
-          ? { id: results[0]?.id, scope: results[0]?.scope, similarity: results[0]?.similarity_score, content: results[0]?.content.slice(0, 80) }
-          : null,
       });
 
       return results.map(rowToRetrievedMemory);

@@ -81,14 +81,8 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
           categories: parsed.categories as MemoryCategory[] | undefined,
         };
 
-        logger.info('Knowledge search starting', {
+        logger.info(`Knowledge search starting: projectId=${context.projectId}, agentId=${context.agentId ?? 'NONE'}, query="${parsed.query.slice(0, 80)}", topK=${parsed.topK}, storeExists=${!!store}`, {
           component: 'knowledge-search',
-          projectId: context.projectId,
-          agentId: context.agentId,
-          traceId: context.traceId,
-          storeExists: !!store,
-          storeType: typeof store,
-          retrievalParams: JSON.stringify(retrievalParams),
         });
 
         const retrieved = await store.retrieve(retrievalParams);
@@ -101,15 +95,8 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
           metadata: entry.metadata,
         }));
 
-        logger.info('Knowledge search completed', {
+        logger.info(`Knowledge search completed: ${results.length} results, projectId=${context.projectId}, firstResult=${results[0]?.content.slice(0, 80) ?? 'NONE'}, similarity=${results[0]?.similarity ?? 'N/A'}`, {
           component: 'knowledge-search',
-          projectId: context.projectId,
-          agentId: context.agentId,
-          traceId: context.traceId,
-          resultsCount: results.length,
-          firstResultPreview: results.length > 0
-            ? { category: results[0]?.category, similarity: results[0]?.similarity, content: results[0]?.content.slice(0, 100) }
-            : null,
         });
 
         return ok({
