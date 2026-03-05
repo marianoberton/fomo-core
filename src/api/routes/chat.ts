@@ -49,7 +49,18 @@ export function chatRoutes(
       fallbackProvider,
       memoryManager,
       costGuard,
+      welcomeMessageResponse,
     } = setupResult.value;
+
+    // Short-circuit: if a welcome message was just injected, return it directly without running LLM
+    if (welcomeMessageResponse) {
+      return sendSuccess(reply, {
+        sessionId,
+        response: welcomeMessageResponse,
+        toolCalls: [],
+        usage: null,
+      });
+    }
 
     // 3. Create abort controller tied to client disconnect
     const abortController = new AbortController();

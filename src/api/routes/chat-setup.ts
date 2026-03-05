@@ -119,6 +119,8 @@ export interface ChatSetupResult {
   memoryManager: MemoryManager;
   /** Per-request cost guard. */
   costGuard: CostGuard;
+  /** If set, the welcome message was just injected — return this directly without running LLM. */
+  welcomeMessageResponse?: string;
 }
 
 /** Structured error returned when chat setup fails. */
@@ -385,16 +387,15 @@ Do not decline a request if your Manager might be able to approve it.
   }));
 
   // 5b. Welcome message — if session is new (no prior messages) and agent has a welcomeMessage in metadata,
-  // inject it as the first assistant message so the model "continues" from that opening.
+  // return it directly without running the LLM. Persist it as the first assistant message.
   const welcomeMessage = agentRecord?.metadata?.['welcomeMessage'] as string | undefined;
+  let welcomeMessageResponse: string | undefined;
   if (welcomeMessage && conversationHistory.length === 0) {
-    // Persist as assistant message so it appears in session history
-    await sessionRepository.addMessage(sessionId, {
-      role: 'assistant',
-      content: welcomeMessage,
-    });
-    // Also inject into in-memory history for this turn
-    conversationHistory.push({ role: 'assistant', content: welcomeMessage });
+    // Persist the user message first
+    await sessionRepository.addMessage(sessionId, { role: 'user', content: body.message ?? '' });
+    // Persist the welcome as assistant message
+    await sessionRepository.addMessage(sessionId, { role: 'assistant', content: welcomeMessage });
+    welcomeMessageResponse = welcomeMessage;
   }
 
   // 6. Resolve LLM providers (primary + optional fallback)
@@ -561,6 +562,7 @@ Do not decline a request if your Manager might be able to approve it.
     fallbackProvider,
     memoryManager,
     costGuard,
+    welcomeMessageResponse,
   });
 }
 
