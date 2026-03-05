@@ -45,6 +45,7 @@ import {
   createNotionCreateTaskTool,
   createGmailSendTool,
   createGoogleCalendarEventTool,
+  createGmailReadTool,
   createTwentyUpsertTool,
   createTwentySearchTool,
   createReadFileTool,
@@ -238,6 +239,7 @@ async function start(): Promise<void> {
     toolRegistry.register(createNotionCreateTaskTool({ secretService }));
     toolRegistry.register(createGmailSendTool({ secretService }));
     toolRegistry.register(createGoogleCalendarEventTool({ secretService }));
+    toolRegistry.register(createGmailReadTool({ secretService }));
 
     const taskManager = createTaskManager({ repository: scheduledTaskRepository });
     toolRegistry.register(createProposeScheduledTaskTool({ taskManager }));

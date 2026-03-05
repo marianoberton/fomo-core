@@ -87,3 +87,4 @@ export { createWahaSendMessageTool } from './waha-send-message.js';
 export { createNotionCreateTaskTool } from './notion-create-task.js';
 export { createGmailSendTool } from './gmail-send.js';
 export { createGoogleCalendarEventTool } from './google-calendar-event.js';
+export { createGmailReadTool } from './gmail-read.js';
