@@ -11,8 +11,8 @@ import type { ExecutableTool, ToolResult } from '@/tools/types.js';
 import type { OdooToolOptions } from './odoo-get-debts.js';
 
 const inputSchema = z.object({
-  invoiceId:   z.number().describe('ID de la factura en Odoo'),
-  amount:      z.number().optional().describe('Monto pagado'),
+  invoiceId:   z.union([z.number(), z.array(z.number())]).describe('ID o array de IDs de facturas en Odoo'),
+  amount:      z.number().optional().describe('Monto pagado (total entre todas las facturas)'),
   paymentDate: z.string().optional().describe('Fecha del pago (YYYY-MM-DD). Default: hoy'),
   memo:        z.string().optional().describe('Nota del pago'),
   isPromise:   z.boolean().default(false).describe('Si true, solo registra promesa de pago como nota'),
@@ -62,7 +62,8 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) return err(new ToolExecutionError('odoo-register-payment', parsed.error.message));
 
-      const { invoiceId, amount, paymentDate, memo, isPromise, promiseDate } = parsed.data;
+      const { invoiceId: invoiceIdRaw, amount, paymentDate, memo, isPromise, promiseDate } = parsed.data;
+      const invoiceIds = Array.isArray(invoiceIdRaw) ? invoiceIdRaw : [invoiceIdRaw];
       const { projectId } = context;
 
       const odooUser = await options.secretService.get(projectId, 'ODOO_USER');
@@ -77,13 +78,13 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
         const session = await odooAuth(odooUrl, odooDB, odooUser, odooPass);
         const today = new Date().toISOString().split('T')[0]!;
 
-        // Promesa de pago — solo nota en la factura
+        // Promesa de pago — nota en todas las facturas
         if (isPromise) {
           const note = `[PROMESA DE PAGO] Cliente prometió abonar el ${promiseDate ?? 'sin fecha'}. ${memo ?? ''}`.trim();
-          await odooCall(odooUrl, session, 'account.move', 'write', [[invoiceId], { narration: note }]);
+          await odooCall(odooUrl, session, 'account.move', 'write', [invoiceIds, { narration: note }]);
           return ok({
             success: true,
-            output: { message: `Promesa registrada para el ${promiseDate ?? 'sin fecha'}`, invoiceId },
+            output: { message: `Promesa registrada para el ${promiseDate ?? 'sin fecha'} en ${invoiceIds.length} factura/s`, invoiceIds },
             durationMs: Date.now() - start,
           });
         }
@@ -93,10 +94,12 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
         const journals = await odooCall(odooUrl, session, 'account.journal', 'search', [[['type', 'in', ['bank', 'cash']]]]) as number[];
         if (!journals.length) throw new Error('No hay journal de banco/caja configurado');
 
-        const invoices = await odooCall(odooUrl, session, 'account.move', 'read', [[invoiceId]], {
+        const invoices = await odooCall(odooUrl, session, 'account.move', 'read', [invoiceIds], {
           fields: ['partner_id', 'amount_residual'],
         }) as Array<{ partner_id: [number, string]; amount_residual: number }>;
-        if (!invoices.length) throw new Error(`Factura ${invoiceId} no encontrada`);
+        if (!invoices.length) throw new Error(`Facturas ${invoiceIds.join(',')} no encontradas`);
+
+        const totalResidual = invoices.reduce((s, i) => s + i.amount_residual, 0);
         const invoice = invoices[0]!;
 
         const paymentId = await odooCall(odooUrl, session, 'account.payment', 'create', [{
@@ -111,20 +114,20 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
 
         await odooCall(odooUrl, session, 'account.payment', 'action_post', [[paymentId]]);
 
-        const isPartial = amount < invoice.amount_residual;
-        const remaining = invoice.amount_residual - amount;
+        const isPartial = amount < totalResidual;
+        const remaining = totalResidual - amount;
 
         return ok({
           success: true,
           output: {
             paymentId,
-            invoiceId,
+            invoiceIds,
             amountPaid: amount,
             isPartial,
             remainingAmount: isPartial ? remaining : 0,
             message: isPartial
               ? `Pago parcial de $${amount.toLocaleString()} registrado. Saldo: $${remaining.toLocaleString()}`
-              : `Pago completo de $${amount.toLocaleString()} registrado`,
+              : `Pago completo de $${amount.toLocaleString()} registrado en ${invoiceIds.length} factura/s`,
           },
           durationMs: Date.now() - start,
         });

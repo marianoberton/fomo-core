@@ -101,10 +101,10 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
         ];
 
         const invoices = await odooCall(odooUrl, session, 'account.move', 'search_read', [domain], {
-          fields: ['id', 'name', 'partner_id', 'invoice_date_due', 'amount_total', 'amount_residual', 'payment_state', 'narration'],
+          fields: ['id', 'name', 'partner_id', 'invoice_date_due', 'amount_total', 'amount_untaxed', 'amount_residual', 'payment_state', 'narration'],
           order: 'invoice_date_due asc',
           limit: 20,
-        }) as Array<{ id: number; name: string; partner_id: [number, string]; invoice_date_due: string; amount_total: number; amount_residual: number; payment_state: string; narration: string }>;
+        }) as Array<{ id: number; name: string; partner_id: [number, string]; invoice_date_due: string; amount_total: number; amount_untaxed: number; amount_residual: number; payment_state: string; narration: string }>;
 
         if (!invoices.length) {
           return ok({ success: true, output: { debts: [], message: 'No hay facturas pendientes' }, durationMs: Date.now() - start });
@@ -129,6 +129,7 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
             dueDate:       inv.invoice_date_due,
             daysOverdue:   diffDays,
             totalAmount:   inv.amount_total,
+            amountUntaxed: inv.amount_untaxed,
             pendingAmount: inv.amount_residual,
             paymentState:  inv.payment_state === 'partial' ? 'pago_parcial' : 'sin_pagar',
             notes:         inv.narration,
