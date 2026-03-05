@@ -143,14 +143,28 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
         const sessions = await sessionRepository.listByProject(projectId, 'active');
         let session: Session | null = null;
 
-        // Try to find an existing active session for this contact
+        // Find existing active session for this contact
+        let existingSession: Session | null = null;
         for (const s of sessions) {
           const metadata = s.metadata;
           if (metadata?.['contactId'] === contact.id) {
-            session = s;
+            existingSession = s;
             break;
           }
         }
+
+        // /start (or resetSession flag) → close existing session and force a new one
+        if (message.resetSession && existingSession) {
+          await sessionRepository.updateStatus(existingSession.id, 'completed');
+          logger.info('Session reset via /start command', {
+            component: 'inbound-processor',
+            oldSessionId: existingSession.id,
+            contactId: contact.id,
+          });
+          existingSession = null;
+        }
+
+        session = existingSession;
 
         if (!session) {
           session = await sessionRepository.create({

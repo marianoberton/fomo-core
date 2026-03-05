@@ -25,6 +25,9 @@ export interface InboundMessage {
   /** Raw payload for debugging */
   rawPayload: unknown;
   receivedAt: Date;
+
+  /** If true, the inbound-processor should close the existing session and start a new one */
+  resetSession?: boolean;
 }
 
 // ─── Outbound Message ───────────────────────────────────────────

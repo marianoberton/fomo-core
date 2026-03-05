@@ -111,6 +111,9 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
       const text = message.text;
       if (!text) return Promise.resolve(null); // Skip non-text messages for now
 
+      // /start command → force a new session
+      const isStartCommand = text.trim() === '/start' || text.trim().startsWith('/start ');
+
       const chat = message.chat;
       const from = message.from;
 
@@ -128,12 +131,13 @@ export function createTelegramAdapter(config: TelegramAdapterConfig): ChannelAda
         projectId: config.projectId,
         senderIdentifier: String(chat.id),
         senderName,
-        content: text,
+        content: isStartCommand ? 'Hola' : text,
         replyToChannelMessageId: message.reply_to_message
           ? String(message.reply_to_message.message_id)
           : undefined,
         rawPayload: payload,
         receivedAt: new Date(message.date * 1000),
+        resetSession: isStartCommand,
       });
     },
 
