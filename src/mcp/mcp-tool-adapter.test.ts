@@ -47,118 +47,80 @@ describe('mcp-tool-adapter', () => {
       toolInfo = createMockToolInfo();
     });
 
+    /**
+     * Helper: build adapter options using the current `connection` / `toolInfo` test vars.
+     * Captures by reference so reassigning `connection` inside a test is reflected.
+     */
+    function mkTool(opts: { serverName?: string; connection?: MCPConnection; prefix?: string } = {}) {
+      const conn = opts.connection ?? connection;
+      return createMCPExecutableTool({
+        serverName: opts.serverName ?? 'test-server',
+        toolInfo,
+        getConnection: () => Promise.resolve(conn),
+        getConnectionStatus: () => conn.status,
+        ...(opts.prefix !== undefined ? { prefix: opts.prefix } : {}),
+      });
+    }
+
     describe('tool identity', () => {
       it('creates tool ID with mcp:{serverName}:{toolName} format', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'google-calendar',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool({ serverName: 'google-calendar' });
 
         expect(tool.id).toBe('mcp:google-calendar:list_events');
       });
 
       it('uses custom prefix when provided', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'google-calendar',
-          toolInfo,
-          connection,
-          prefix: 'gcal',
-        });
+        const tool = mkTool({ serverName: 'google-calendar', prefix: 'gcal' });
 
         expect(tool.id).toBe('mcp:gcal:list_events');
       });
 
       it('preserves tool name from MCP server', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         expect(tool.name).toBe('list_events');
       });
 
       it('uses MCP tool description', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         expect(tool.description).toBe('Lists calendar events');
       });
 
       it('falls back to default description when empty', () => {
         toolInfo.description = '';
-        const tool = createMCPExecutableTool({
-          serverName: 'my-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool({ serverName: 'my-server' });
 
         expect(tool.description).toBe('MCP tool from my-server');
       });
 
       it('sets category to mcp', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
-
-        expect(tool.category).toBe('mcp');
+        expect(mkTool().category).toBe('mcp');
       });
 
       it('sets riskLevel to medium', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
-
-        expect(tool.riskLevel).toBe('medium');
+        expect(mkTool().riskLevel).toBe('medium');
       });
 
       it('marks tool as having side effects', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
-
-        expect(tool.sideEffects).toBe(true);
+        expect(mkTool().sideEffects).toBe(true);
       });
 
       it('supports dry run', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
-
-        expect(tool.supportsDryRun).toBe(true);
+        expect(mkTool().supportsDryRun).toBe(true);
       });
     });
 
     describe('schema validation', () => {
       it('accepts valid object input', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = tool.inputSchema.safeParse({ date: '2026-01-01' });
         expect(result.success).toBe(true);
       });
 
       it('accepts empty input (defaults to empty object)', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = tool.inputSchema.safeParse(undefined);
         expect(result.success).toBe(true);
@@ -168,11 +130,7 @@ describe('mcp-tool-adapter', () => {
       });
 
       it('accepts arbitrary keys (pass-through to MCP server)', () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = tool.inputSchema.safeParse({
           anything: 'goes',
@@ -185,15 +143,11 @@ describe('mcp-tool-adapter', () => {
 
     describe('execute', () => {
       it('calls connection.callTool with correct arguments', async () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         await tool.execute({ date: '2026-01-01' }, context);
 
-         
+
         expect(connection.callTool).toHaveBeenCalledWith(
           'list_events',
           { date: '2026-01-01' },
@@ -207,11 +161,7 @@ describe('mcp-tool-adapter', () => {
           }),
         });
 
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = await tool.execute({ date: '2026-01-01' }, context);
 
@@ -236,11 +186,7 @@ describe('mcp-tool-adapter', () => {
           }),
         });
 
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = await tool.execute({}, context);
 
@@ -260,11 +206,7 @@ describe('mcp-tool-adapter', () => {
           }),
         });
 
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = await tool.execute({}, context);
 
@@ -282,11 +224,7 @@ describe('mcp-tool-adapter', () => {
           }),
         });
 
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = await tool.execute({}, context);
 
@@ -305,11 +243,7 @@ describe('mcp-tool-adapter', () => {
           ),
         });
 
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = await tool.execute({}, context);
 
@@ -322,11 +256,7 @@ describe('mcp-tool-adapter', () => {
       });
 
       it('includes durationMs in result', async () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = await tool.execute({}, context);
 
@@ -337,26 +267,18 @@ describe('mcp-tool-adapter', () => {
       });
 
       it('passes empty object when input is nullish', async () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         await tool.execute(undefined, context);
 
-         
+
         expect(connection.callTool).toHaveBeenCalledWith('list_events', {});
       });
     });
 
     describe('dryRun', () => {
       it('returns success without calling the server', async () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = await tool.dryRun({ date: '2026-01-01' }, context);
 
@@ -370,16 +292,12 @@ describe('mcp-tool-adapter', () => {
           );
         }
 
-         
+
         expect(connection.callTool).not.toHaveBeenCalled();
       });
 
       it('includes durationMs in dry run result', async () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
         const result = await tool.dryRun({}, context);
 
@@ -392,13 +310,9 @@ describe('mcp-tool-adapter', () => {
 
     describe('healthCheck', () => {
       it('returns true when connected', async () => {
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
-         
+
         expect(tool.healthCheck).toBeDefined();
         const healthFn = tool.healthCheck?.bind(tool);
         const healthy = healthFn ? await healthFn() : false;
@@ -408,13 +322,9 @@ describe('mcp-tool-adapter', () => {
       it('returns false when disconnected', async () => {
         connection = createMockConnection({ status: 'disconnected' });
 
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
-         
+
         expect(tool.healthCheck).toBeDefined();
         const healthFn = tool.healthCheck?.bind(tool);
         const healthy = healthFn ? await healthFn() : false;
@@ -424,13 +334,9 @@ describe('mcp-tool-adapter', () => {
       it('returns false when in error state', async () => {
         connection = createMockConnection({ status: 'error' });
 
-        const tool = createMCPExecutableTool({
-          serverName: 'test-server',
-          toolInfo,
-          connection,
-        });
+        const tool = mkTool();
 
-         
+
         expect(tool.healthCheck).toBeDefined();
         const healthFn = tool.healthCheck?.bind(tool);
         const healthy = healthFn ? await healthFn() : false;

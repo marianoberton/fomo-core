@@ -22,7 +22,7 @@ const logger = createLogger({ name: 'mcp-client' });
 export interface CreateMCPConnectionOptions {
   /** Server configuration. */
   config: MCPServerConfig;
-  /** Connection timeout in milliseconds. Defaults to 30000. */
+  /** Connection timeout in milliseconds. Defaults to 5000. */
   timeoutMs?: number;
 }
 
@@ -33,7 +33,7 @@ export interface CreateMCPConnectionOptions {
 export async function createMCPConnection(
   options: CreateMCPConnectionOptions,
 ): Promise<MCPConnection> {
-  const { config, timeoutMs = 30_000 } = options;
+  const { config, timeoutMs = 5_000 } = options;
 
   logger.info('Connecting to MCP server', {
     component: 'mcp-client',

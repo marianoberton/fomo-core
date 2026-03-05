@@ -21,8 +21,16 @@ export interface MCPToolAdapterOptions {
   serverName: string;
   /** Tool info as reported by the MCP server. */
   toolInfo: MCPToolInfo;
-  /** Live connection to the MCP server. */
-  connection: MCPConnection;
+  /**
+   * Lazy connection getter — called at execute() time.
+   * May trigger a reconnection if the server dropped between requests.
+   */
+  getConnection: () => Promise<MCPConnection>;
+  /**
+   * Returns the current connection status without triggering a connection.
+   * Used for healthCheck. Return 'unconnected' if no connection has been made yet.
+   */
+  getConnectionStatus: () => string;
   /** Namespace prefix for the tool ID. Defaults to serverName. */
   prefix?: string;
 }
@@ -32,7 +40,7 @@ export interface MCPToolAdapterOptions {
  * The tool ID is namespaced as `mcp:{prefix}:{toolName}` to avoid collisions.
  */
 export function createMCPExecutableTool(options: MCPToolAdapterOptions): ExecutableTool {
-  const { serverName, toolInfo, connection, prefix } = options;
+  const { serverName, toolInfo, getConnection, getConnectionStatus, prefix } = options;
   const toolPrefix = prefix ?? serverName;
   const toolId = `mcp:${toolPrefix}:${toolInfo.name}`;
 
@@ -67,8 +75,9 @@ export function createMCPExecutableTool(options: MCPToolAdapterOptions): Executa
           mcpToolName: toolInfo.name,
         });
 
+        const conn = await getConnection();
         const toolInput = (input ?? {}) as Record<string, unknown>;
-        const mcpResult = await connection.callTool(toolInfo.name, toolInput);
+        const mcpResult = await conn.callTool(toolInfo.name, toolInput);
 
         const durationMs = Date.now() - startTime;
 
@@ -156,7 +165,7 @@ export function createMCPExecutableTool(options: MCPToolAdapterOptions): Executa
     },
 
     healthCheck(): Promise<boolean> {
-      return Promise.resolve(connection.status === 'connected');
+      return Promise.resolve(getConnectionStatus() === 'connected');
     },
   };
 }

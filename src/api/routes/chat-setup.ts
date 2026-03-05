@@ -444,25 +444,22 @@ Do not decline a request if your Manager might be able to approve it.
     usageStore: createPrismaUsageStore(deps.prisma),
   });
 
-  // 8. Connect MCP servers and register their tools (if configured)
+  // 8. Prepare MCP tools (lazy — uses cache for known servers; connects only for first-time servers)
+  // Reconnection for dropped connections happens at tool execute() time, not here.
   const mcpToolIds: string[] = [];
   if (agentConfig.mcpServers && agentConfig.mcpServers.length > 0) {
     const { mcpManager, toolRegistry } = deps;
 
-    // Connect servers that aren't already connected
-    const needConnection = agentConfig.mcpServers.filter(
-      (s) => !mcpManager.getConnection(s.name),
-    );
-    if (needConnection.length > 0) {
-      await mcpManager.connectAll(needConnection);
-    }
+    const preparedIds = await mcpManager.prepareTools(agentConfig.mcpServers);
 
-    // Register discovered MCP tools in the shared tool registry
+    // Register prepared MCP tools in the shared tool registry
     for (const tool of mcpManager.getTools()) {
-      if (!toolRegistry.has(tool.id)) {
-        toolRegistry.register(tool);
+      if (preparedIds.includes(tool.id)) {
+        if (!toolRegistry.has(tool.id)) {
+          toolRegistry.register(tool);
+        }
+        mcpToolIds.push(tool.id);
       }
-      mcpToolIds.push(tool.id);
     }
   }
 

@@ -168,6 +168,7 @@ export function createMockMCPManager(): {
 } {
   return {
     connectAll: vi.fn().mockResolvedValue(undefined),
+    prepareTools: vi.fn().mockResolvedValue([]),
     disconnect: vi.fn().mockResolvedValue(undefined),
     disconnectAll: vi.fn().mockResolvedValue(undefined),
     getConnection: vi.fn().mockReturnValue(undefined),

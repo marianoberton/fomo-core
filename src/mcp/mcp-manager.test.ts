@@ -265,6 +265,78 @@ describe('mcp-manager', () => {
     });
   });
 
+  describe('prepareTools', () => {
+    it('connects on first use and caches tool info', async () => {
+      const conn = createMockConnection('google-calendar', calendarTools);
+      mockCreateMCPConnection.mockResolvedValue(conn);
+
+      const manager = createMCPManager();
+      const ids = await manager.prepareTools([
+        { name: 'google-calendar', transport: 'stdio', command: 'npx' },
+      ]);
+
+      expect(ids).toHaveLength(2);
+      expect(ids).toContain('mcp:google-calendar:list_events');
+      expect(manager.getTools()).toHaveLength(2);
+      expect(mockCreateMCPConnection).toHaveBeenCalledOnce();
+    });
+
+    it('uses cache on second call — no reconnection', async () => {
+      const conn = createMockConnection('google-calendar', calendarTools);
+      mockCreateMCPConnection.mockResolvedValue(conn);
+
+      const manager = createMCPManager();
+      const config: MCPServerConfig = { name: 'google-calendar', transport: 'stdio', command: 'npx' };
+
+      // First call — connects
+      await manager.prepareTools([config]);
+      // Second call — should use cache, no new connection
+      await manager.prepareTools([config]);
+
+      expect(mockCreateMCPConnection).toHaveBeenCalledOnce();
+      expect(manager.getTools()).toHaveLength(2);
+    });
+
+    it('skips unknown servers gracefully on connection failure', async () => {
+      mockCreateMCPConnection.mockRejectedValue(new Error('timeout'));
+
+      const manager = createMCPManager();
+      const ids = await manager.prepareTools([
+        { name: 'unreachable', transport: 'sse', url: 'http://localhost:9999/mcp' },
+      ]);
+
+      expect(ids).toHaveLength(0);
+      expect(manager.getTools()).toHaveLength(0);
+    });
+
+    it('mixes cached and new servers in one call', async () => {
+      const calendarConn = createMockConnection('google-calendar', calendarTools);
+      const emailConn = createMockConnection('gmail', emailTools);
+
+      mockCreateMCPConnection
+        .mockResolvedValueOnce(calendarConn)
+        .mockResolvedValueOnce(emailConn);
+
+      const manager = createMCPManager();
+
+      // First: connect calendar
+      await manager.prepareTools([{ name: 'google-calendar', transport: 'stdio', command: 'npx' }]);
+      expect(mockCreateMCPConnection).toHaveBeenCalledOnce();
+
+      mockCreateMCPConnection.mockClear();
+
+      // Second: calendar from cache + gmail new
+      const ids = await manager.prepareTools([
+        { name: 'google-calendar', transport: 'stdio', command: 'npx' },
+        { name: 'gmail', transport: 'stdio', command: 'npx' },
+      ]);
+
+      // Only gmail should trigger a new connection
+      expect(mockCreateMCPConnection).toHaveBeenCalledOnce();
+      expect(ids).toHaveLength(3); // 2 calendar + 1 gmail
+    });
+  });
+
   describe('getToolSchemas', () => {
     it('returns JSON Schemas for all MCP tools', async () => {
       const conn = createMockConnection('google-calendar', calendarTools);
