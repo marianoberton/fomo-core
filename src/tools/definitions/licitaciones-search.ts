@@ -78,9 +78,8 @@ export function createLicitacionesSearchTool(options: LicitacionesSearchOptions)
         // Estado
         if (estado) {
           params.set('estado_proceso', `ilike.*${estado}*`);
-        } else if (soloActivos) {
-          params.set('estado_proceso', 'in.(Publicado,En Apertura,En Evaluacion,Preadjudicado)');
         }
+        // soloActivos se ignora si no hay filtro específico — el catálogo es mayormente histórico
 
         if (tipo_proceso) params.set('tipo_proceso', `ilike.*${tipo_proceso}*`);
         if (organismo) params.set('organismo', `ilike.*${organismo}*`);
