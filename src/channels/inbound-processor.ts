@@ -24,6 +24,8 @@ export interface InboundProcessorDeps {
   logger: Logger;
   /** Optional agent-channel router for mode-aware agent resolution. */
   agentChannelRouter?: AgentChannelRouter;
+  /** Optional broadcaster to notify WebSocket clients of new messages. */
+  sessionBroadcaster?: import('@/hitl/session-broadcaster.js').SessionBroadcaster;
   /** Function to run the agent and get a response */
   runAgent: (params: {
     projectId: ProjectId;
@@ -76,6 +78,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
     sessionRepository,
     logger,
     agentChannelRouter,
+    sessionBroadcaster,
     runAgent,
   } = deps;
 
@@ -194,7 +197,33 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
           session = { ...session, metadata: updatedMetadata };
         }
 
-        // 3. Run the agent (with mode-aware params)
+        // 3. If session is paused (operator takeover), persist message but skip agent
+        if (session.status === 'paused') {
+          const stored = await sessionRepository.addMessage(
+            session.id as import('@/core/types.js').SessionId,
+            { role: 'user', content: message.content },
+          );
+
+          logger.info('Session paused — persisted inbound message without running agent', {
+            component: 'inbound-processor',
+            sessionId: session.id,
+            contactId: contact.id,
+          });
+
+          // Notify connected WebSocket clients so the operator sees the new message
+          if (sessionBroadcaster) {
+            sessionBroadcaster.broadcast(session.id, {
+              type: 'message.new',
+              role: 'user',
+              content: message.content,
+              messageId: stored.id,
+            });
+          }
+
+          return { success: true };
+        }
+
+        // 4. Run the agent (with mode-aware params)
         const agentResult = await runAgent({
           projectId,
           sessionId: session.id,
@@ -204,7 +233,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
           userMessage: message.content,
         });
 
-        // 4. Send response back via the same channel
+        // 5. Send response back via the same channel
         const sendResult = await channelResolver.send(projectId, message.channel, {
           channel: message.channel,
           recipientIdentifier: message.senderIdentifier,

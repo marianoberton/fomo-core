@@ -434,7 +434,7 @@ export function createMockDeps(): RouteDependencies & {
     mcpServerRepository: createMockMCPServerRepository(),
     skillService: createMockSkillService(),
     prisma: {} as RouteDependencies['prisma'],
-    sessionBroadcaster: { subscribe: () => () => { /* noop */ }, broadcast: () => { /* noop */ } },
+    sessionBroadcaster: { subscribe: vi.fn().mockReturnValue(() => { /* noop */ }), broadcast: vi.fn() },
     resumeAfterApproval: () => Promise.resolve(),
     logger: createMockLogger(),
   };

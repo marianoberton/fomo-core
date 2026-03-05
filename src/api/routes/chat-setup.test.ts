@@ -166,6 +166,25 @@ describe('prepareChatRun', () => {
     }
   });
 
+  it('returns error when session is paused (operator takeover)', async () => {
+    const project = createSampleProject();
+    const session = createSampleSession({ status: 'paused' });
+
+    deps.projectRepository.findById.mockResolvedValue(project);
+    deps.sessionRepository.findById.mockResolvedValue(session);
+
+    const result = await prepareChatRun(
+      { projectId: 'proj-1', sessionId: 'sess-1', message: 'Hello' },
+      deps,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('SESSION_PAUSED');
+      expect(result.error.statusCode).toBe(409);
+    }
+  });
+
   it('returns error when no active prompt layers exist', async () => {
     const project = createSampleProject();
     const session = createSampleSession();

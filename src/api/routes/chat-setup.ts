@@ -326,6 +326,13 @@ Do not decline a request if your Manager might be able to approve it.
         statusCode: 404,
       });
     }
+    if (existing.status === 'paused') {
+      return err({
+        code: 'SESSION_PAUSED',
+        message: 'Session is paused — a human operator has taken over this conversation',
+        statusCode: 409,
+      });
+    }
     sessionId = existing.id;
   } else {
     const newSession = await sessionRepository.create({

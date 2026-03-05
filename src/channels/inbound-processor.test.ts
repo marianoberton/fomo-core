@@ -213,6 +213,75 @@ describe('InboundProcessor', () => {
     });
   });
 
+  describe('paused session (operator takeover)', () => {
+    it('persists message but skips agent when session is paused', async () => {
+      const pausedSession: Session = {
+        ...mockSession,
+        status: 'paused',
+      };
+      const sessionRepo: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
+        create: vi.fn(),
+        findById: vi.fn(),
+        findByContactId: vi.fn(),
+        updateStatus: vi.fn(),
+        updateMetadata: vi.fn().mockResolvedValue(true),
+        listByProject: vi.fn().mockResolvedValue([pausedSession]),
+        addMessage: vi.fn().mockResolvedValue({ id: 'msg-stored-1', sessionId: pausedSession.id, role: 'user', content: 'Hello', createdAt: new Date() }),
+        getMessages: vi.fn().mockResolvedValue([]),
+      };
+
+      const deps = createDeps({ sessionRepository: sessionRepo });
+      const processor = createInboundProcessor(deps);
+
+      const result = await processor.process(createMessage());
+
+      expect(result.success).toBe(true);
+      // Message should be persisted
+      expect(sessionRepo.addMessage).toHaveBeenCalledWith(
+        'session-1',
+        { role: 'user', content: 'Hello' },
+      );
+      // Agent should NOT run
+      expect(deps.runAgent).not.toHaveBeenCalled();
+    });
+
+    it('broadcasts to sessionBroadcaster when session is paused', async () => {
+      const pausedSession: Session = {
+        ...mockSession,
+        status: 'paused',
+      };
+      const sessionRepo: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
+        create: vi.fn(),
+        findById: vi.fn(),
+        findByContactId: vi.fn(),
+        updateStatus: vi.fn(),
+        updateMetadata: vi.fn().mockResolvedValue(true),
+        listByProject: vi.fn().mockResolvedValue([pausedSession]),
+        addMessage: vi.fn().mockResolvedValue({ id: 'msg-stored-2', sessionId: pausedSession.id, role: 'user', content: 'Hello', createdAt: new Date() }),
+        getMessages: vi.fn().mockResolvedValue([]),
+      };
+
+      const mockBroadcaster = {
+        subscribe: vi.fn().mockReturnValue(() => { /* noop */ }),
+        broadcast: vi.fn(),
+      };
+
+      const deps = createDeps({ sessionRepository: sessionRepo, sessionBroadcaster: mockBroadcaster });
+      const processor = createInboundProcessor(deps);
+
+      await processor.process(createMessage());
+
+      expect(mockBroadcaster.broadcast).toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({
+          type: 'message.new',
+          role: 'user',
+          content: 'Hello',
+        }),
+      );
+    });
+  });
+
   describe('with agentChannelRouter', () => {
     it('passes resolved agentId to runAgent', async () => {
       const mockRouter: { [K in keyof AgentChannelRouter]: ReturnType<typeof vi.fn> } = {

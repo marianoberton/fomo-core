@@ -506,6 +506,7 @@ async function start(): Promise<void> {
       sessionRepository,
       logger,
       agentChannelRouter,
+      sessionBroadcaster,
       runAgent,
     });
 
