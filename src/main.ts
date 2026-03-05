@@ -37,6 +37,7 @@ import {
   createSendChannelMessageTool,
   createTwentyCrmTool,
   createTwentyUpdateTool,
+  createTwentyUpsertTool,
   createReadFileTool,
   createQuerySessionsTool,
   createReadSessionHistoryTool,
@@ -205,6 +206,10 @@ async function start(): Promise<void> {
       secretService,
     }));
     toolRegistry.register(createTwentyUpdateTool({
+      twentyBaseUrl: process.env['TWENTY_BASE_URL'] ?? 'https://crm.fomo.com.ar',
+      secretService,
+    }));
+    toolRegistry.register(createTwentyUpsertTool({
       twentyBaseUrl: process.env['TWENTY_BASE_URL'] ?? 'https://crm.fomo.com.ar',
       secretService,
     }));
