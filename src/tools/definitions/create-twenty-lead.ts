@@ -51,13 +51,20 @@ const inputSchema = z.object({
     .enum(['web', 'whatsapp', 'telegram', 'referral', 'email', 'cold_outreach', 'other'])
     .default('web')
     .describe('Canal de origen del lead'),
-  notes: z.string().max(2000).optional().describe('Notas adicionales de calificación'),
+  notes: z
+    .string()
+    .max(2000)
+    .optional()
+    .describe(
+      'Resumen de la conversación: qué preguntó el lead, qué producto le interesa, contexto relevante. ' +
+        'El agente debe completar este campo automáticamente con el contexto de la conversación.',
+    ),
   opportunityName: z
     .string()
     .max(200)
     .optional()
     .describe(
-      'Nombre de la oportunidad. Si no se provee, se usa "[empresa] - [fecha]".',
+      'Nombre de la oportunidad. Si no se provee, se usa "[empresa] - Demo Request".',
     ),
 });
 
@@ -143,6 +150,9 @@ async function createPerson(
     name: { firstName: opts.firstName, lastName: opts.lastName },
     companyId: opts.companyId,
   };
+  // Twenty REST v2: emails/phones expect flat string fields, not nested objects.
+  // Correct: { primaryEmail: "email@example.com" }
+  // Correct: { primaryPhoneNumber: "+54..." }
   if (opts.email) {
     payload['emails'] = { primaryEmail: opts.email };
   }
@@ -232,7 +242,7 @@ export function createTwentyCrmTool(options: TwentyCrmToolOptions): ExecutableTo
             contact: `${data.firstName} ${data.lastName}`.trim(),
             email: data.email ?? null,
             phone: data.phone ?? null,
-            opportunity: data.opportunityName ?? `${data.company} - Lead`,
+            opportunity: data.opportunityName ?? `${data.company} - Demo Request`,
             source: data.source,
           },
         },
@@ -310,9 +320,7 @@ export function createTwentyCrmTool(options: TwentyCrmToolOptions): ExecutableTo
         }
 
         // 3. Opportunity — siempre nueva
-        const oppName =
-          data.opportunityName ??
-          `${data.company} - ${new Date().toISOString().slice(0, 10)}`;
+        const oppName = data.opportunityName ?? `${data.company} - Demo Request`;
 
         const opportunityId = await createOpportunity(baseUrl, headers, {
           name: oppName,
