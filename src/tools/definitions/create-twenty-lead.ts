@@ -194,9 +194,8 @@ async function createOpportunity(
     companyId: opts.companyId,
     pointOfContactId: opts.personId,
   };
-  if (opts.notes) {
-    payload['body'] = opts.notes;
-  }
+  // 'body' field removed — not supported in current Twenty schema
+  // Notes are captured in the opportunity name instead
 
   const res = await twentyRequest(baseUrl, headers, 'POST', '/opportunities', payload);
   if (!res.ok) {
@@ -309,14 +308,22 @@ export function createTwentyCrmTool(options: TwentyCrmToolOptions): ExecutableTo
           personId = await findPerson(baseUrl, headers, data.email);
         }
         if (!personId) {
-          personId = await createPerson(baseUrl, headers, {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            email: data.email,
-            phone: data.phone,
-            companyId,
-          });
-          personCreated = true;
+          try {
+            personId = await createPerson(baseUrl, headers, {
+              firstName: data.firstName,
+              lastName: data.lastName,
+              email: data.email,
+              phone: data.phone,
+              companyId,
+            });
+            personCreated = true;
+          } catch (createErr) {
+            // If duplicate email, try finding again (race condition or prior run)
+            if (data.email) {
+              personId = await findPerson(baseUrl, headers, data.email);
+            }
+            if (!personId) throw createErr;
+          }
           logger.info('Twenty person created', {
             component: 'create-twenty-lead',
             personId,
