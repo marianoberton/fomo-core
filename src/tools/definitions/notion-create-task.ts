@@ -65,7 +65,7 @@ export function createNotionCreateTaskTool(options: NotionCreateTaskOptions): Ex
           select: { name: priority },
         },
         'Status': {
-          status: { name: 'To Do' },
+          select: { name: 'To Do' },
         },
       };
 
