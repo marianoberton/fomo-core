@@ -12,7 +12,6 @@ import { ToolExecutionError } from '@/core/errors.js';
 import type { NexusError } from '@/core/errors.js';
 import type { ExecutableTool, ToolResult } from '@/tools/types.js';
 import type { LongTermMemoryStore } from '@/memory/memory-manager.js';
-import type { MemoryCategory } from '@/memory/types.js';
 import { createLogger } from '@/observability/logger.js';
 
 const logger = createLogger({ name: 'knowledge-search' });
@@ -22,13 +21,11 @@ export interface KnowledgeSearchToolOptions {
   store: LongTermMemoryStore;
 }
 
-const categorySchema = z.enum(['fact', 'decision', 'preference', 'task_context', 'learning']);
-
 const inputSchema = z.object({
   query: z.string().min(1).max(2000),
   topK: z.number().int().min(1).max(20).optional().default(5),
   minImportance: z.number().min(0).max(1).optional(),
-  categories: z.array(categorySchema).optional(),
+  categories: z.array(z.string()).optional(),
 });
 
 const outputSchema = z.object({
@@ -56,7 +53,8 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
     description:
       'Search the knowledge base for relevant information using semantic similarity. ' +
       'Returns matching entries ranked by relevance. Filter by importance score (0-1) ' +
-      'and categories (fact, decision, preference, task_context, learning).',
+      'and categories. Categories is optional — if unsure which categories exist, ' +
+      'omit it to search across all entries.',
     category: 'memory',
     inputSchema,
     outputSchema,
@@ -78,7 +76,7 @@ export function createKnowledgeSearchTool(options: KnowledgeSearchToolOptions): 
           topK: parsed.topK,
           projectId: context.projectId,
           minImportance: parsed.minImportance,
-          categories: parsed.categories as MemoryCategory[] | undefined,
+          categories: parsed.categories,
         };
 
         logger.info(`Knowledge search starting: projectId=${context.projectId}, agentId=${context.agentId ?? 'NONE'}, query="${parsed.query.slice(0, 80)}", topK=${parsed.topK}, storeExists=${!!store}`, {

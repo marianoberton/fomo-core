@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import type { ProjectId, SessionId } from '@/core/types.js';
-import type { MemoryCategory } from './types.js';
 import { createPrismaMemoryStore } from './prisma-memory-store.js';
 import type { EmbeddingGenerator } from './prisma-memory-store.js';
 
@@ -164,7 +163,7 @@ describe('PrismaLongTermMemoryStore', () => {
         query: 'test',
         topK: 3,
         minImportance: 0.7,
-        categories: ['fact', 'decision'] as MemoryCategory[],
+        categories: ['fact', 'decision'],
         sessionScope: SESSION_ID,
       });
 

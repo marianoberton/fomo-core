@@ -44,7 +44,7 @@ export interface MemoryRetrieval {
   /** Project to search within. Required for correct isolation. */
   projectId?: ProjectId;
   minImportance?: number;
-  categories?: MemoryCategory[];
+  categories?: string[];
   /** If provided, search only within this session. Null = project-wide. */
   sessionScope?: SessionId;
   /**
