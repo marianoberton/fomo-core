@@ -142,6 +142,78 @@ Server → Client:
 | PATCH | `/scheduled-tasks/:id` | Update task (approve, pause, resume) |
 | DELETE | `/scheduled-tasks/:id` | Delete task |
 
+### Operator Messages
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | `/projects/:projectId/sessions/:sessionId/operator-message` | Send a message from a human operator into a paused session, bypassing the agent loop |
+
+**POST `/projects/:id/sessions/:id/operator-message` request:**
+```json
+{
+  "content": "Hola, te escribo desde el equipo de soporte...",
+  "operatorName": "Mariano"   // optional, defaults to "operator"
+}
+```
+
+**Response:**
+```json
+{
+  "messageId": "msg-xyz",
+  "delivered": true,
+  "channel": "whatsapp"
+}
+```
+
+**Key rules:**
+- Session must be in `paused` status — returns 409 if not paused
+- Message is stored with `role: "assistant"` + `toolCalls: { fromOperator: true, operatorName }`
+- Delivered via the session's channel (WhatsApp/Telegram) if routing metadata exists
+- Broadcasts `message.new` event to WebSocket clients
+- Allows human takeover without interrupting the session history
+
+---
+
+### Models
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/models` | Returns all available LLM models with metadata |
+
+**GET `/models` response:**
+```json
+[
+  {
+    "id": "claude-sonnet-4-5",
+    "provider": "Anthropic",
+    "contextWindow": 200000,
+    "maxOutputTokens": 8192,
+    "supportsTools": true,
+    "inputPricePer1M": 3.0,
+    "outputPricePer1M": 15.0
+  }
+]
+```
+
+**Exposed models (curated list):**
+- **Anthropic:** claude-opus-4-6, claude-sonnet-4-5, claude-haiku-4-5
+- **OpenAI:** gpt-5, gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini
+- **Google:** gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash
+- **OpenRouter:** Llama 3.3 70B, DeepSeek Chat, Mistral Large
+
+---
+
+### Sessions (updated)
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/sessions` | List sessions (filter by projectId, status, agentId, channel) |
+| GET | `/sessions/:id` | Get session with messages and traces |
+| PATCH | `/sessions/:id` | Update session (close, pause, resume, etc.) |
+| PATCH | `/sessions/:id/status` | Update session status directly |
+
+---
+
 ### Channel Integrations
 
 | Method | Route | Description |

@@ -1,6 +1,6 @@
 # Nexus Core — Current State, Decisions, and Roadmap
 
-## What's Built (as of February 28, 2026)
+## What's Built (as of March 6, 2026)
 
 ### Core Engine — COMPLETE
 - Full agent runner loop with streaming, failover, abort signal support
@@ -42,9 +42,22 @@ All 28 tools are implemented, registered, and tested:
 - Slack adapter
 - Chatwoot adapter
 - Dynamic channel resolver (lazy adapter creation from DB config + secrets)
-- Inbound processor (webhook → contact → session → agent → response)
+- Inbound processor (webhook → contact → session → agent → response) — now includes session status awareness (skips closed sessions)
 - Proactive messenger (BullMQ-backed outbound queue)
 - Channel webhook routes (dynamic per project)
+
+### Human Operator Takeover — NEW (March 6, 2026)
+- `POST /projects/:id/sessions/:id/operator-message` — operator sends a message bypassing the agent loop
+- Only works on `paused` sessions (409 if active)
+- Message stored as `role: assistant` with `fromOperator: true` metadata
+- Delivered to the customer's channel (WhatsApp/Telegram) if routing metadata exists
+- Broadcasts via WebSocket to connected dashboard clients
+- Enables full human takeover flow: pause session → operator types → customer receives
+
+### Models API — NEW (March 6, 2026)
+- `GET /models` — exposes curated list of LLM models with metadata (provider, context window, pricing, tool support)
+- Powers the model selector in fomo-platform's agent config UI
+- 15 models across Anthropic, OpenAI, Google, OpenRouter
 
 ### Security — COMPLETE
 - Tool RBAC (explicit whitelist per agent, no wildcards)
