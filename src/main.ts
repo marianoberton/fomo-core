@@ -129,8 +129,8 @@ const server = Fastify({
   logger: false,
 });
 
-// Allow binary file uploads (any content type → raw buffer)
-server.addContentTypeParser('*', { parseAs: 'buffer' }, (_req, body, done) => {
+// Allow binary file uploads (any non-JSON content type → raw buffer)
+server.addContentTypeParser(/^(?!application\/json|text\/).*/, { parseAs: 'buffer' }, (_req, body, done) => {
   done(null, body);
 });
 
