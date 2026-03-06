@@ -129,6 +129,15 @@ const server = Fastify({
   logger: false,
 });
 
+// Allow binary file uploads (Excel, PDF, images, etc.)
+server.addContentTypeParser(
+  ['application/octet-stream', 'application/pdf', 'image/png', 'image/jpeg', 'image/jpg',
+   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+   'application/vnd.ms-excel'],
+  { parseAs: 'buffer' },
+  (_req, body, done) => { done(null, body); },
+);
+
 server.get('/health', () => {
   return { status: 'ok', timestamp: new Date().toISOString() };
 });
