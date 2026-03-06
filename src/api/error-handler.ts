@@ -98,6 +98,7 @@ export function registerErrorHandler(fastify: FastifyInstance): void {
       error: message,
       stack,
     });
-    await sendError(reply, 'INTERNAL_ERROR', 'An unexpected error occurred', 500);
+    const devMessage = process.env['NODE_ENV'] !== 'production' ? message : 'An unexpected error occurred';
+    await sendError(reply, 'INTERNAL_ERROR', devMessage, 500);
   });
 }
