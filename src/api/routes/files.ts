@@ -28,6 +28,18 @@ export function fileRoutes(
 ): void {
   const { fileService, fileRepository, logger } = deps;
 
+  // ─── Debug endpoint ─────────────────────────────────────────────
+  fastify.post('/files/debug', async (request, reply) => {
+    const body = request.body;
+    return reply.send({
+      bodyType: typeof body,
+      isBuffer: Buffer.isBuffer(body),
+      hasData: body && typeof body === 'object' && 'data' in (body as object),
+      bodyPreview: Buffer.isBuffer(body) ? body.slice(0, 20).toString('hex') : JSON.stringify(body)?.slice(0, 100),
+      contentType: request.headers['content-type'],
+    });
+  });
+
   // ─── Upload File ────────────────────────────────────────────────
 
   fastify.post(
