@@ -150,6 +150,23 @@ export function agentRoutes(
     },
   );
 
+  // ─── Get Agent (project-scoped) ─────────────────────────────────
+
+  fastify.get(
+    '/projects/:projectId/agents/:agentId',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, agentId } = request.params as { projectId: string; agentId: string };
+
+      const agent = await agentRegistry.get(agentId as AgentId);
+
+      if (!agent || agent.projectId !== projectId) {
+        return sendNotFound(reply, 'Agent', agentId);
+      }
+
+      return sendSuccess(reply, agent);
+    },
+  );
+
   // ─── Get Agent by Name ──────────────────────────────────────────
 
   fastify.get(
@@ -269,6 +286,51 @@ export function agentRoutes(
     },
   );
 
+  // ─── Update Agent (project-scoped, accepts PUT) ────────────────
+
+  fastify.put(
+    '/projects/:projectId/agents/:agentId',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, agentId } = request.params as { projectId: string; agentId: string };
+      const parseResult = updateAgentSchema.safeParse(request.body);
+
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.flatten(),
+        });
+      }
+
+      const existing = await agentRepository.findById(agentId as AgentId);
+      if (!existing || existing.projectId !== projectId) {
+        return sendNotFound(reply, 'Agent', agentId);
+      }
+
+      if (parseResult.data.modes && parseResult.data.modes.length > 0) {
+        const collision = await checkChannelCollision(
+          agentRepository, projectId, agentId, parseResult.data.modes,
+        );
+        if (collision) {
+          return sendError(
+            reply,
+            'CHANNEL_COLLISION',
+            `Channel "${collision.channel}" is already claimed by agent "${collision.agentName}"`,
+            409,
+          );
+        }
+      }
+
+      try {
+        const agent = await agentRepository.update(agentId as AgentId, parseResult.data);
+        agentRegistry.invalidate(agentId as AgentId);
+        logger.info('Agent updated', { component: 'agents', agentId });
+        await sendSuccess(reply, agent); return;
+      } catch {
+        return sendNotFound(reply, 'Agent', agentId);
+      }
+    },
+  );
+
   // ─── Delete Agent ───────────────────────────────────────────────
 
   fastify.delete(
@@ -286,6 +348,29 @@ export function agentRoutes(
         return await reply.status(204).send();
       } catch {
         // Prisma throws if record not found
+        return reply.status(404).send({ error: 'Agent not found' });
+      }
+    },
+  );
+
+  // ─── Delete Agent (project-scoped) ────────────────────────────
+
+  fastify.delete(
+    '/projects/:projectId/agents/:agentId',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, agentId } = request.params as { projectId: string; agentId: string };
+
+      const existing = await agentRepository.findById(agentId as AgentId);
+      if (!existing || existing.projectId !== projectId) {
+        return sendNotFound(reply, 'Agent', agentId);
+      }
+
+      try {
+        await agentRepository.delete(agentId as AgentId);
+        agentRegistry.invalidate(agentId as AgentId);
+        logger.info('Agent deleted', { component: 'agents', agentId });
+        return await reply.status(204).send();
+      } catch {
         return reply.status(404).send({ error: 'Agent not found' });
       }
     },
