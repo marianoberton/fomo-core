@@ -21,6 +21,7 @@ const updateStatusSchema = z.object({
 
 const sessionListQuerySchema = z.object({
   status: z.string().optional(),
+  agentId: z.string().optional(),
 });
 
 // ─── Route Plugin ───────────────────────────────────────────────
@@ -41,6 +42,7 @@ export function sessionRoutes(
       const sessions = await sessionRepository.listByProject(
         request.params.projectId as ProjectId,
         filters.status,
+        filters.agentId,
       );
       return sendSuccess(reply, paginate(sessions, limit, offset));
     },

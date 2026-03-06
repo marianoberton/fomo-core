@@ -10,6 +10,7 @@ import type { ProjectId, SessionId } from '@/core/types.js';
 export interface Session {
   id: SessionId;
   projectId: ProjectId;
+  agentId?: string;
   status: string;
   metadata?: Record<string, unknown>;
   createdAt: Date;
@@ -42,7 +43,7 @@ export interface SessionRepository {
   findByContactId(projectId: ProjectId, contactId: string): Promise<Session | null>;
   updateStatus(id: SessionId, status: string): Promise<boolean>;
   updateMetadata(id: SessionId, metadata: Record<string, unknown>): Promise<boolean>;
-  listByProject(projectId: ProjectId, status?: string): Promise<Session[]>;
+  listByProject(projectId: ProjectId, status?: string, agentId?: string): Promise<Session[]>;
   addMessage(sessionId: SessionId, message: { role: string; content: string; toolCalls?: unknown; usage?: unknown }, traceId?: string): Promise<StoredMessage>;
   getMessages(sessionId: SessionId): Promise<StoredMessage[]>;
 }
@@ -51,6 +52,7 @@ export interface SessionRepository {
 function toSessionModel(record: {
   id: string;
   projectId: string;
+  agentId: string | null;
   status: string;
   metadata: unknown;
   createdAt: Date;
@@ -60,6 +62,7 @@ function toSessionModel(record: {
   return {
     id: record.id as SessionId,
     projectId: record.projectId as ProjectId,
+    agentId: record.agentId ?? undefined,
     status: record.status,
     metadata: (record.metadata as Record<string, unknown> | null) ?? undefined,
     createdAt: record.createdAt,
@@ -132,11 +135,12 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
       }
     },
 
-    async listByProject(projectId: ProjectId, status?: string): Promise<Session[]> {
+    async listByProject(projectId: ProjectId, status?: string, agentId?: string): Promise<Session[]> {
       const records = await prisma.session.findMany({
         where: {
           projectId,
           ...(status && { status }),
+          ...(agentId && { agentId }),
         },
         orderBy: { createdAt: 'desc' },
       });

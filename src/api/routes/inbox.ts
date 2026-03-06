@@ -155,11 +155,11 @@ export function inboxRoutes(
       const agentId = metadata?.['agentId'] as string | undefined;
 
       // Load contact info
-      let contact: { id: string; name: string; role?: string; phone?: string; email?: string } | undefined;
+      let contact: { id: string; name: string; role?: string; phone?: string; email?: string; tags?: string[] } | undefined;
       if (contactId) {
         const c = await prisma.contact.findUnique({
           where: { id: contactId },
-          select: { id: true, name: true, role: true, phone: true, email: true },
+          select: { id: true, name: true, role: true, phone: true, email: true, tags: true },
         });
         if (c) {
           contact = {
@@ -168,6 +168,7 @@ export function inboxRoutes(
             role: c.role ?? undefined,
             phone: c.phone ?? undefined,
             email: c.email ?? undefined,
+            tags: c.tags.length > 0 ? c.tags : undefined,
           };
         }
       }
