@@ -44,8 +44,18 @@ export function fileRoutes(
 
       const { projectId, filename, mimeType, expiresIn } = query.data;
 
-      // Get raw body as buffer
-      const content = request.body as Buffer | undefined;
+      // Support both raw binary body AND JSON with base64 data field
+      let content: Buffer | undefined;
+      const rawBody = request.body;
+
+      if (Buffer.isBuffer(rawBody) && rawBody.length > 0) {
+        content = rawBody;
+      } else if (rawBody && typeof rawBody === 'object' && 'data' in rawBody) {
+        const b64 = (rawBody as { data: string }).data;
+        content = Buffer.from(b64, 'base64');
+      } else if (typeof rawBody === 'string' && rawBody.length > 0) {
+        content = Buffer.from(rawBody, 'base64');
+      }
 
       if (!content || content.length === 0) {
         return reply.status(400).send({ error: 'Empty file body' });
@@ -77,7 +87,7 @@ export function fileRoutes(
         sizeBytes: file.sizeBytes,
       });
 
-      return reply.status(201).send({ file });
+      return reply.status(201).send({ success: true, data: file });
     },
   );
 
