@@ -71,13 +71,20 @@ export function fileRoutes(
         ? new Date(Date.now() + expiresIn * 1000)
         : undefined;
 
-      const file = await fileService.upload({
-        projectId: projectId as ProjectId,
-        filename,
-        mimeType: resolvedMimeType,
-        content,
-        expiresAt,
-      });
+      let file;
+      try {
+        file = await fileService.upload({
+          projectId: projectId as ProjectId,
+          filename,
+          mimeType: resolvedMimeType,
+          content,
+          expiresAt,
+        });
+      } catch (uploadErr) {
+        const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+        logger.error('File upload failed', { component: 'files-route', error: msg });
+        return reply.status(500).send({ success: false, error: { code: 'UPLOAD_ERROR', message: msg } });
+      }
 
       logger.info('File uploaded via API', {
         component: 'files-route',
