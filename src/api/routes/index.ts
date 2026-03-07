@@ -37,6 +37,7 @@ import { operatorMessageRoutes } from './operator-message.js';
 import { modelRoutes } from './models.js';
 import { webchatAdminRoutes } from './webchat.js';
 import { mediaRoutes } from './media.js';
+import { vapiRoutes } from './vapi.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -77,4 +78,5 @@ export async function registerRoutes(
   modelRoutes(fastify, deps);
   webchatAdminRoutes(fastify, { prisma: deps.prisma, logger: deps.logger });
   mediaRoutes(fastify, deps);
+  vapiRoutes(fastify, deps);
 }

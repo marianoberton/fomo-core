@@ -19,6 +19,7 @@ import type {
   SendResult,
   SlackIntegrationConfig,
   TelegramIntegrationConfig,
+  VapiIntegrationConfig,
   WhatsAppIntegrationConfig,
   WhatsAppWahaIntegrationConfig,
 } from './types.js';
@@ -27,6 +28,7 @@ import { createWhatsAppAdapter } from './adapters/whatsapp.js';
 import { createWhatsAppWahaAdapter } from './adapters/whatsapp-waha.js';
 import { createSlackAdapter } from './adapters/slack.js';
 import { createChatwootAdapter } from './adapters/chatwoot.js';
+import { createVapiAdapter } from './adapters/vapi.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -158,6 +160,25 @@ export function createChannelResolver(deps: ChannelResolverDeps): ChannelResolve
           agentBotId: cwConfig.agentBotId,
           projectId,
         });
+      }
+
+      case 'vapi': {
+        const vapiConfig = config as VapiIntegrationConfig;
+        try {
+          const vapiApiKey = await secretService.get(projectId, vapiConfig.vapiApiKeySecretKey);
+          return createVapiAdapter({
+            vapiApiKey,
+            assistantId: vapiConfig.assistantId,
+            phoneNumberId: vapiConfig.phoneNumberId,
+            projectId,
+          });
+        } catch {
+          logger.error(`Failed to resolve VAPI secret: ${vapiConfig.vapiApiKeySecretKey}`, {
+            component: 'channel-resolver',
+            projectId,
+          });
+          return null;
+        }
       }
 
       default:

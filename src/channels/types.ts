@@ -3,7 +3,7 @@ import type { ProjectId } from '@/core/types.js';
 
 // ─── Channel Types ──────────────────────────────────────────────
 
-export type ChannelType = 'whatsapp' | 'whatsapp-waha' | 'telegram' | 'slack' | 'email' | 'chatwoot';
+export type ChannelType = 'whatsapp' | 'whatsapp-waha' | 'telegram' | 'slack' | 'email' | 'chatwoot' | 'vapi';
 
 // ─── Inbound Message ────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ export interface ChannelConfig {
 // ─── Integration Providers ──────────────────────────────────────
 
 export type ChannelIntegrationId = string;
-export type IntegrationProvider = 'chatwoot' | 'telegram' | 'whatsapp' | 'whatsapp-waha' | 'slack';
+export type IntegrationProvider = 'chatwoot' | 'telegram' | 'whatsapp' | 'whatsapp-waha' | 'slack' | 'vapi';
 
 // ─── Per-Provider Integration Configs ───────────────────────────
 
@@ -135,13 +135,33 @@ export interface SlackIntegrationConfig {
   signingSecretSecretKey?: string;
 }
 
+/** VAPI (voice AI) integration config. */
+export interface VapiIntegrationConfig {
+  /** Key in the secrets table for the VAPI API key. */
+  vapiApiKeySecretKey: string;
+  /** VAPI assistant ID (pre-created in VAPI dashboard with custom LLM server URL). */
+  assistantId: string;
+  /** VAPI phone number ID (assigned to the assistant). */
+  phoneNumberId: string;
+  /** Human-readable phone number (e.g. "+15551234567"). */
+  phoneNumber: string;
+  /**
+   * Optional agentId to use for this voice integration.
+   * If not set, the first active agent in the project is used.
+   */
+  agentId?: string;
+  /** Key in the secrets table for the VAPI webhook secret (x-vapi-secret header). */
+  vapiWebhookSecretKey?: string;
+}
+
 /** Union of all per-provider integration configs. */
 export type IntegrationConfigUnion =
   | ChatwootIntegrationConfig
   | TelegramIntegrationConfig
   | WhatsAppIntegrationConfig
   | WhatsAppWahaIntegrationConfig
-  | SlackIntegrationConfig;
+  | SlackIntegrationConfig
+  | VapiIntegrationConfig;
 
 /** Map from provider to its config type. */
 export interface IntegrationConfigMap {
@@ -150,6 +170,7 @@ export interface IntegrationConfigMap {
   whatsapp: WhatsAppIntegrationConfig;
   'whatsapp-waha': WhatsAppWahaIntegrationConfig;
   slack: SlackIntegrationConfig;
+  vapi: VapiIntegrationConfig;
 }
 
 // ─── Zod Schemas for Integration Configs ────────────────────────
@@ -183,6 +204,15 @@ export const SlackIntegrationConfigSchema = z.object({
   signingSecretSecretKey: z.string().min(1).max(128).optional(),
 });
 
+export const VapiIntegrationConfigSchema = z.object({
+  vapiApiKeySecretKey: z.string().min(1).max(128),
+  assistantId: z.string().min(1),
+  phoneNumberId: z.string().min(1),
+  phoneNumber: z.string().min(1),
+  agentId: z.string().optional(),
+  vapiWebhookSecretKey: z.string().min(1).max(128).optional(),
+});
+
 /** Discriminated union for creating integrations via API. */
 export const CreateIntegrationConfigSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('chatwoot'), config: ChatwootIntegrationConfigSchema }),
@@ -190,6 +220,7 @@ export const CreateIntegrationConfigSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('whatsapp'), config: WhatsAppIntegrationConfigSchema }),
   z.object({ provider: z.literal('whatsapp-waha'), config: WhatsAppWahaIntegrationConfigSchema }),
   z.object({ provider: z.literal('slack'), config: SlackIntegrationConfigSchema }),
+  z.object({ provider: z.literal('vapi'), config: VapiIntegrationConfigSchema }),
 ]);
 
 // ─── Channel Integration ───────────────────────────────────────

@@ -59,6 +59,9 @@ function channelToIdentifier(channel: ChannelType, value: string): ChannelIdenti
     case 'chatwoot':
       // Chatwoot conversations are identified by conversation ID, stored as phone
       return { type: 'phone', value };
+    case 'vapi':
+      // VAPI voice calls use phone number as identifier
+      return { type: 'phone', value };
   }
 }
 

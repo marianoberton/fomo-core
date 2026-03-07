@@ -53,6 +53,7 @@ function createMockSessionRepository(): SessionRepository {
     }),
     findById: vi.fn(),
     findByContactId: vi.fn(),
+    findByCallId: vi.fn(),
     updateStatus: vi.fn(),
     updateMetadata: vi.fn(),
     listByProject: vi.fn(),

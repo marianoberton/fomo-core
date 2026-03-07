@@ -42,6 +42,8 @@ export interface SessionRepository {
   create(input: SessionCreateInput): Promise<Session>;
   findById(id: SessionId): Promise<Session | null>;
   findByContactId(projectId: ProjectId, contactId: string): Promise<Session | null>;
+  /** Find an active session by VAPI call ID stored in metadata.callId. */
+  findByCallId(callId: string, projectId: ProjectId): Promise<Session | null>;
   updateStatus(id: SessionId, status: string): Promise<boolean>;
   updateMetadata(id: SessionId, metadata: Record<string, unknown>): Promise<boolean>;
   listByProject(projectId: ProjectId, status?: string, agentId?: string): Promise<Session[]>;
@@ -104,6 +106,21 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
           metadata: {
             path: ['contactId'],
             equals: contactId,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!record) return null;
+      return toSessionModel(record);
+    },
+
+    async findByCallId(callId: string, projectId: ProjectId): Promise<Session | null> {
+      const record = await prisma.session.findFirst({
+        where: {
+          projectId,
+          metadata: {
+            path: ['callId'],
+            equals: callId,
           },
         },
         orderBy: { createdAt: 'desc' },

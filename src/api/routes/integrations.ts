@@ -12,6 +12,7 @@ import {
   WhatsAppWahaIntegrationConfigSchema,
   SlackIntegrationConfigSchema,
   ChatwootIntegrationConfigSchema,
+  VapiIntegrationConfigSchema,
 } from '@/channels/types.js';
 import type { IntegrationProvider, IntegrationConfigUnion, WhatsAppWahaIntegrationConfig } from '@/channels/types.js';
 
@@ -47,6 +48,11 @@ const CreateIntegrationSchema = z.discriminatedUnion('provider', [
   z.object({
     provider: z.literal('chatwoot'),
     config: ChatwootIntegrationConfigSchema,
+    status: z.enum(['active', 'paused']).optional(),
+  }),
+  z.object({
+    provider: z.literal('vapi'),
+    config: VapiIntegrationConfigSchema,
     status: z.enum(['active', 'paused']).optional(),
   }),
 ]);
@@ -173,6 +179,11 @@ function getReferencedSecretKeys(provider: IntegrationProvider, config: Record<s
       return []; // WAHA uses direct URL, no secrets
     case 'chatwoot':
       return []; // Chatwoot uses env vars, not secrets table
+    case 'vapi': {
+      const keys = [config['vapiApiKeySecretKey'] as string];
+      if (config['vapiWebhookSecretKey']) keys.push(config['vapiWebhookSecretKey'] as string);
+      return keys.filter(Boolean);
+    }
     default:
       return [];
   }
@@ -325,6 +336,7 @@ export function integrationRoutes(
           'whatsapp-waha': WhatsAppWahaIntegrationConfigSchema,
           slack: SlackIntegrationConfigSchema,
           chatwoot: ChatwootIntegrationConfigSchema,
+          vapi: VapiIntegrationConfigSchema,
         };
         const schema = configSchemas[existing.provider];
         if (schema) {

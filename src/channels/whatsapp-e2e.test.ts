@@ -93,6 +93,7 @@ function createMockSessionRepository(): SessionRepository {
     }),
     findById: vi.fn((id: string): Promise<Session | null> => Promise.resolve(sessions.get(id) ?? null)),
     findByContactId: vi.fn((): Promise<Session | null> => Promise.resolve(null)),
+    findByCallId: vi.fn((): Promise<Session | null> => Promise.resolve(null)),
     listByProject: vi.fn((): Promise<Session[]> => Promise.resolve(Array.from(sessions.values()))),
     addMessage: vi.fn((sessionId: string, message: { role: string; content: string }): Promise<StoredMessage> => {
       const session = sessions.get(sessionId);
