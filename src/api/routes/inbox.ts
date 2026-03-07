@@ -63,7 +63,7 @@ export function inboxRoutes(
         agentId?: string;
         channel?: string;
         messageCount: number;
-        lastMessage?: { role: string; content: string; createdAt: string };
+        lastMessage?: { role: string; content: string; mediaUrls?: string[]; createdAt: string };
         createdAt: string;
         updatedAt: string;
       }[] = [];
@@ -103,7 +103,7 @@ export function inboxRoutes(
         const lastMsg = await prisma.message.findFirst({
           where: { sessionId: session.id },
           orderBy: { createdAt: 'desc' },
-          select: { role: true, content: true, createdAt: true },
+          select: { role: true, content: true, mediaUrls: true, createdAt: true },
         });
 
         enriched.push({
@@ -116,7 +116,12 @@ export function inboxRoutes(
           channel: sessionChannel,
           messageCount: session._count.messages,
           lastMessage: lastMsg
-            ? { role: lastMsg.role, content: lastMsg.content, createdAt: lastMsg.createdAt.toISOString() }
+            ? {
+                role: lastMsg.role,
+                content: lastMsg.content,
+                mediaUrls: lastMsg.mediaUrls.length > 0 ? lastMsg.mediaUrls : undefined,
+                createdAt: lastMsg.createdAt.toISOString(),
+              }
             : undefined,
           createdAt: session.createdAt.toISOString(),
           updatedAt: session.updatedAt.toISOString(),
