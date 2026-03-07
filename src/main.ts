@@ -110,6 +110,7 @@ import { channelWebhookRoutes } from '@/api/routes/channel-webhooks.js';
 import { createWebhookQueue } from '@/channels/webhook-queue.js';
 import type { WebhookQueue } from '@/channels/webhook-queue.js';
 import { onboardingRoutes } from '@/api/routes/onboarding.js';
+import { webchatPublicRoutes } from '@/api/routes/webchat.js';
 import { telegramApprovalWebhookRoutes } from '@/api/routes/telegram-webhook.js';
 import { createTelegramApprovalNotifier } from '@/hitl/telegram-approval-notifier.js';
 import { createSessionBroadcaster } from '@/hitl/session-broadcaster.js';
@@ -720,6 +721,15 @@ async function start(): Promise<void> {
       resumeAfterApproval,
       logger,
     };
+
+    // Register public webchat routes (no auth, direct on root server)
+    webchatPublicRoutes(server, {
+      prisma,
+      sessionRepository,
+      logger,
+      runAgent,
+    });
+    logger.info('Webchat public routes registered at /webchat/*', { component: 'main' });
 
     // Register API routes under /api/v1 prefix
     await server.register(
