@@ -7,7 +7,8 @@
  * Integrates all subsystems: PromptBuilder, LLMProvider, ToolRegistry,
  * MemoryManager, CostGuard, and observability via ExecutionTrace.
  */
-import type { LLMProvider, Message, TokenUsage } from '@/providers/types.js';
+import type { LLMProvider, Message, MessageContent, TextContent, TokenUsage } from '@/providers/types.js';
+import { fetchMediaContent } from '@/providers/media-fetcher.js';
 import { calculateCost } from '@/providers/models.js';
 import type { ToolRegistry } from '@/tools/registry/index.js';
 import type { MemoryManager } from '@/memory/index.js';
@@ -74,6 +75,11 @@ export interface AgentRunner {
     abortSignal?: AbortSignal;
     /** Optional callback for real-time streaming events (used by WebSocket endpoint). */
     onEvent?: (event: AgentStreamEvent) => void;
+    /**
+     * Media URLs attached to the current user message (images, audio, video from channel).
+     * The runner will fetch and convert them to provider-appropriate content parts.
+     */
+    mediaUrls?: string[];
   }): Promise<Result<ExecutionTrace, NexusError>>;
 }
 
@@ -97,6 +103,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
     async run(params) {
       const {
         message,
+        mediaUrls,
         agentConfig: agentConfigParam,
         sessionId,
         systemPrompt: preBuiltSystemPrompt,
@@ -148,8 +155,38 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
       try {
         // Initialize conversation with history + new user message
         const conversation: Message[] = [...conversationHistory];
-        if (message) {
-          conversation.push({ role: 'user', content: message });
+        if (message || (mediaUrls && mediaUrls.length > 0)) {
+          // Build multimodal content if media URLs are present
+          if (mediaUrls && mediaUrls.length > 0) {
+            const googleApiKey = process.env['GOOGLE_API_KEY'];
+            const mediaParts: MessageContent[] = [];
+
+            // Fetch all media concurrently (best-effort — failures are logged and skipped)
+            await Promise.all(
+              mediaUrls.map(async (url) => {
+                try {
+                  const part = await fetchMediaContent(url, { googleApiKey });
+                  if (part) mediaParts.push(part);
+                } catch (e) {
+                  runLogger.warn('Failed to fetch media for multimodal context', {
+                    component: 'agent-runner',
+                    url,
+                    error: e instanceof Error ? e.message : String(e),
+                  });
+                }
+              }),
+            );
+
+            const contentParts: MessageContent[] = [];
+            if (message) {
+              const textPart: TextContent = { type: 'text', text: message };
+              contentParts.push(textPart);
+            }
+            contentParts.push(...mediaParts);
+            conversation.push({ role: 'user', content: contentParts });
+          } else {
+            conversation.push({ role: 'user', content: message! });
+          }
         }
 
         // ── Model Routing ───────────────────────────────────────────

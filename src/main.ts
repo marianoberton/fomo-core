@@ -300,6 +300,7 @@ async function start(): Promise<void> {
       sourceChannel?: string;
       contactRole?: string;
       userMessage: string;
+      mediaUrls?: string[];
     }): Promise<{ response: string }> => {
       const setupResult = await prepareChatRun(
         {
@@ -340,6 +341,7 @@ async function start(): Promise<void> {
       try {
         const result = await agentRunner.run({
           message: setup.sanitizedMessage,
+          mediaUrls: params.mediaUrls,
           agentConfig: setup.agentConfig,
           sessionId: setup.sessionId,
           systemPrompt: setup.systemPrompt,

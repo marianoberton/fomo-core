@@ -109,6 +109,7 @@ model Message {
   sessionId String   @map("session_id")
   role      String
   content   String
+  mediaUrls String[] @default([]) @map("media_urls")
   toolCalls Json?    @map("tool_calls")
   usage     Json?
   traceId   String?  @map("trace_id")

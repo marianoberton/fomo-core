@@ -34,6 +34,7 @@ export interface InboundProcessorDeps {
     sourceChannel?: string;
     contactRole?: string;
     userMessage: string;
+    mediaUrls?: string[];
   }) => Promise<{ response: string }>;
 }
 
@@ -201,7 +202,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
         if (session.status === 'paused') {
           const stored = await sessionRepository.addMessage(
             session.id as import('@/core/types.js').SessionId,
-            { role: 'user', content: message.content },
+            { role: 'user', content: message.content, mediaUrls: message.mediaUrls },
           );
 
           logger.info('Session paused — persisted inbound message without running agent', {
@@ -231,6 +232,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
           sourceChannel: message.channel,
           contactRole: contact.role,
           userMessage: message.content,
+          mediaUrls: message.mediaUrls,
         });
 
         // 5. Send response back via the same channel

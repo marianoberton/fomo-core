@@ -11,6 +11,7 @@ import { getModelMeta } from './models.js';
 import type {
   ChatEvent,
   ChatParams,
+  ImageContent,
   LLMProvider,
   Message,
   ToolDefinitionForProvider,
@@ -84,6 +85,34 @@ function toOpenAIMessages(
             content: part.content,
           });
           break;
+        case 'image':
+        case 'audio':
+        case 'video':
+          // Collected separately after inner loop (images) or skipped (audio/video)
+          break;
+      }
+    }
+
+    // Re-build user content with image_url parts for vision models
+    if (msg.role === 'user') {
+      const imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];
+      for (const part of msg.content) {
+        if (part.type === 'image') {
+          const imgPart = part as ImageContent;
+          imageParts.push({
+            type: 'image_url',
+            image_url: { url: `data:${imgPart.mimeType};base64,${imgPart.data}` },
+          });
+        }
+      }
+      if (imageParts.length > 0 && !toolResults.length) {
+        const contentArray: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
+        if (textParts.length > 0) {
+          contentArray.push({ type: 'text', text: textParts.join('') });
+        }
+        contentArray.push(...imageParts);
+        result.push({ role: 'user', content: contentArray });
+        continue;
       }
     }
 
@@ -297,7 +326,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): LLMProvide
           for (const part of msg.content) {
             if (part.type === 'text') totalChars += part.text.length;
             else if (part.type === 'tool_result') totalChars += part.content.length;
-            else totalChars += JSON.stringify(part.input).length;
+            else if (part.type === 'tool_use') totalChars += JSON.stringify(part.input).length;
           }
         }
       }

@@ -23,7 +23,28 @@ export interface ToolResultContent {
   isError?: boolean;
 }
 
-export type MessageContent = TextContent | ToolUseContent | ToolResultContent;
+/** Inline image — base64 encoded. Supported by Claude, GPT-4o, Gemini. */
+export interface ImageContent {
+  type: 'image';
+  data: string;       // base64-encoded bytes
+  mimeType: string;   // 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+}
+
+/** Inline audio — base64 encoded. Supported natively by Gemini; other providers skip. */
+export interface AudioContent {
+  type: 'audio';
+  data: string;       // base64-encoded bytes
+  mimeType: string;   // 'audio/ogg' | 'audio/opus' | 'audio/mp3' | 'audio/wav' | 'audio/aac'
+}
+
+/** Video — referenced via Gemini File API URI. Only Gemini supports this. */
+export interface VideoContent {
+  type: 'video';
+  fileUri: string;    // Gemini File API URI (e.g. "https://generativelanguage.googleapis.com/v1beta/files/...")
+  mimeType: string;   // 'video/mp4' | 'video/webm' | 'video/mov'
+}
+
+export type MessageContent = TextContent | ImageContent | AudioContent | VideoContent | ToolUseContent | ToolResultContent;
 
 export interface Message {
   role: MessageRole;

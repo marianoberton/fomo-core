@@ -29,6 +29,7 @@ export interface StoredMessage {
   sessionId: SessionId;
   role: string;
   content: string;
+  mediaUrls?: string[];
   toolCalls?: unknown;
   usage?: unknown;
   traceId?: string;
@@ -44,7 +45,7 @@ export interface SessionRepository {
   updateStatus(id: SessionId, status: string): Promise<boolean>;
   updateMetadata(id: SessionId, metadata: Record<string, unknown>): Promise<boolean>;
   listByProject(projectId: ProjectId, status?: string, agentId?: string): Promise<Session[]>;
-  addMessage(sessionId: SessionId, message: { role: string; content: string; toolCalls?: unknown; usage?: unknown }, traceId?: string): Promise<StoredMessage>;
+  addMessage(sessionId: SessionId, message: { role: string; content: string; mediaUrls?: string[]; toolCalls?: unknown; usage?: unknown }, traceId?: string): Promise<StoredMessage>;
   getMessages(sessionId: SessionId): Promise<StoredMessage[]>;
 }
 
@@ -149,7 +150,7 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
 
     async addMessage(
       sessionId: SessionId,
-      message: { role: string; content: string; toolCalls?: unknown; usage?: unknown },
+      message: { role: string; content: string; mediaUrls?: string[]; toolCalls?: unknown; usage?: unknown },
       traceId?: string,
     ): Promise<StoredMessage> {
       const record = await prisma.message.create({
@@ -158,6 +159,7 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
           sessionId,
           role: message.role,
           content: message.content,
+          mediaUrls: message.mediaUrls ?? [],
           toolCalls: message.toolCalls as Prisma.InputJsonValue,
           usage: message.usage as Prisma.InputJsonValue,
           traceId: traceId ?? null,
@@ -168,6 +170,7 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
         sessionId: record.sessionId as SessionId,
         role: record.role,
         content: record.content,
+        mediaUrls: record.mediaUrls.length > 0 ? record.mediaUrls : undefined,
         toolCalls: record.toolCalls ?? undefined,
         usage: record.usage ?? undefined,
         traceId: record.traceId ?? undefined,
@@ -185,6 +188,7 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
         sessionId: r.sessionId as SessionId,
         role: r.role,
         content: r.content,
+        mediaUrls: r.mediaUrls.length > 0 ? r.mediaUrls : undefined,
         toolCalls: r.toolCalls ?? undefined,
         usage: r.usage ?? undefined,
         traceId: r.traceId ?? undefined,

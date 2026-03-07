@@ -10,6 +10,7 @@ import { getModelMeta } from './models.js';
 import type {
   ChatEvent,
   ChatParams,
+  ImageContent,
   LLMProvider,
   Message,
   ToolDefinitionForProvider,
@@ -64,6 +65,24 @@ function toAnthropicMessages(
             content: part.content,
             is_error: part.isError,
           });
+          break;
+        case 'image': {
+          // Claude 3.5+ supports base64 images inline
+          const imgPart = part as ImageContent;
+          const validMime = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
+          type AnthropicImageMime = (typeof validMime)[number];
+          const mimeType: AnthropicImageMime = validMime.includes(imgPart.mimeType as AnthropicImageMime)
+            ? (imgPart.mimeType as AnthropicImageMime)
+            : 'image/jpeg';
+          blocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: mimeType, data: imgPart.data },
+          });
+          break;
+        }
+        case 'audio':
+        case 'video':
+          // Anthropic does not support native audio/video content parts (as of 2026-03)
           break;
       }
     }

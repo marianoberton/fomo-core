@@ -36,6 +36,7 @@ import { workforceMetricsRoutes } from './workforce-metrics.js';
 import { operatorMessageRoutes } from './operator-message.js';
 import { modelRoutes } from './models.js';
 import { webchatAdminRoutes } from './webchat.js';
+import { mediaRoutes } from './media.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -75,4 +76,5 @@ export async function registerRoutes(
   operatorMessageRoutes(fastify, deps);
   modelRoutes(fastify, deps);
   webchatAdminRoutes(fastify, { prisma: deps.prisma, logger: deps.logger });
+  mediaRoutes(fastify, deps);
 }

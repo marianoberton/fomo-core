@@ -309,7 +309,7 @@ export function createOpenRouterProvider(options: OpenRouterProviderOptions): LL
           for (const part of msg.content) {
             if (part.type === 'text') totalChars += part.text.length;
             else if (part.type === 'tool_result') totalChars += part.content.length;
-            else totalChars += JSON.stringify(part.input).length;
+            else if (part.type === 'tool_use') totalChars += JSON.stringify(part.input).length;
           }
         }
       }

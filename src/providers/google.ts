@@ -21,6 +21,9 @@ import type {
   LLMProvider,
   Message,
   ToolDefinitionForProvider,
+  ImageContent,
+  AudioContent,
+  VideoContent,
 } from './types.js';
 
 const logger = createLogger({ name: 'google-provider' });
@@ -74,6 +77,27 @@ function toGoogleMessages(messages: Message[]): Content[] {
               },
             });
             break;
+          case 'image': {
+            const imgPart = part as ImageContent;
+            parts.push({
+              inlineData: { mimeType: imgPart.mimeType, data: imgPart.data },
+            });
+            break;
+          }
+          case 'audio': {
+            const audioPart = part as AudioContent;
+            parts.push({
+              inlineData: { mimeType: audioPart.mimeType, data: audioPart.data },
+            });
+            break;
+          }
+          case 'video': {
+            const videoPart = part as VideoContent;
+            parts.push({
+              fileData: { mimeType: videoPart.mimeType, fileUri: videoPart.fileUri },
+            });
+            break;
+          }
         }
       }
     }

@@ -177,7 +177,7 @@ export function inboxRoutes(
       const messages = await prisma.message.findMany({
         where: { sessionId: sessionId as string & SessionId },
         orderBy: { createdAt: 'asc' },
-        select: { id: true, role: true, content: true, toolCalls: true, createdAt: true },
+        select: { id: true, role: true, content: true, mediaUrls: true, toolCalls: true, createdAt: true },
       });
 
       // Load execution traces for this session
@@ -206,6 +206,7 @@ export function inboxRoutes(
           id: m.id,
           role: m.role,
           content: m.content,
+          mediaUrls: m.mediaUrls.length > 0 ? m.mediaUrls : undefined,
           toolCalls: m.toolCalls,
           createdAt: m.createdAt.toISOString(),
         })),
