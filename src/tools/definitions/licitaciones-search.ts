@@ -1,7 +1,7 @@
 /**
  * licitaciones-search — Busca licitaciones públicas argentinas en el catálogo
- * Valentina lo usa para encontrar oportunidades relevantes para el cliente.
  * Catálogo: 47k+ registros de CABA y Nación (2020-2026).
+ * Por defecto filtra solo activos (soloActivos=true).
  */
 import { z } from 'zod';
 import type { ExecutionContext } from '@/core/types.js';
@@ -30,7 +30,7 @@ export function createLicitacionesSearchTool(options: LicitacionesSearchOptions)
   return {
     id: 'licitaciones-search',
     name: 'licitaciones-search',
-    description: 'Busca licitaciones públicas argentinas en catálogo de 47k registros (CABA + Nación). Valentina lo usa para encontrar oportunidades relevantes.',
+    description: 'Busca licitaciones públicas argentinas en catálogo de 47k registros (CABA + Nación). Por defecto solo trae procesos activos (Publicado, En Apertura, En Evaluacion).',
     category: 'research',
     riskLevel: 'low',
     requiresApproval: false,
@@ -75,11 +75,13 @@ export function createLicitacionesSearchTool(options: LicitacionesSearchOptions)
           params.set('jurisdiccion', `ilike.*${jurisdiccion}*`);
         }
 
-        // Estado
+        // Estado / soloActivos
         if (estado) {
           params.set('estado_proceso', `ilike.*${estado}*`);
+        } else if (soloActivos) {
+          // Filtrar solo procesos activos: Publicado, En Apertura, En Evaluacion
+          params.set('estado_proceso', 'in.(Publicado,En Apertura,En Evaluacion,Abierto)')
         }
-        // soloActivos se ignora si no hay filtro específico — el catálogo es mayormente histórico
 
         if (tipo_proceso) params.set('tipo_proceso', `ilike.*${tipo_proceso}*`);
         if (organismo) params.set('organismo', `ilike.*${organismo}*`);
