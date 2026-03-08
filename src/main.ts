@@ -122,6 +122,7 @@ import {
 } from '@/api/routes/chat-setup.js';
 import type { ProjectId } from '@/core/types.js';
 import { createCampaignRunner } from '@/campaigns/campaign-runner.js';
+import { createNotifySlackTool } from '@/tools/definitions/notify-slack.js';
 import type { CampaignRunner } from '@/campaigns/campaign-runner.js';
 
 const logger = createLogger();
@@ -242,6 +243,7 @@ async function start(): Promise<void> {
     toolRegistry.register(createOdooGetDebtsTool({ odooBaseUrl, secretService }));
     toolRegistry.register(createOdooRegisterPaymentTool({ odooBaseUrl, secretService }));
     toolRegistry.register(createNotifyOwnerTool({ secretService }));
+    toolRegistry.register(createNotifySlackTool({ secretService }));
     toolRegistry.register(createMpCreatePaymentLinkTool({
       secretService,
       coreBaseUrl: process.env['CORE_BASE_URL'] ?? 'https://core.fomo.com.ar',
