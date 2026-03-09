@@ -42,7 +42,7 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.create).mockResolvedValue(
-        mockMeta as ReturnType<PrismaClient['apiKey']['create']>,
+        mockMeta as unknown as Awaited<ReturnType<PrismaClient['apiKey']['create']>>,
       );
 
       const result = await service.generateApiKey({
@@ -69,7 +69,7 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.create).mockResolvedValue(
-        mockMeta as ReturnType<PrismaClient['apiKey']['create']>,
+        mockMeta as unknown as Awaited<ReturnType<PrismaClient['apiKey']['create']>>,
       );
 
       const result = await service.generateApiKey({
@@ -77,7 +77,7 @@ describe('api-key-service', () => {
         name: 'Master Key',
       });
 
-      const createCall = vi.mocked(mockPrisma.apiKey.create).mock.calls[0];
+      const createCall = vi.mocked(mockPrisma.apiKey.create).mock.calls[0]!;
       const passedKey = createCall[0].data.key;
 
       // The stored key should be a SHA-256 hash (64 hex chars)
@@ -99,7 +99,7 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.create).mockResolvedValue(
-        mockMeta as ReturnType<PrismaClient['apiKey']['create']>,
+        mockMeta as unknown as Awaited<ReturnType<PrismaClient['apiKey']['create']>>,
       );
 
       const result = await service.generateApiKey({
@@ -108,7 +108,7 @@ describe('api-key-service', () => {
         name: 'Test Key',
       });
 
-      const createCall = vi.mocked(mockPrisma.apiKey.create).mock.calls[0];
+      const createCall = vi.mocked(mockPrisma.apiKey.create).mock.calls[0]!;
       const passedPrefix = createCall[0].data.prefix;
 
       expect(passedPrefix).toBe(result.plaintext.slice(0, 8));
@@ -128,7 +128,7 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.create).mockResolvedValue(
-        mockMeta as ReturnType<PrismaClient['apiKey']['create']>,
+        mockMeta as unknown as Awaited<ReturnType<PrismaClient['apiKey']['create']>>,
       );
 
       const result = await service.generateApiKey({
@@ -154,7 +154,7 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.create).mockResolvedValue(
-        mockMeta as ReturnType<PrismaClient['apiKey']['create']>,
+        mockMeta as unknown as Awaited<ReturnType<PrismaClient['apiKey']['create']>>,
       );
 
       const result = await service.generateApiKey({
@@ -182,10 +182,10 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.findUnique).mockResolvedValue(
-        record as ReturnType<PrismaClient['apiKey']['findUnique']>,
+        record as unknown as Awaited<ReturnType<PrismaClient['apiKey']['findUnique']>>,
       );
       vi.mocked(mockPrisma.apiKey.update).mockResolvedValue(
-        record as ReturnType<PrismaClient['apiKey']['update']>,
+        record as unknown as Awaited<ReturnType<PrismaClient['apiKey']['update']>>,
       );
 
       // For this test, we'll use a raw key that when hashed matches what findUnique will find
@@ -222,7 +222,7 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.findUnique).mockResolvedValue(
-        record as ReturnType<PrismaClient['apiKey']['findUnique']>,
+        record as unknown as Awaited<ReturnType<PrismaClient['apiKey']['findUnique']>>,
       );
 
       const result = await service.validateApiKey('revoked-key');
@@ -245,7 +245,7 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.findUnique).mockResolvedValue(
-        record as ReturnType<PrismaClient['apiKey']['findUnique']>,
+        record as unknown as Awaited<ReturnType<PrismaClient['apiKey']['findUnique']>>,
       );
 
       const result = await service.validateApiKey('expired-key');
@@ -268,10 +268,10 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.findUnique).mockResolvedValue(
-        record as ReturnType<PrismaClient['apiKey']['findUnique']>,
+        record as unknown as Awaited<ReturnType<PrismaClient['apiKey']['findUnique']>>,
       );
       vi.mocked(mockPrisma.apiKey.update).mockResolvedValue(
-        record as ReturnType<PrismaClient['apiKey']['update']>,
+        record as unknown as Awaited<ReturnType<PrismaClient['apiKey']['update']>>,
       );
 
       await service.validateApiKey('valid-key');
@@ -297,7 +297,7 @@ describe('api-key-service', () => {
       };
 
       vi.mocked(mockPrisma.apiKey.update).mockResolvedValue(
-        record as ReturnType<PrismaClient['apiKey']['update']>,
+        record as unknown as Awaited<ReturnType<PrismaClient['apiKey']['update']>>,
       );
 
       const result = await service.revokeApiKey('key-1');
@@ -349,7 +349,7 @@ describe('api-key-service', () => {
       ];
 
       vi.mocked(mockPrisma.apiKey.findMany).mockResolvedValue(
-        records as ReturnType<PrismaClient['apiKey']['findMany']>,
+        records as unknown as Awaited<ReturnType<PrismaClient['apiKey']['findMany']>>,
       );
 
       const result = await service.listApiKeys('proj-1');
@@ -376,7 +376,7 @@ describe('api-key-service', () => {
       ];
 
       vi.mocked(mockPrisma.apiKey.findMany).mockResolvedValue(
-        records as ReturnType<PrismaClient['apiKey']['findMany']>,
+        records as unknown as Awaited<ReturnType<PrismaClient['apiKey']['findMany']>>,
       );
 
       const result = await service.listApiKeys();
