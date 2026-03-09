@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FOMO – Demo Widget de Chat</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+
+    /* Nav */
+    nav {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    nav .logo {
+      font-size: 22px;
+      font-weight: 800;
+      color: #6366f1;
+      letter-spacing: -0.5px;
+    }
+    nav .logo span { color: #1e293b; }
+    nav .nav-links { display: flex; gap: 24px; font-size: 14px; color: #64748b; }
+    nav .nav-links a { text-decoration: none; color: inherit; }
+    nav .cta {
+      background: #6366f1;
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    /* Hero */
+    .hero {
+      max-width: 900px;
+      margin: 80px auto;
+      text-align: center;
+      padding: 0 24px;
+    }
+    .hero .badge {
+      display: inline-block;
+      background: #ede9fe;
+      color: #6366f1;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 4px 14px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      letter-spacing: 0.3px;
+    }
+    .hero h1 {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -1.5px;
+      margin-bottom: 20px;
+      color: #0f172a;
+    }
+    .hero h1 span { color: #6366f1; }
+    .hero p {
+      font-size: 20px;
+      color: #64748b;
+      max-width: 640px;
+      margin: 0 auto 40px;
+      line-height: 1.6;
+    }
+    .hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .hero-btns .btn-primary {
+      background: #6366f1;
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background .15s;
+    }
+    .hero-btns .btn-primary:hover { background: #4f46e5; }
+    .hero-btns .btn-secondary {
+      background: #fff;
+      color: #1e293b;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid #e2e8f0;
+      transition: border-color .15s;
+    }
+    .hero-btns .btn-secondary:hover { border-color: #6366f1; color: #6366f1; }
+
+    /* Embed code section */
+    .embed-section {
+      max-width: 900px;
+      margin: 0 auto 80px;
+      padding: 0 24px;
+    }
+    .embed-section h2 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #0f172a;
+    }
+    .embed-section p { color: #64748b; margin-bottom: 24px; font-size: 16px; }
+    .code-card {
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 24px 28px;
+      position: relative;
+    }
+    .code-card pre {
+      color: #e2e8f0;
+      font-family: "Fira Code", "Cascadia Code", monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .code-card pre .comment { color: #64748b; }
+    .code-card pre .tag { color: #f472b6; }
+    .code-card pre .attr { color: #60a5fa; }
+    .code-card pre .val { color: #34d399; }
+    .copy-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .15s;
+    }
+    .copy-btn:hover { background: #334155; color: #fff; }
+    .copy-btn.copied { color: #34d399; border-color: #34d399; }
+
+    /* Features */
+    .features {
+      max-width: 900px;
+      margin: 0 auto 80px;
+      padding: 0 24px;
+    }
+    .features h2 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 32px;
+      color: #0f172a;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .feature-card .icon {
+      width: 44px;
+      height: 44px;
+      background: #ede9fe;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      font-size: 22px;
+    }
+    .feature-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .feature-card p { font-size: 14px; color: #64748b; line-height: 1.5; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid #e2e8f0;
+      padding: 32px;
+      text-align: center;
+      font-size: 14px;
+      color: #94a3b8;
+      background: #fff;
+    }
+    footer a { color: #6366f1; text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 34px; }
+      .hero p { font-size: 16px; }
+      nav .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="logo">FOMO<span>.</span></div>
+    <div class="nav-links">
+      <a href="#">Producto</a>
+      <a href="#">Precios</a>
+      <a href="#">Docs</a>
+    </div>
+    <a href="https://core.fomo.com.ar" class="cta">Ir al panel →</a>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="badge">✨ Widget de Chat para tu Sitio</div>
+    <h1>Tu agente de IA,<br/><span>en cualquier web</span></h1>
+    <p>Embed el chatbot de FOMO en tu sitio con una sola línea de código. Sin frameworks. Sin dependencias. 100% personalizable.</p>
+    <div class="hero-btns">
+      <a href="#embed" class="btn-primary">Ver código de integración</a>
+      <a href="https://core.fomo.com.ar" class="btn-secondary">Abrir panel →</a>
+    </div>
+  </section>
+
+  <!-- Embed Code -->
+  <section class="embed-section" id="embed">
+    <h2>Integración en 1 línea</h2>
+    <p>Copiá este snippet y pegalo antes del <code>&lt;/body&gt;</code> de tu sitio. El chat aparece automáticamente.</p>
+    <div class="code-card">
+      <pre><span class="comment">&lt;!-- FOMO Chat Widget --&gt;</span>
+<span class="tag">&lt;script</span>
+  <span class="attr">data-project</span>=<span class="val">"4SqKBrE3GDwfCRsdxVmYC"</span>
+  <span class="attr">src</span>=<span class="val">"https://core.fomo.com.ar/webchat/widget.js"</span>
+<span class="tag">&gt;&lt;/script&gt;</span></pre>
+      <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+    </div>
+
+    <br/>
+
+    <p>¿Querés cambiar el color del widget? Configuralo desde el panel admin.</p>
+    <div class="code-card">
+      <pre><span class="comment"># Configurar webchat via API</span>
+curl -X PUT https://core.fomo.com.ar/api/v1/projects/<span class="val">TU_PROJECT_ID</span>/webchat \
+  -H <span class="val">"Authorization: Bearer TU_API_KEY"</span> \
+  -H <span class="val">"Content-Type: application/json"</span> \
+  -d '{
+    "title": "Chat con nosotros",
+    "welcomeMessage": "¡Hola! ¿En qué te puedo ayudar?",
+    "primaryColor": "#7c3aed",
+    "agentName": "Elena",
+    "agentId": "<span class="val">TU_AGENT_ID</span>",
+    "enabled": true
+  }'</pre>
+      <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <h2>¿Qué incluye el widget?</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="icon">💬</div>
+        <h3>Chat flotante</h3>
+        <p>Bubble en esquina inferior derecha, no interrumpe la navegación del usuario.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🤖</div>
+        <h3>IA de FOMO</h3>
+        <p>Conectado directamente a tu agente configurado en el panel. Responde en segundos.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">🎨</div>
+        <h3>Personalizable</h3>
+        <p>Color, nombre y mensaje de bienvenida configurables desde el panel admin.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📱</div>
+        <h3>Mobile-friendly</h3>
+        <p>Responsive por defecto. Se adapta a cualquier tamaño de pantalla.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">💾</div>
+        <h3>Sesiones persistentes</h3>
+        <p>El historial de chat se guarda en localStorage para no perder el contexto.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">⚡</div>
+        <h3>Sin dependencias</h3>
+        <p>JavaScript puro, CSS inline. No requiere React, Vue ni ningún framework.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>Hecho con ♥ por <a href="https://fomo.com.ar">FOMO</a> · Agentes de IA para PyMEs argentinas</p>
+  </footer>
+
+  <!-- Load the widget (demo live) -->
+  <script
+    data-project="4SqKBrE3GDwfCRsdxVmYC"
+    src="https://core.fomo.com.ar/webchat/widget.js"
+  ></script>
+
+  <script>
+    function copyCode(btn) {
+      var pre = btn.previousElementSibling;
+      var text = pre.textContent;
+      navigator.clipboard.writeText(text).then(function() {
+        btn.textContent = '✓ Copiado';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.textContent = 'Copiar';
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(function() {
+        // fallback
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✓ Copiado';
+        btn.classList.add('copied');
+        setTimeout(function() { btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

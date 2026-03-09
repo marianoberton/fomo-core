@@ -735,6 +735,29 @@ async function start(): Promise<void> {
     });
     logger.info('Webchat public routes registered at /webchat/*', { component: 'main' });
 
+    // Serve widget demo page (public, no auth)
+    server.get('/widget-demo', async (_request, reply) => {
+      const { readFile } = await import('node:fs/promises');
+      const { resolve, dirname } = await import('node:path');
+      const { fileURLToPath } = await import('node:url');
+      const __dirname = dirname(fileURLToPath(import.meta.url));
+      // In production (compiled), dist/main.js → look for public/ at project root
+      const candidates = [
+        resolve(__dirname, '..', 'public', 'widget-demo.html'),
+        resolve(__dirname, 'public', 'widget-demo.html'),
+        resolve(process.cwd(), 'public', 'widget-demo.html'),
+      ];
+      for (const p of candidates) {
+        try {
+          const html = await readFile(p, 'utf-8');
+          return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
+        } catch {
+          // try next
+        }
+      }
+      return reply.code(404).send('Demo page not found');
+    });
+
     // Register API routes under /api/v1 prefix
     await server.register(
       async (prefixed) => {
