@@ -39,6 +39,7 @@ import { webchatAdminRoutes } from './webchat.js';
 import { mediaRoutes } from './media.js';
 import { vapiRoutes } from './vapi.js';
 import { whatsappTemplateRoutes } from './whatsapp-templates.js';
+import { apiKeyRoutes } from './api-keys.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -81,4 +82,5 @@ export async function registerRoutes(
   mediaRoutes(fastify, deps);
   vapiRoutes(fastify, deps);
   whatsappTemplateRoutes(fastify, deps);
+  apiKeyRoutes(fastify, { apiKeyService: deps.apiKeyService, logger: deps.logger });
 }

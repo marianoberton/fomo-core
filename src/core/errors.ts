@@ -156,3 +156,15 @@ export class ToolExecutionError extends NexusError {
     this.name = 'ToolExecutionError';
   }
 }
+
+/** Thrown when an API key is invalid, revoked, or expired. */
+export class ApiKeyError extends NexusError {
+  constructor(message: string) {
+    super({
+      message,
+      code: 'API_KEY_ERROR',
+      statusCode: 401,
+    });
+    this.name = 'ApiKeyError';
+  }
+}

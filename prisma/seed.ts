@@ -1537,6 +1537,30 @@ Temporada alta: {{highSeason}}. Temporada baja: {{lowSeason}}.`,
   // Summary
   // ═══════════════════════════════════════════════════════════════
 
+  // ─── API Keys ────────────────────────────────────────────────────────────────
+  // Seed the current NEXUS_API_KEY from env as a master key (one-time, idempotent).
+  const existingKeyCount = await prisma.apiKey.count();
+  if (existingKeyCount === 0) {
+    const rawKey = process.env['NEXUS_API_KEY'];
+    if (rawKey) {
+      const { createHash } = await import('node:crypto');
+      const hash = createHash('sha256').update(rawKey).digest('hex');
+      const prefix = rawKey.slice(0, 8);
+      await prisma.apiKey.create({
+        data: {
+          key: hash,
+          prefix,
+          name: 'Default master key (seeded from NEXUS_API_KEY)',
+          projectId: null,
+          scopes: ['*'],
+        },
+      });
+      console.log('Seeded master API key from NEXUS_API_KEY env var');
+    } else {
+      console.log('No NEXUS_API_KEY set — skipping master key seed');
+    }
+  }
+
   console.log('\nSeed completed successfully!');
   console.log('  6 projects, 5 agents, 18 prompt layers, 2 scheduled tasks, 12 MCP templates, 10 skill templates');
   console.log('\nProjects:');

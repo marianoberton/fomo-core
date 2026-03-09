@@ -26,6 +26,7 @@ import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-serv
 import type { SessionBroadcaster } from '@/hitl/session-broadcaster.js';
 import type { SkillService } from '@/skills/skill-service.js';
 import type { CampaignRunner } from '@/campaigns/campaign-runner.js';
+import type { ApiKeyService } from '@/security/api-key-service.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -132,5 +133,7 @@ export interface RouteDependencies {
     resolvedBy: string;
     note?: string;
   }) => Promise<void>;
+  /** Per-project API key management service. */
+  apiKeyService: ApiKeyService;
   logger: Logger;
 }

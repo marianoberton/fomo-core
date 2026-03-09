@@ -21,6 +21,7 @@ import {
 } from '@/infrastructure/repositories/index.js';
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
 import { createSecretService } from '@/secrets/secret-service.js';
+import { createApiKeyService } from '@/security/api-key-service.js';
 import { createKnowledgeService } from '@/knowledge/knowledge-service.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
 import { createToolRegistry } from '@/tools/registry/tool-registry.js';
@@ -179,6 +180,7 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     campaignRunner: null,
     longTermMemoryStore: null,
     secretService,
+    apiKeyService: createApiKeyService({ prisma, logger }),
     knowledgeService: createKnowledgeService({ prisma }),
     skillService: createSkillService({ repository: createSkillRepository(prisma) }),
     channelResolver,

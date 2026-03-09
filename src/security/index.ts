@@ -5,3 +5,7 @@ export type { ApprovalGate, ApprovalGateOptions, ApprovalNotifier, ReminderNotif
 export { createPrismaApprovalStore } from './prisma-approval-store.js';
 export { sanitizeInput, validateUserInput } from './input-sanitizer.js';
 export type { SanitizeOptions, SanitizeResult } from './input-sanitizer.js';
+
+// API Keys
+export type { ApiKeyService, ApiKeyMeta, ApiKeyValidationResult } from './api-key-service.js';
+export { createApiKeyService } from './api-key-service.js';

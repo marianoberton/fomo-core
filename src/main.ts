@@ -19,6 +19,7 @@ import {
 } from '@/infrastructure/repositories/index.js';
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
 import { createSecretService } from '@/secrets/secret-service.js';
+import { createApiKeyService } from '@/security/api-key-service.js';
 import { createKnowledgeService } from '@/knowledge/knowledge-service.js';
 import type { KnowledgeService } from '@/knowledge/types.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
@@ -171,6 +172,9 @@ async function start(): Promise<void> {
 
     // Encrypted secrets service (AES-256-GCM) — requires SECRETS_ENCRYPTION_KEY env var
     const secretService = createSecretService({ secretRepository });
+
+    // API key service — per-project and master API keys
+    const apiKeyService = createApiKeyService({ prisma, logger });
 
     // Channel resolver — per-project adapter resolution from DB + secrets
     const channelResolver = createChannelResolver({
@@ -715,6 +719,7 @@ async function start(): Promise<void> {
       campaignRunner,
       longTermMemoryStore,
       secretService,
+      apiKeyService,
       knowledgeService,
       channelResolver,
       channelIntegrationRepository,
@@ -762,7 +767,7 @@ async function start(): Promise<void> {
     await server.register(
       async (prefixed) => {
         // Auth middleware — validates Bearer token on all routes except /api/v1/webhooks/*
-        registerAuthMiddleware(prefixed, process.env['NEXUS_API_KEY'] ?? '', logger);
+        registerAuthMiddleware(prefixed, process.env['NEXUS_API_KEY'] ?? '', logger, apiKeyService);
 
         await prefixed.register(registerRoutes, deps);
 

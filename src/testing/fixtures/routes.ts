@@ -25,6 +25,7 @@ import type { ChannelIntegrationRepository } from '@/channels/types.js';
 import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 import type { SecretService } from '@/secrets/types.js';
 import type { SkillService } from '@/skills/skill-service.js';
+import type { ApiKeyService } from '@/security/api-key-service.js';
 import type { Logger } from '@/observability/logger.js';
 import type {
   ExecutionTrace,
@@ -306,6 +307,18 @@ export function createMockSecretService(): {
   };
 }
 
+/** Create a mock ApiKeyService with all methods as vi.fn(). */
+export function createMockApiKeyService(): {
+  [K in keyof ApiKeyService]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    generateApiKey: vi.fn(),
+    validateApiKey: vi.fn(),
+    revokeApiKey: vi.fn(),
+    listApiKeys: vi.fn(),
+  };
+}
+
 /** Create a mock ChannelResolver with all methods as vi.fn(). */
 export function createMockChannelResolver(): {
   [K in keyof ChannelResolver]: ReturnType<typeof vi.fn>;
@@ -401,6 +414,7 @@ export function createMockDeps(): RouteDependencies & {
   agentRegistry: ReturnType<typeof createMockAgentRegistry>;
   agentComms: ReturnType<typeof createMockAgentComms>;
   secretService: ReturnType<typeof createMockSecretService>;
+  apiKeyService: ReturnType<typeof createMockApiKeyService>;
   channelResolver: ReturnType<typeof createMockChannelResolver>;
   channelIntegrationRepository: ReturnType<typeof createMockChannelIntegrationRepository>;
   mcpServerRepository: ReturnType<typeof createMockMCPServerRepository>;
@@ -429,6 +443,7 @@ export function createMockDeps(): RouteDependencies & {
     campaignRunner: null,
     longTermMemoryStore: null,
     secretService: createMockSecretService(),
+    apiKeyService: createMockApiKeyService(),
     knowledgeService: null,
     channelResolver: createMockChannelResolver(),
     channelIntegrationRepository: createMockChannelIntegrationRepository(),

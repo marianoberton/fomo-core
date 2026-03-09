@@ -35,6 +35,7 @@ model Project {
   agents               Agent[]
   channelIntegrations  ChannelIntegration[]
   secrets              Secret[]
+  apiKeys              ApiKey[]
   mcpServerInstances   MCPServerInstance[]
   skillInstances       SkillInstance[]
   campaigns            Campaign[]
@@ -437,6 +438,26 @@ model Secret {
   @@unique([projectId, key])
   @@index([projectId])
   @@map("secrets")
+}
+
+// ─── API Keys ────────────────────────────────────────────────────
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  key        String    @unique                   // SHA-256 hex hash — never plaintext
+  prefix     String                              // first 8 chars of raw token
+  name       String
+  projectId  String?   @map("project_id")        // null = master key (full access)
+  scopes     String[]  @default([])              // ["chat", "agents:read", "agents:write", "*"]
+  expiresAt  DateTime? @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("api_keys")
 }
 
 // ─── Files ──────────────────────────────────────────────────────
