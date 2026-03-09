@@ -41,6 +41,16 @@ export interface OutboundMessage {
   mediaUrls?: string[];
   replyToChannelMessageId?: string;
 
+  /**
+   * WhatsApp Meta template config — when set, sends a template message instead of text.
+   * Only used by the WhatsApp Cloud API adapter (provider: 'whatsapp').
+   */
+  template?: {
+    name: string;
+    language: string;
+    components?: object[];
+  };
+
   options?: {
     parseMode?: 'markdown' | 'html';
     silent?: boolean;

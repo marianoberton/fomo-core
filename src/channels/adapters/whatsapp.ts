@@ -1,5 +1,6 @@
 /**
  * WhatsApp Channel Adapter — sends/receives messages via WhatsApp Cloud API.
+ * Supports both plain text and Meta template messages.
  */
 import type { ChannelAdapter, InboundMessage, OutboundMessage, SendResult } from '../types.js';
 import type { ProjectId } from '@/core/types.js';
@@ -77,11 +78,71 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
   const apiVersion = config.apiVersion ?? 'v18.0';
   const baseUrl = `https://graph.facebook.com/${apiVersion}/${config.phoneNumberId}`;
 
+  /** Send a WhatsApp template message directly. */
+  async function sendTemplate(
+    to: string,
+    templateName: string,
+    languageCode: string,
+    components?: object[],
+  ): Promise<SendResult> {
+    try {
+      const body = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          ...(components && components.length > 0 && { components }),
+        },
+      };
+
+      const response = await fetch(`${baseUrl}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.accessToken}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = (await response.json()) as unknown as WhatsAppSendResponse;
+
+      if (data.messages && data.messages.length > 0) {
+        return {
+          success: true,
+          channelMessageId: data.messages[0]?.id,
+        };
+      }
+
+      return {
+        success: false,
+        error: data.error?.message ?? 'Unknown WhatsApp template error',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
   return {
     channelType: 'whatsapp',
 
     async send(message: OutboundMessage): Promise<SendResult> {
       try {
+        // Route to template sending if template config is present
+        if (message.template) {
+          return await sendTemplate(
+            message.recipientIdentifier,
+            message.template.name,
+            message.template.language,
+            message.template.components,
+          );
+        }
+
         const body = {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
@@ -191,4 +252,85 @@ export function createWhatsAppAdapter(config: WhatsAppAdapterConfig): ChannelAda
       }
     },
   };
+}
+
+// ─── Standalone Template Helpers ────────────────────────────────
+
+export interface WhatsAppTemplateItem {
+  name: string;
+  status: string;
+  language: string;
+  components: object[];
+}
+
+interface WhatsAppTemplateListResponse {
+  data?: WhatsAppTemplateItem[];
+  error?: { message: string; type: string; code: number };
+}
+
+/**
+ * Fetch message templates from Meta WABA API.
+ * Requires a WABA ID (not the Phone Number ID) and access token.
+ */
+export async function fetchWhatsAppTemplates(
+  wabaId: string,
+  accessToken: string,
+  apiVersion = 'v18.0',
+): Promise<WhatsAppTemplateItem[]> {
+  const url = `https://graph.facebook.com/${apiVersion}/${wabaId}/message_templates?fields=name,status,language,components&access_token=${encodeURIComponent(accessToken)}`;
+  const response = await fetch(url);
+  const data = (await response.json()) as unknown as WhatsAppTemplateListResponse;
+
+  if (data.error) {
+    throw new Error(`Meta API error ${data.error.code}: ${data.error.message}`);
+  }
+
+  return data.data ?? [];
+}
+
+/**
+ * Send a WhatsApp template message using raw credentials (no adapter instantiation required).
+ */
+export async function sendWhatsAppTemplate(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  templateName: string,
+  languageCode: string,
+  components?: object[],
+  apiVersion = 'v18.0',
+): Promise<{ success: boolean; channelMessageId?: string; error?: string }> {
+  const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
+  const body = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      ...(components && components.length > 0 && { components }),
+    },
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = (await response.json()) as unknown as WhatsAppSendResponse;
+
+    if (data.messages && data.messages.length > 0) {
+      return { success: true, channelMessageId: data.messages[0]?.id };
+    }
+
+    return { success: false, error: data.error?.message ?? 'Unknown WhatsApp template error' };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
 }

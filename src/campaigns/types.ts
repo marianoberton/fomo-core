@@ -69,6 +69,17 @@ export interface ABTestResult {
 
 // ─── Domain Types ───────────────────────────────────────────────
 
+// ─── Template Config ────────────────────────────────────────────
+
+/** WhatsApp Meta template config for campaigns. Stored inside `metadata.templateConfig`. */
+export interface CampaignTemplateConfig {
+  name: string;
+  language: string;
+  components?: object[];
+}
+
+// ─── Domain Types ───────────────────────────────────────────────
+
 export interface Campaign {
   id: CampaignId;
   projectId: ProjectId;
@@ -84,6 +95,12 @@ export interface Campaign {
   abTest?: ABTestConfig;
   scheduledFor?: Date;
   completedAt?: Date;
+  /**
+   * Additional campaign config. May include:
+   * - `abTest: ABTestConfig` — A/B test settings
+   * - `templateConfig: CampaignTemplateConfig` — WhatsApp Meta template to use instead of plain text
+   * - `channelProvider: 'whatsapp' | 'whatsapp-waha'` — override which WhatsApp provider to use
+   */
   metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;

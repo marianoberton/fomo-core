@@ -18,6 +18,7 @@ import type {
   CampaignExecutionResult,
   AudienceFilter,
   ABTestConfig,
+  CampaignTemplateConfig,
 } from './types.js';
 import { selectVariant } from './ab-test-engine.js';
 import { markCampaignReply } from './campaign-tracker.js';
@@ -173,6 +174,11 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
       let skipped = 0;
       const channel = campaign.channel as CampaignChannel;
 
+      // Extract optional template + provider overrides from metadata
+      const meta = campaign.metadata as Record<string, unknown> | null;
+      const templateConfig = meta?.['templateConfig'] as CampaignTemplateConfig | undefined;
+      const channelProvider = (meta?.['channelProvider'] as 'whatsapp' | 'whatsapp-waha' | undefined) ?? channel as ChannelType;
+
       for (const contact of contacts) {
         const recipient = resolveRecipient(contact, channel);
 
@@ -220,9 +226,10 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
           const result = await proactiveMessenger.send({
             projectId: campaign.projectId as ProjectId,
             contactId: contact.id as ContactId,
-            channel: channel as ChannelType,
+            channel: channelProvider as ChannelType,
             recipientIdentifier: recipient,
             content: message,
+            ...(templateConfig && { template: templateConfig }),
             metadata: {
               campaignId,
               campaignName: campaign.name,

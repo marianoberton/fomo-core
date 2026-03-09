@@ -38,6 +38,7 @@ import { modelRoutes } from './models.js';
 import { webchatAdminRoutes } from './webchat.js';
 import { mediaRoutes } from './media.js';
 import { vapiRoutes } from './vapi.js';
+import { whatsappTemplateRoutes } from './whatsapp-templates.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -79,4 +80,5 @@ export async function registerRoutes(
   webchatAdminRoutes(fastify, { prisma: deps.prisma, logger: deps.logger });
   mediaRoutes(fastify, deps);
   vapiRoutes(fastify, deps);
+  whatsappTemplateRoutes(fastify, deps);
 }

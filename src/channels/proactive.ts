@@ -25,6 +25,15 @@ export interface ProactiveMessageRequest {
   recipientIdentifier: string;
   /** Message content */
   content: string;
+  /**
+   * Optional WhatsApp Meta template config.
+   * When set, sends a template message instead of plain text (only for 'whatsapp' provider).
+   */
+  template?: {
+    name: string;
+    language: string;
+    components?: object[];
+  };
   /** Optional: schedule for later */
   scheduledFor?: Date;
   /** Optional: metadata for tracking */
@@ -50,6 +59,11 @@ export interface ProactiveMessageJobData {
   channel: ChannelType;
   recipientIdentifier: string;
   content: string;
+  template?: {
+    name: string;
+    language: string;
+    components?: object[];
+  };
   metadata?: Record<string, unknown>;
 }
 
@@ -61,7 +75,7 @@ export const PROACTIVE_MESSAGE_QUEUE = 'proactive-messages';
 
 /** Type guard: checks if a ChannelType is a supported IntegrationProvider. */
 function isIntegrationProvider(channel: ChannelType): channel is IntegrationProvider {
-  return channel === 'whatsapp' || channel === 'telegram' || channel === 'slack' || channel === 'chatwoot';
+  return channel === 'whatsapp' || channel === 'whatsapp-waha' || channel === 'telegram' || channel === 'slack' || channel === 'chatwoot';
 }
 
 export interface ProactiveMessengerDeps {
@@ -92,6 +106,7 @@ export function createProactiveMessenger(deps: ProactiveMessengerDeps): Proactiv
         channel: request.channel,
         recipientIdentifier: request.recipientIdentifier,
         content: request.content,
+        ...(request.template && { template: request.template }),
       });
     },
 
@@ -106,6 +121,7 @@ export function createProactiveMessenger(deps: ProactiveMessengerDeps): Proactiv
         channel: request.channel,
         recipientIdentifier: request.recipientIdentifier,
         content: request.content,
+        ...(request.template && { template: request.template }),
         metadata: request.metadata,
       };
 
@@ -183,6 +199,7 @@ export function createProactiveMessageHandler(deps: {
       channel: data.channel,
       recipientIdentifier: data.recipientIdentifier,
       content: data.content,
+      ...(data.template && { template: data.template }),
     });
 
     if (result.success) {

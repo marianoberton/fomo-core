@@ -380,6 +380,45 @@ describe('WhatsAppAdapter', () => {
     });
   });
 
+  describe('template sending', () => {
+    it('sends template message when message.template is set', async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        json: () => Promise.resolve({
+          messaging_product: 'whatsapp',
+          messages: [{ id: 'tmpl_msg_001' }],
+        }),
+      } as Response);
+
+      const adapter = createWhatsAppAdapter(defaultConfig);
+
+      const message: OutboundMessage = {
+        channel: 'whatsapp',
+        recipientIdentifier: '5491132766709',
+        content: '',
+        template: {
+          name: 'hello_world',
+          language: 'en_US',
+          components: [
+            {
+              type: 'body',
+              parameters: [{ type: 'text', text: 'John' }],
+            },
+          ],
+        },
+      };
+
+      const result = await adapter.send(message);
+
+      expect(result.success).toBe(true);
+      expect(result.channelMessageId).toBe('tmpl_msg_001');
+
+      const callArgs = vi.mocked(fetch).mock.calls[0];
+      const body = JSON.parse(callArgs?.[1]?.body as string) as Record<string, unknown>;
+      expect(body['type']).toBe('template');
+      expect((body['template'] as Record<string, unknown>)['name']).toBe('hello_world');
+    });
+  });
+
   describe('isHealthy', () => {
     it('returns true when API is accessible', async () => {
       vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
