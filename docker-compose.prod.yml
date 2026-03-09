@@ -34,6 +34,9 @@ services:
   app:
     image: ghcr.io/marianoberton/fomo-core:latest
     restart: unless-stopped
+    networks:
+      - default
+      - dokploy-network
     ports:
       - "3002:3002"
     env_file:
@@ -65,6 +68,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-fomo-core}_default
+  dokploy-network:
+    external: true
 
 volumes:
   pgdata:
