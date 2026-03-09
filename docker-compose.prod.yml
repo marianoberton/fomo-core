@@ -68,5 +68,11 @@ services:
 
 volumes:
   pgdata:
+    external: true
+    name: compose-back-up-cross-platform-port-fem9ec_pgdata
   redisdata:
+    external: true
+    name: compose-back-up-cross-platform-port-fem9ec_redisdata
   filedata:
+    external: true
+    name: compose-back-up-cross-platform-port-fem9ec_filedata
