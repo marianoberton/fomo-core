@@ -112,8 +112,9 @@ describe('DockerSocketService', () => {
 
     it('creates and starts container successfully', async () => {
       mockHttpResponses([
-        { statusCode: 201, body: { Id: 'container-abc123' } },
-        { statusCode: 204, body: '' },
+        { statusCode: 200, body: [] }, // allocatePort — list containers
+        { statusCode: 201, body: { Id: 'container-abc123' } }, // create
+        { statusCode: 204, body: '' }, // start
       ]);
 
       const result = await service.createClientContainer(request);
@@ -124,7 +125,10 @@ describe('DockerSocketService', () => {
     });
 
     it('returns failure when container creation fails', async () => {
-      mockHttpResponse(409, { message: 'Conflict — container already exists' });
+      mockHttpResponses([
+        { statusCode: 200, body: [] }, // allocatePort
+        { statusCode: 409, body: { message: 'Conflict — container already exists' } },
+      ]);
 
       const result = await service.createClientContainer(request);
 
@@ -134,8 +138,9 @@ describe('DockerSocketService', () => {
 
     it('returns failure when container start fails', async () => {
       mockHttpResponses([
-        { statusCode: 201, body: { Id: 'container-abc123' } },
-        { statusCode: 500, body: { message: 'Cannot start container' } },
+        { statusCode: 200, body: [] }, // allocatePort
+        { statusCode: 201, body: { Id: 'container-abc123' } }, // create
+        { statusCode: 500, body: { message: 'Cannot start container' } }, // start
       ]);
 
       const result = await service.createClientContainer(request);
@@ -168,6 +173,7 @@ describe('DockerSocketService', () => {
 
     it('logs container creation', async () => {
       mockHttpResponses([
+        { statusCode: 200, body: [] }, // allocatePort
         { statusCode: 201, body: { Id: 'container-abc123' } },
         { statusCode: 204, body: '' },
       ]);

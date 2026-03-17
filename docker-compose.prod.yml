@@ -61,8 +61,16 @@ services:
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      # Provisioning
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
+      DOCKER_API_VERSION: "1.43"
+      FOMO_CORE_API_URL: ${FOMO_CORE_API_URL:-https://api.fomo.com.ar}
+      PROVISIONING_PORT_RANGE_START: "19000"
+      PROVISIONING_PORT_RANGE_END: "19999"
     volumes:
       - filedata:/app/data/files
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./templates:/app/templates:ro
     depends_on:
       postgres:
         condition: service_healthy

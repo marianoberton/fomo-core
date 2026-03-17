@@ -1,0 +1,17 @@
+# USER.md - Datos del Cliente
+
+## Empresa
+
+- **Nombre:** {{company_name}}
+- **Vertical:** {{company_vertical}}
+- **Owner:** {{owner_name}}
+
+## Configuración
+
+- **Manager Name:** {{manager_name}}
+- **Idioma:** es-AR
+- **Timezone:** America/Argentina/Buenos_Aires
+
+## Canales Activos
+
+{{channels_list}}

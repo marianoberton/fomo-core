@@ -9,13 +9,17 @@ import type {
   ProvisioningResult,
   ClientContainerStatus,
 } from './provisioning-types.js';
+import type { TemplateEngine } from './template-engine.js';
 
 // ─── Constants ──────────────────────────────────────────────────
 
 const DOCKER_SOCKET = '/var/run/docker.sock';
-const CONTAINER_IMAGE = 'ghcr.io/fomo-fomo/fomo-core:latest';
+const CONTAINER_IMAGE = 'fomo/openclaw-client:latest';
 const CONTAINER_PREFIX = 'fomo-client-';
 const DOCKER_NETWORK = 'fomo-network';
+const PORT_RANGE_START = 19000;
+const PORT_RANGE_END = 19999;
+const IMAGE_VERSION = 'latest';
 
 // ─── Docker Socket Helper ───────────────────────────────────────
 
@@ -86,6 +90,7 @@ export interface DockerSocketService {
 /** Dependencies for the Docker socket service. */
 export interface DockerSocketServiceDeps {
   logger: Logger;
+  templateEngine?: TemplateEngine;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -107,7 +112,12 @@ function buildEnvVars(req: CreateClientRequest): string[] {
   const env: string[] = [
     `CLIENT_ID=${req.clientId}`,
     `CLIENT_NAME=${req.clientName}`,
+    `INSTANCE_NAME=${req.clientId}`,
     `CHANNELS=${req.channels.join(',')}`,
+    `SOUL_COMPANY_NAME=${req.companyName ?? req.clientName}`,
+    `SOUL_COMPANY_VERTICAL=${req.vertical ?? 'ventas'}`,
+    `MANAGER_NAME=${req.managerName ?? 'Manager'}`,
+    `OWNER_NAME=${req.ownerName ?? ''}`,
   ];
   if (req.agentConfig.provider) env.push(`MODEL_PROVIDER=${req.agentConfig.provider}`);
   env.push(`MODEL_NAME=${req.agentConfig.model}`);
@@ -115,6 +125,31 @@ function buildEnvVars(req: CreateClientRequest): string[] {
   if (req.agentConfig.maxTokens) env.push(`AGENT_MAX_TOKENS=${String(req.agentConfig.maxTokens)}`);
   if (req.agentConfig.temperature !== undefined) env.push(`AGENT_TEMPERATURE=${String(req.agentConfig.temperature)}`);
   return env;
+}
+
+/** Allocate a dynamic port from the provisioning range by querying existing containers. */
+async function allocatePort(): Promise<number> {
+  const filters = JSON.stringify({ label: ['fomo.managed=true'] });
+  const res = await dockerRequest(
+    'GET',
+    `/containers/json?all=true&filters=${encodeURIComponent(filters)}`,
+  );
+
+  const usedPorts = new Set<number>();
+  if (res.statusCode === 200 && Array.isArray(res.body)) {
+    for (const container of res.body as Array<{ Labels?: Record<string, string> }>) {
+      const portLabel = container.Labels?.['com.fomo.port'];
+      if (portLabel) {
+        usedPorts.add(Number(portLabel));
+      }
+    }
+  }
+
+  for (let port = PORT_RANGE_START; port <= PORT_RANGE_END; port++) {
+    if (!usedPorts.has(port)) return port;
+  }
+
+  throw new Error(`No available ports in range ${PORT_RANGE_START}-${PORT_RANGE_END}`);
 }
 
 /** Compute uptime in seconds from a Docker container start timestamp. */
@@ -137,20 +172,57 @@ function extractDockerError(body: unknown, fallbackStatusCode: number): string {
 
 /** Create a Docker socket service for managing client containers. */
 export function createDockerSocketService(deps: DockerSocketServiceDeps): DockerSocketService {
-  const { logger } = deps;
+  const { logger, templateEngine } = deps;
   const COMPONENT = 'docker-socket-service';
 
   return {
     async createClientContainer(req: CreateClientRequest): Promise<ProvisioningResult> {
       const name = containerName(req.clientId);
+      const vertical = req.vertical ?? 'ventas';
 
       logger.info('Creating client container', {
         component: COMPONENT,
         clientId: req.clientId,
         containerName: name,
+        vertical,
       });
 
       try {
+        // Allocate a dynamic port
+        const hostPort = await allocatePort();
+
+        // Prepare template workspace if template engine is available
+        let workspaceDir: string | undefined;
+        const binds: string[] = [];
+
+        if (templateEngine) {
+          const templateVars: Record<string, string> = {
+            client_id: req.clientId,
+            instance_name: req.clientId,
+            company_name: req.companyName ?? req.clientName,
+            company_vertical: vertical,
+            manager_name: req.managerName ?? 'Manager',
+            owner_name: req.ownerName ?? '',
+            channels: req.channels.join(','),
+            channels_list: req.channels.map((ch) => `- ${ch}`).join('\n'),
+            channels_config: req.channels.map((ch) => `${ch}:\n    enabled: true`).join('\n  '),
+            health_check_port: '8080',
+            fomo_core_api_url: process.env['FOMO_CORE_API_URL'] ?? 'https://api.fomo.com.ar',
+          };
+
+          workspaceDir = await templateEngine.prepareClientWorkspace(
+            req.clientId,
+            vertical,
+            templateVars,
+          );
+
+          binds.push(
+            `${workspaceDir}/SOUL.md:/app/SOUL.md:ro`,
+            `${workspaceDir}/USER.md:/app/USER.md:ro`,
+            `${workspaceDir}/config:/app/config:ro`,
+          );
+        }
+
         // Create container via Docker API
         const createRes = await dockerRequest(
           'POST',
@@ -158,15 +230,24 @@ export function createDockerSocketService(deps: DockerSocketServiceDeps): Docker
           {
             Image: CONTAINER_IMAGE,
             Env: buildEnvVars(req),
+            ExposedPorts: { '8080/tcp': {} },
             HostConfig: {
               NetworkMode: DOCKER_NETWORK,
               RestartPolicy: { Name: 'unless-stopped' },
+              PortBindings: {
+                '8080/tcp': [{ HostPort: String(hostPort) }],
+              },
+              Binds: binds.length > 0 ? binds : undefined,
             },
             Labels: {
+              'fomo.managed': 'true',
               'fomo.client-id': req.clientId,
               'fomo.client-name': req.clientName,
               'fomo.channels': req.channels.join(','),
-              'fomo.managed': 'true',
+              'com.fomo.clientId': req.clientId,
+              'com.fomo.vertical': vertical,
+              'com.fomo.version': IMAGE_VERSION,
+              'com.fomo.port': String(hostPort),
             },
           },
         );
@@ -195,6 +276,8 @@ export function createDockerSocketService(deps: DockerSocketServiceDeps): Docker
           component: COMPONENT,
           containerId,
           containerName: name,
+          hostPort,
+          vertical,
         });
 
         return { success: true, containerId, containerName: name };

@@ -27,6 +27,10 @@ export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 
 // ─── Create Client Request ──────────────────────────────────────
 
+/** Supported client verticals for template selection. */
+export const VerticalSchema = z.enum(['ventas', 'atencion', 'operaciones']);
+export type Vertical = z.infer<typeof VerticalSchema>;
+
 /** Schema for creating a new client container. */
 export const CreateClientRequestSchema = z.object({
   /** Unique identifier for the client. */
@@ -37,6 +41,14 @@ export const CreateClientRequestSchema = z.object({
   channels: z.array(ChannelSchema).min(1),
   /** Agent configuration for the client's container. */
   agentConfig: AgentConfigSchema,
+  /** Client vertical for template selection. */
+  vertical: VerticalSchema.optional(),
+  /** Company name used in templates. */
+  companyName: z.string().min(1).max(256).optional(),
+  /** Owner name used in templates. */
+  ownerName: z.string().min(1).max(256).optional(),
+  /** Manager agent name. */
+  managerName: z.string().min(1).max(128).optional(),
 });
 export type CreateClientRequest = z.infer<typeof CreateClientRequestSchema>;
 
