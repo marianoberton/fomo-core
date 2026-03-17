@@ -28,6 +28,8 @@ export interface LLMProviderConfig {
   apiKeyEnvVar?: string;
   /** Custom base URL for self-hosted providers (e.g. Ollama). */
   baseUrl?: string;
+  /** Secret name for API key retrieval. */
+  apiKeySecretName?: string;
 }
 
 // ─── Failover Config ────────────────────────────────────────────

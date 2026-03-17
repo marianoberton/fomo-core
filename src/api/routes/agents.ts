@@ -39,11 +39,13 @@ const limitsSchema = z.object({
 });
 
 const llmConfigSchema = z.object({
-  provider: z.enum(['anthropic', 'openai', 'google', 'ollama']).optional(),
+  provider: z.enum(['anthropic', 'openai', 'google', 'ollama', 'openrouter']).optional(),
   model: z.string().min(1).optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxOutputTokens: z.number().int().positive().optional(),
   apiKeyEnvVar: z.string().min(1).optional(),
+  baseUrl: z.string().optional(),
+  apiKeySecretName: z.string().optional(),
 });
 
 const agentModeSchema = z.object({

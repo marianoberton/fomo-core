@@ -39,11 +39,13 @@ export interface AgentLimits {
 
 /** Optional per-agent LLM override. When set, overrides project-level LLM config. */
 export interface AgentLLMConfig {
-  provider?: 'anthropic' | 'openai' | 'google' | 'ollama';
+  provider?: 'anthropic' | 'openai' | 'google' | 'ollama' | 'openrouter';
   model?: string;
   temperature?: number;
   maxOutputTokens?: number;
   apiKeyEnvVar?: string;
+  baseUrl?: string;
+  apiKeySecretName?: string;
 }
 
 // ─── MCP Server Config ───────────────────────────────────────────
