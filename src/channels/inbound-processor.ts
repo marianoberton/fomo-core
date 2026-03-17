@@ -6,6 +6,10 @@
  * 2. Find or create session for the contact
  * 3. Run the agent with the message
  * 4. Send the response back via the same channel
+ *
+ * Routing logic:
+ * - WhatsApp/Telegram/Slack from clients → agent-channel-router (mode-aware)
+ * - OpenClaw Manager (sourceChannel=openclaw in rawPayload) → direct agent invocation, skip channel send
  */
 import type { Logger } from '@/observability/logger.js';
 import type { ProjectId } from '@/core/types.js';
@@ -99,6 +103,67 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
 
       try {
         const projectId = message.projectId;
+
+        // ─── OpenClaw Manager routing ──────────────────────────────
+        // Messages from OpenClaw Manager are identified by sourceChannel=openclaw
+        // in the rawPayload. These bypass contact resolution and channel routing —
+        // the agent is invoked directly, and the response is returned without sending
+        // back via a channel adapter (OpenClaw gets the response via HTTP).
+        const rawPayload = message.rawPayload as Record<string, unknown> | null;
+        const isOpenClawSource = rawPayload?.['sourceChannel'] === 'openclaw';
+
+        if (isOpenClawSource) {
+          const openclawAgentId = rawPayload?.['agentId'] as string | undefined;
+
+          logger.info('Routing decision: OpenClaw Manager message — direct agent invocation', {
+            component: 'inbound-processor',
+            routingType: 'openclaw',
+            agentId: openclawAgentId,
+            projectId,
+            messageId: message.id,
+          });
+
+          // Create a session for this OpenClaw invocation
+          const session = await sessionRepository.create({
+            projectId,
+            metadata: {
+              sourceChannel: 'openclaw',
+              channel: 'openclaw',
+              ...(openclawAgentId ? { agentId: openclawAgentId } : {}),
+            },
+          });
+
+          const agentResult = await runAgent({
+            projectId,
+            sessionId: session.id,
+            agentId: openclawAgentId,
+            sourceChannel: 'openclaw',
+            userMessage: message.content,
+            mediaUrls: message.mediaUrls,
+          });
+
+          const durationMs = Date.now() - startTime;
+
+          logger.info('Processed OpenClaw inbound message', {
+            component: 'inbound-processor',
+            routingType: 'openclaw',
+            sessionId: session.id,
+            agentId: openclawAgentId,
+            durationMs,
+          });
+
+          // Response is returned to the caller (OpenClaw adapter) — no channel send needed
+          return { success: true };
+        }
+
+        // ─── Standard channel routing (WhatsApp, Telegram, etc.) ───
+
+        logger.info('Routing decision: standard channel message', {
+          component: 'inbound-processor',
+          routingType: 'channel',
+          channel: message.channel,
+          messageId: message.id,
+        });
 
         // Validate channel is a supported integration provider
         if (!isIntegrationProvider(message.channel)) {

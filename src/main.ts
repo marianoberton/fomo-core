@@ -112,6 +112,7 @@ import { chatwootWebhookRoutes } from '@/api/routes/chatwoot-webhook.js';
 import { channelWebhookRoutes } from '@/api/routes/channel-webhooks.js';
 import { createWebhookQueue } from '@/channels/webhook-queue.js';
 import type { WebhookQueue } from '@/channels/webhook-queue.js';
+import { openclawAdapterRoutes } from '@/channels/openclaw-adapter.js';
 import { onboardingRoutes } from '@/api/routes/onboarding.js';
 import { webchatPublicRoutes } from '@/api/routes/webchat.js';
 import { telegramApprovalWebhookRoutes } from '@/api/routes/telegram-webhook.js';
@@ -806,6 +807,18 @@ async function start(): Promise<void> {
           ...deps,
           channelIntegrationRepository,
         });
+
+        // OpenClaw adapter — receives inbound calls from OpenClaw Manager instances
+        const openclawInternalKey = process.env['OPENCLAW_INTERNAL_KEY'];
+        if (openclawInternalKey) {
+          openclawAdapterRoutes(prefixed, {
+            openclawInternalKey,
+            inboundProcessor,
+            runAgent,
+            logger,
+          });
+          logger.info('OpenClaw adapter registered at POST /api/v1/openclaw/inbound', { component: 'main' });
+        }
       },
       { prefix: '/api/v1' },
     );
