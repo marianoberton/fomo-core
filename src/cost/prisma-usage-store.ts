@@ -237,16 +237,12 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
       if (projectIds.length > 0) {
         const projects = await prisma.project.findMany({
           where: { id: { in: projectIds } },
-          select: { id: true, name: true, monthlyBudgetUSD: true },
+          select: { id: true, name: true },
         });
         for (const proj of projects) {
           const pd = projectMap.get(proj.id);
           if (pd) {
             pd.projectName = proj.name;
-            if (proj.monthlyBudgetUSD) {
-              pd.budgetUSD = proj.monthlyBudgetUSD;
-              pd.budgetUsedPercent = (pd.totalCostUSD / proj.monthlyBudgetUSD) * 100;
-            }
           }
         }
         // Attach agents and clients to each project
@@ -301,6 +297,9 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
       const byClient = Array.from(clientMap.values()).sort(
         (a, b) => b.totalCostUSD - a.totalCostUSD,
       );
+      const byProject = Array.from(projectMap.values()).sort(
+        (a, b) => b.totalCostUSD - a.totalCostUSD,
+      );
       const byModel = Array.from(modelMap.entries())
         .map(([model, data]) => ({ model, ...data }))
         .sort((a, b) => b.costUSD - a.costUSD);
@@ -308,6 +307,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
       return {
         totalCostUSD,
         period,
+        byProject,
         byClient,
         byAgent,
         byModel,

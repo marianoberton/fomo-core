@@ -107,6 +107,24 @@ export function costRoutes(
     return sendSuccess(reply, detail);
   });
 
+  // GET /api/v1/cost/projects?period=month
+  fastify.get('/projects', async (request, reply) => {
+    const query = z
+      .object({ period: periodSchema.optional() })
+      .parse(request.query);
+    const summary = await store.getCostSummary(query.period ?? 'month');
+    return sendSuccess(reply, summary.byProject);
+  });
+
+  // GET /api/v1/cost/projects/:projectId
+  fastify.get('/projects/:projectId', async (request, reply) => {
+    const { projectId } = z.object({ projectId: z.string() }).parse(request.params);
+    const query = z.object({ period: periodSchema.optional() }).parse(request.query);
+    const summary = await store.getCostSummary(query.period ?? 'month', projectId as ProjectId);
+    const project = summary.byProject.find((p) => p.projectId === projectId);
+    return sendSuccess(reply, project ?? { projectId, totalCostUSD: 0, requestCount: 0, agents: [], clients: [] });
+  });
+
   // POST /api/v1/cost/clients/:clientId/budget
   fastify.post('/clients/:clientId/budget', async (request, reply) => {
     const { clientId } = z
