@@ -490,4 +490,132 @@ export function agentRoutes(
       }
     },
   );
+
+  // ─── Invoke Agent ──────────────────────────────────────────────
+
+  fastify.post(
+    '/agents/:agentId/invoke',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { agentId } = request.params as { agentId: string };
+      const parseResult = invokeAgentSchema.safeParse(request.body);
+
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.flatten(),
+        });
+      }
+
+      // 1. Verify agent exists and is active
+      const agent = await agentRegistry.get(agentId as AgentId);
+      if (!agent) {
+        return sendNotFound(reply, 'Agent', agentId);
+      }
+
+      if (agent.status !== 'active') {
+        return sendError(
+          reply,
+          'AGENT_NOT_ACTIVE',
+          `Agent "${agentId}" is ${agent.status}`,
+          409,
+        );
+      }
+
+      const { message, sessionId, sourceChannel, contactRole, metadata } =
+        parseResult.data;
+
+      // 2. Run shared chat setup (sanitize, load project/session/prompt, create services)
+      const setupResult = await prepareChatRun(
+        {
+          projectId: agent.projectId,
+          agentId,
+          sessionId,
+          sourceChannel,
+          contactRole,
+          message,
+          metadata,
+        },
+        deps,
+      );
+
+      if (!setupResult.ok) {
+        return sendError(
+          reply,
+          setupResult.error.code,
+          setupResult.error.message,
+          setupResult.error.statusCode,
+        );
+      }
+
+      const setup = setupResult.value;
+
+      // 3. Create abort controller tied to client disconnect
+      const abortController = new AbortController();
+      request.raw.on('close', () => {
+        if (!request.raw.complete) {
+          abortController.abort();
+        }
+      });
+
+      // 4. Create agent runner and execute
+      const agentRunner = createAgentRunner({
+        provider: setup.provider,
+        fallbackProvider: setup.fallbackProvider,
+        toolRegistry: deps.toolRegistry,
+        memoryManager: setup.memoryManager,
+        costGuard: setup.costGuard,
+        logger,
+      });
+
+      const result = await agentRunner.run({
+        message: setup.sanitizedMessage,
+        agentConfig: setup.agentConfig,
+        sessionId: setup.sessionId,
+        systemPrompt: setup.systemPrompt,
+        promptSnapshot: setup.promptSnapshot,
+        conversationHistory: setup.conversationHistory,
+        abortSignal: abortController.signal,
+      });
+
+      if (!result.ok) {
+        throw result.error;
+      }
+
+      const trace = result.value;
+
+      // 5. Persist execution trace
+      await deps.executionTraceRepository.save(trace);
+
+      // 6. Persist messages
+      await deps.sessionRepository.addMessage(setup.sessionId, {
+        role: 'user',
+        content: setup.sanitizedMessage,
+      }, trace.id);
+
+      const assistantText = extractAssistantResponse(trace.events);
+      const toolCalls = extractToolCalls(trace.events);
+
+      await deps.sessionRepository.addMessage(setup.sessionId, {
+        role: 'assistant',
+        content: assistantText,
+      }, trace.id);
+
+      logger.info('Agent invoked', { component: 'agents', agentId, traceId: trace.id });
+
+      // 7. Return response
+      return sendSuccess(reply, {
+        agentId,
+        sessionId: setup.sessionId,
+        traceId: trace.id,
+        response: assistantText,
+        toolCalls,
+        timestamp: new Date().toISOString(),
+        usage: {
+          inputTokens: trace.totalTokensUsed,
+          outputTokens: 0,
+          costUSD: trace.totalCostUSD,
+        },
+      });
+    },
+  );
 }
