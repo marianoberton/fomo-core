@@ -68,9 +68,21 @@ export interface ClientSpend {
   budgetUsedPercent?: number;
 }
 
+export interface ProjectSpend {
+  projectId: string;
+  projectName: string;
+  totalCostUSD: number;
+  requestCount: number;
+  agents: AgentSpend[];
+  clients: ClientSpend[];
+  budgetUSD?: number;
+  budgetUsedPercent?: number;
+}
+
 export interface CostSummary {
   totalCostUSD: number;
   period: 'today' | 'week' | 'month';
+  byProject: ProjectSpend[];
   byClient: ClientSpend[];
   byAgent: AgentSpend[];
   byModel: { model: string; costUSD: number; requests: number }[];

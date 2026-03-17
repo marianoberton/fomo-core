@@ -1,6 +1,6 @@
 /**
  * Prisma-backed UsageStore for persistent cost tracking.
- * Rate limiting (RPM/RPH) stays in-memory — ephemeral and latency-sensitive.
+ * Rate limiting (RPM/RPH) stays in-memory - ephemeral and latency-sensitive.
  * Spend aggregation (daily/monthly) uses Prisma aggregate queries.
  */
 import type { PrismaClient } from '@prisma/client';
@@ -8,7 +8,7 @@ import { nanoid } from 'nanoid';
 import type { ProjectId } from '@/core/types.js';
 import { createLogger } from '@/observability/logger.js';
 import type { UsageStore } from './cost-guard.js';
-import type { AgentSpend, ClientSpend, CostSummary } from './types.js';
+import type { AgentSpend, ClientSpend, ProjectSpend, CostSummary } from './types.js';
 
 const logger = createLogger({ name: 'prisma-usage-store' });
 
@@ -17,7 +17,7 @@ const logger = createLogger({ name: 'prisma-usage-store' });
  * with in-memory rate limiting for low-latency RPM/RPH checks.
  */
 export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
-  // In-memory rate limiting (ephemeral — acceptable to lose on restart)
+  // In-memory rate limiting (ephemeral - acceptable to lose on restart)
   const requestTimestamps: { projectId: string; timestamp: Date }[] = [];
 
   /** Prune timestamps older than 2 hours to prevent unbounded growth. */
@@ -140,8 +140,10 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
       const agentMap = new Map<string, AgentSpend>();
       // Aggregate by client
       const clientMap = new Map<string, ClientSpend>();
+      // Aggregate by project
+      const projectMap = new Map<string, ProjectSpend>();
       // Aggregate by model
-      const modelMap = new Map<string, { costUSD: number; requests: number }>();
+      const modelMap = new Map<string, { costUSD: number; requests: number }>(); 
 
       for (const record of records) {
         // By model
@@ -150,6 +152,21 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
           costUSD: modelData.costUSD + record.costUsd,
           requests: modelData.requests + 1,
         });
+
+        // By project (always present)
+        {
+          const existing = projectMap.get(record.projectId) || {
+            projectId: record.projectId,
+            projectName: `Project ${record.projectId.slice(0, 8)}`,
+            totalCostUSD: 0,
+            requestCount: 0,
+            agents: [],
+            clients: [],
+          };
+          existing.totalCostUSD += record.costUsd;
+          existing.requestCount += 1;
+          projectMap.set(record.projectId, existing);
+        }
 
         // By agent (if agentId exists)
         if (record.agentId) {
@@ -212,6 +229,34 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
 
             clientMap.set(record.clientId, clientData);
           }
+        }
+      }
+
+      // Fetch project names
+      const projectIds = Array.from(projectMap.keys());
+      if (projectIds.length > 0) {
+        const projects = await prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, name: true, monthlyBudgetUSD: true },
+        });
+        for (const proj of projects) {
+          const pd = projectMap.get(proj.id);
+          if (pd) {
+            pd.projectName = proj.name;
+            if (proj.monthlyBudgetUSD) {
+              pd.budgetUSD = proj.monthlyBudgetUSD;
+              pd.budgetUsedPercent = (pd.totalCostUSD / proj.monthlyBudgetUSD) * 100;
+            }
+          }
+        }
+        // Attach agents and clients to each project
+        for (const [projId, pd] of projectMap.entries()) {
+          pd.agents = Array.from(agentMap.values()).filter(
+            (a) => records.some((r) => r.projectId === projId && r.agentId === a.agentId),
+          );
+          pd.clients = Array.from(clientMap.values()).filter(
+            (c) => records.some((r) => r.projectId === projId && r.clientId === c.clientId),
+          );
         }
       }
 
