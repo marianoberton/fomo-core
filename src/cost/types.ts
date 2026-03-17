@@ -6,6 +6,8 @@ export interface UsageRecord {
   id: UsageRecordId;
   projectId: ProjectId;
   sessionId: SessionId;
+  agentId?: string;
+  clientId?: string;
   traceId: TraceId;
   provider: string;
   model: string;
@@ -41,4 +43,36 @@ export interface CostAlert {
   budgetUSD: number;
   percentUsed: number;
   timestamp: Date;
+}
+
+// ─── Cost Summary Types ─────────────────────────────────────────
+
+export interface AgentSpend {
+  agentId: string;
+  agentName: string;
+  totalCostUSD: number;
+  inputTokens: number;
+  outputTokens: number;
+  requestCount: number;
+  avgCostPerRequest: number;
+  topModel: string;
+}
+
+export interface ClientSpend {
+  clientId: string;
+  clientName: string;
+  totalCostUSD: number;
+  requestCount: number;
+  agents: AgentSpend[];
+  budgetUSD?: number;
+  budgetUsedPercent?: number;
+}
+
+export interface CostSummary {
+  totalCostUSD: number;
+  period: 'today' | 'week' | 'month';
+  byClient: ClientSpend[];
+  byAgent: AgentSpend[];
+  byModel: { model: string; costUSD: number; requests: number }[];
+  topExpensive: AgentSpend[];
 }

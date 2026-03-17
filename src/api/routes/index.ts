@@ -33,6 +33,7 @@ import { skillRoutes } from './skills.js';
 import { campaignRoutes } from './campaigns.js';
 import { verticalRoutes } from './verticals.js';
 import { workforceMetricsRoutes } from './workforce-metrics.js';
+import { costRoutes } from './cost.js';
 import { operatorMessageRoutes } from './operator-message.js';
 import { modelRoutes } from './models.js';
 import { webchatAdminRoutes } from './webchat.js';
@@ -89,4 +90,7 @@ export async function registerRoutes(
     dokployService: deps.dokployService,
     logger: deps.logger,
   });
+
+  // Cost monitoring routes
+  await fastify.register(costRoutes, deps);
 }

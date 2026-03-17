@@ -39,6 +39,7 @@ model Project {
   mcpServerInstances   MCPServerInstance[]
   skillInstances       SkillInstance[]
   campaigns            Campaign[]
+  clients              Client[]
 
   @@map("projects")
 }
@@ -183,6 +184,8 @@ model UsageRecord {
   id               String   @id
   projectId        String   @map("project_id")
   sessionId        String   @map("session_id")
+  agentId          String?  @map("agent_id")
+  clientId         String?  @map("client_id")
   traceId          String   @map("trace_id")
   provider         String
   model            String
@@ -197,6 +200,8 @@ model UsageRecord {
 
   @@index([projectId, timestamp])
   @@index([projectId, sessionId])
+  @@index([projectId, agentId])
+  @@index([projectId, clientId])
   @@map("usage_records")
 }
 
@@ -676,4 +681,23 @@ model CampaignReply {
 
   @@index([contactId])
   @@map("campaign_replies")
+}
+
+// ─── Clients (for cost tracking) ────────────────────────────────
+
+model Client {
+  id               String   @id @default(cuid())
+  projectId        String   @map("project_id")
+  name             String
+  externalId       String?  @map("external_id")  // External CRM ID
+  monthlyBudgetUSD Float?   @map("monthly_budget_usd")
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, externalId])
+  @@index([projectId])
+  @@map("clients")
 }

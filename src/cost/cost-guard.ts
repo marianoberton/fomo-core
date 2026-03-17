@@ -8,7 +8,7 @@ import type { CostConfig, ProjectId } from '@/core/types.js';
 import { createLogger } from '@/observability/logger.js';
 import type { TokenUsage } from '@/providers/types.js';
 import { calculateCost } from '@/providers/models.js';
-import type { BudgetStatus, CostAlert } from './types.js';
+import type { BudgetStatus, CostAlert, AgentSpend, ClientSpend, CostSummary } from './types.js';
 
 const logger = createLogger({ name: 'cost-guard' });
 
@@ -33,6 +33,12 @@ export interface UsageStore {
   getRequestsLastHour(projectId: ProjectId): Promise<number>;
   /** Record a request timestamp. */
   recordRequest(projectId: ProjectId): Promise<void>;
+  /** Get cost summary aggregated by agent, client, and model. */
+  getCostSummary(period: 'today' | 'week' | 'month', projectId?: ProjectId): Promise<CostSummary>;
+  /** Get spend for a specific agent. */
+  getAgentSpend(agentId: string, period: 'today' | 'week' | 'month', projectId?: ProjectId): Promise<AgentSpend>;
+  /** Get spend for a specific client. */
+  getClientSpend(clientId: string, period: 'today' | 'week' | 'month', projectId?: ProjectId): Promise<ClientSpend>;
 }
 
 /** Callback for cost alert notifications. */
@@ -291,6 +297,20 @@ export function createInMemoryUsageStore(): UsageStore {
     recordRequest(projectId: ProjectId): Promise<void> {
       requestTimestamps.push({ projectId, timestamp: new Date() });
       return Promise.resolve();
+    },
+
+    // In-memory store does not support detailed cost aggregation
+    // Use PrismaUsageStore instead
+    async getCostSummary(): Promise<CostSummary> {
+      throw new Error('getCostSummary not implemented for in-memory store');
+    },
+
+    async getAgentSpend(): Promise<AgentSpend> {
+      throw new Error('getAgentSpend not implemented for in-memory store');
+    },
+
+    async getClientSpend(): Promise<ClientSpend> {
+      throw new Error('getClientSpend not implemented for in-memory store');
     },
   };
 }
