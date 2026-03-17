@@ -1,5 +1,5 @@
 /**
- * Agent routes — CRUD for agents.
+ * Agent routes — CRUD for agents + invoke.
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
@@ -8,6 +8,12 @@ import type { AgentId, AgentMessageId } from '@/agents/types.js';
 import { checkChannelCollision } from '@/channels/agent-channel-router.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
+import {
+  prepareChatRun,
+  extractAssistantResponse,
+  extractToolCalls,
+} from './chat-setup.js';
+import { createAgentRunner } from '@/core/agent-runner.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -92,6 +98,14 @@ const updateAgentSchema = z.object({
   status: z.enum(['active', 'paused', 'disabled']).optional(),
   managerAgentId: z.string().optional().nullable(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const invokeAgentSchema = z.object({
+  message: z.string().min(1).max(100_000),
+  sessionId: z.string().min(1).optional(),
+  sourceChannel: z.string().min(1).optional(),
+  contactRole: z.string().min(1).optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 const sendMessageSchema = z.object({
