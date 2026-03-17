@@ -42,6 +42,15 @@ const MODEL_REGISTRY: Record<string, ModelMeta> = {
     outputPricePer1M: 25,
   },
 
+  // Claude Sonnet 4.6 (March 2026)
+  'claude-sonnet-4-6': {
+    contextWindow: 1_000_000,
+    maxOutputTokens: 16_384,
+    supportsTools: true,
+    inputPricePer1M: 3,
+    outputPricePer1M: 15,
+  },
+
   // Claude 4.5 series (current flagship, Feb 2026)
   'claude-sonnet-4-5': {
     contextWindow: 1_000_000,
@@ -379,6 +388,33 @@ const MODEL_REGISTRY: Record<string, ModelMeta> = {
     supportsTools: true,
     inputPricePer1M: 1.25,
     outputPricePer1M: 10,
+  },
+
+  // Anthropic via OpenRouter (Sonnet 4.6)
+  'anthropic/claude-sonnet-4-6': {
+    contextWindow: 1_000_000,
+    maxOutputTokens: 16_384,
+    supportsTools: true,
+    inputPricePer1M: 3,
+    outputPricePer1M: 15,
+  },
+
+  // MiniMax via OpenRouter (cost-effective conversational)
+  'minimax/minimax-m2.5': {
+    contextWindow: 1_048_576,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.2,
+    outputPricePer1M: 1.1,
+  },
+
+  // Moonshot (Kimi) via OpenRouter (strong reasoning)
+  'moonshotai/kimi-k2.5': {
+    contextWindow: 131_072,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.35,
+    outputPricePer1M: 1.4,
   },
 
   // Qwen (Alibaba, cost-efficient)

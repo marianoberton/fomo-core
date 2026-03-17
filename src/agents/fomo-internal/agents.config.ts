@@ -10,6 +10,7 @@
  */
 
 import type { CreateAgentInput } from '../types.js';
+import { getAgentLLMConfig } from './model-config.js';
 
 // ─── Project ID ───────────────────────────────────────────────────────────────
 // Setear en env o reemplazar al crear via API
@@ -27,11 +28,7 @@ export const famaSalesAgent: CreateAgentInput = {
   name: 'FAMA-Sales',
   description: 'Agente de ventas inbound. Califica leads y agenda demos.',
   operatingMode: 'customer-facing',
-  llmConfig: {
-    provider: 'anthropic',
-    model: 'claude-haiku-4-5', // rápido y barato para primer contacto
-    temperature: 0.4,
-  },
+  llmConfig: getAgentLLMConfig('FAMA-Sales'),
   promptConfig: {
     identity: `Sos FAMA, el agente comercial de FOMO.
 FOMO es una empresa argentina que implementa agentes de IA para PyMEs.
@@ -123,11 +120,7 @@ export const famaManagerAgent: CreateAgentInput = {
   name: 'FAMA-Manager',
   description: 'Chief of Staff interno. Orquesta el equipo y gestiona el negocio.',
   operatingMode: 'manager',
-  llmConfig: {
-    provider: 'anthropic',
-    model: 'claude-sonnet-4-5', // más inteligente para decisiones
-    temperature: 0.3,
-  },
+  llmConfig: getAgentLLMConfig('FAMA-Manager'),
   promptConfig: {
     identity: `Sos FAMA, la Chief of Staff de FOMO.
 Trabajás directamente con Mariano y Guillermina para operar y hacer crecer FOMO.
@@ -212,11 +205,7 @@ export const famaOpsAgent: CreateAgentInput = {
   name: 'FAMA-Ops',
   description: 'Operaciones internas en background. Follow-ups, reportes y alertas.',
   operatingMode: 'internal',
-  llmConfig: {
-    provider: 'anthropic',
-    model: 'claude-haiku-4-5', // tareas simples y repetitivas
-    temperature: 0.2,
-  },
+  llmConfig: getAgentLLMConfig('FAMA-Ops'),
   promptConfig: {
     identity: `Sos FAMA-Ops, el agente de operaciones internas de FOMO.
 Corrés en background. Tu trabajo es mantener el negocio funcionando sin que nadie tenga que pedirte nada.`,
@@ -285,11 +274,7 @@ export const famaCSAgent: CreateAgentInput = {
   name: 'FAMA-CS',
   description: 'Customer Success. Soporte y onboarding de clientes activos de FOMO.',
   operatingMode: 'customer-facing',
-  llmConfig: {
-    provider: 'anthropic',
-    model: 'claude-haiku-4-5',
-    temperature: 0.4,
-  },
+  llmConfig: getAgentLLMConfig('FAMA-CS'),
   promptConfig: {
     identity: `Sos FAMA, el agente de Customer Success de FOMO.
 Trabajás con los clientes que ya contrataron FOMO para que saquen el máximo valor de sus agentes de IA.`,
