@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createClientMonitor } from './client-monitor.js';
 import type { Logger } from '@/observability/logger.js';
-import type { DockerSocketService } from '@/provisioning/docker-socket-service.js';
+import type { DokployService } from '@/provisioning/dokploy-service.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────
 
@@ -19,7 +19,7 @@ function createMockLogger(): Logger {
   };
 }
 
-function createMockDockerSocketService(): DockerSocketService {
+function createMockDokployService(): DokployService {
   return {
     createClientContainer: vi.fn(),
     destroyClientContainer: vi.fn(),
@@ -32,12 +32,12 @@ function createMockDockerSocketService(): DockerSocketService {
 
 describe('createClientMonitor', () => {
   let logger: Logger;
-  let dockerSocketService: DockerSocketService;
+  let dokployService: DokployService;
 
   beforeEach(() => {
     vi.useFakeTimers();
     logger = createMockLogger();
-    dockerSocketService = createMockDockerSocketService();
+    dokployService = createMockDokployService();
   });
 
   afterEach(() => {
@@ -46,7 +46,7 @@ describe('createClientMonitor', () => {
 
   it('starts and stops without errors', () => {
     const monitor = createClientMonitor({
-      dockerSocketService,
+      dokployService,
       logger,
       intervalMs: 5000,
     });
@@ -65,12 +65,12 @@ describe('createClientMonitor', () => {
   });
 
   it('calls listClientContainers on each tick', async () => {
-    vi.mocked(dockerSocketService.listClientContainers).mockResolvedValue([
+    vi.mocked(dokployService.listClientContainers).mockResolvedValue([
       { clientId: 'c1', containerId: 'id1', status: 'running', uptime: 100 },
     ]);
 
     const monitor = createClientMonitor({
-      dockerSocketService,
+      dokployService,
       logger,
       intervalMs: 1000,
     });
@@ -79,22 +79,22 @@ describe('createClientMonitor', () => {
 
     // First call happens immediately on start
     await vi.advanceTimersByTimeAsync(0);
-    expect(dockerSocketService.listClientContainers).toHaveBeenCalledTimes(1);
+    expect(dokployService.listClientContainers).toHaveBeenCalledTimes(1);
 
     // Second call after interval
     await vi.advanceTimersByTimeAsync(1000);
-    expect(dockerSocketService.listClientContainers).toHaveBeenCalledTimes(2);
+    expect(dokployService.listClientContainers).toHaveBeenCalledTimes(2);
 
     monitor.stop();
   });
 
   it('logs warning when a container is stopped', async () => {
-    vi.mocked(dockerSocketService.listClientContainers).mockResolvedValue([
+    vi.mocked(dokployService.listClientContainers).mockResolvedValue([
       { clientId: 'c1', containerId: 'id1', status: 'stopped', uptime: undefined },
     ]);
 
     const monitor = createClientMonitor({
-      dockerSocketService,
+      dokployService,
       logger,
       intervalMs: 1000,
     });
@@ -115,12 +115,12 @@ describe('createClientMonitor', () => {
   });
 
   it('does not exceed max restart attempts', async () => {
-    vi.mocked(dockerSocketService.listClientContainers).mockResolvedValue([
+    vi.mocked(dokployService.listClientContainers).mockResolvedValue([
       { clientId: 'c1', containerId: 'id1', status: 'stopped', uptime: undefined },
     ]);
 
     const monitor = createClientMonitor({
-      dockerSocketService,
+      dokployService,
       logger,
       intervalMs: 1000,
       maxRestartAttempts: 2,
@@ -128,10 +128,10 @@ describe('createClientMonitor', () => {
 
     monitor.start();
 
-    // Tick 1 — first restart attempt
+    // Tick 1 — first attempt logged
     await vi.advanceTimersByTimeAsync(0);
 
-    // Tick 2 — second restart attempt
+    // Tick 2 — second attempt logged
     await vi.advanceTimersByTimeAsync(1000);
 
     // Tick 3 — should hit max attempts, log error instead of trying again
@@ -149,13 +149,13 @@ describe('createClientMonitor', () => {
     monitor.stop();
   });
 
-  it('handles docker service errors gracefully', async () => {
-    vi.mocked(dockerSocketService.listClientContainers).mockRejectedValue(
-      new Error('Docker socket unavailable'),
+  it('handles dokploy service errors gracefully', async () => {
+    vi.mocked(dokployService.listClientContainers).mockRejectedValue(
+      new Error('Dokploy API unavailable'),
     );
 
     const monitor = createClientMonitor({
-      dockerSocketService,
+      dokployService,
       logger,
       intervalMs: 1000,
     });
@@ -167,7 +167,7 @@ describe('createClientMonitor', () => {
       'Client monitor check failed',
       expect.objectContaining({
         component: 'client-monitor',
-        error: 'Docker socket unavailable',
+        error: 'Dokploy API unavailable',
       }),
     );
 
@@ -176,7 +176,7 @@ describe('createClientMonitor', () => {
 
   it('does not start twice', () => {
     const monitor = createClientMonitor({
-      dockerSocketService,
+      dokployService,
       logger,
       intervalMs: 1000,
     });
@@ -185,7 +185,7 @@ describe('createClientMonitor', () => {
     monitor.start(); // Should be a no-op
 
     // listClientContainers called only once (from first start)
-    expect(dockerSocketService.listClientContainers).toHaveBeenCalledTimes(1);
+    expect(dokployService.listClientContainers).toHaveBeenCalledTimes(1);
 
     monitor.stop();
   });

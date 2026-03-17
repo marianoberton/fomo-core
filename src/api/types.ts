@@ -28,7 +28,7 @@ import type { SkillService } from '@/skills/skill-service.js';
 import type { CampaignRunner } from '@/campaigns/campaign-runner.js';
 import type { ApiKeyService } from '@/security/api-key-service.js';
 import type { ProvisioningService } from '@/provisioning/provisioning-service.js';
-import type { DockerSocketService } from '@/provisioning/docker-socket-service.js';
+import type { DokployService } from '@/provisioning/dokploy-service.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -139,7 +139,7 @@ export interface RouteDependencies {
   apiKeyService: ApiKeyService;
   /** Provisioning orchestrator for client container lifecycle. */
   provisioningService: ProvisioningService;
-  /** Low-level Docker socket client for container management. */
-  dockerSocketService: DockerSocketService;
+  /** Dokploy API client for application management. */
+  dokployService: DokployService;
   logger: Logger;
 }

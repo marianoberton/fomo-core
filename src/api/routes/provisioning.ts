@@ -9,7 +9,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { Logger } from '@/observability/logger.js';
 import type { ProvisioningService } from '@/provisioning/provisioning-service.js';
-import type { DockerSocketService } from '@/provisioning/docker-socket-service.js';
+import type { DokployService } from '@/provisioning/dokploy-service.js';
 import { CreateClientRequestSchema } from '@/provisioning/provisioning-types.js';
 import { sendSuccess, sendError } from '../error-handler.js';
 
@@ -18,7 +18,7 @@ import { sendSuccess, sendError } from '../error-handler.js';
 /** Dependencies for provisioning routes. */
 export interface ProvisioningRouteDeps {
   provisioningService: ProvisioningService;
-  dockerSocketService: DockerSocketService;
+  dokployService: DokployService;
   logger: Logger;
 }
 
@@ -29,7 +29,7 @@ export function provisioningRoutes(
   fastify: FastifyInstance,
   deps: ProvisioningRouteDeps,
 ): void {
-  const { provisioningService, dockerSocketService, logger } = deps;
+  const { provisioningService, dokployService, logger } = deps;
 
   // ─── POST /api/v1/provisioning/create ───────────────────────
   fastify.post(
@@ -87,7 +87,7 @@ export function provisioningRoutes(
   fastify.get(
     '/api/v1/provisioning',
     async (_request: FastifyRequest, reply: FastifyReply) => {
-      const containers = await dockerSocketService.listClientContainers();
+      const containers = await dokployService.listClientContainers();
       await sendSuccess(reply, containers);
     },
   );

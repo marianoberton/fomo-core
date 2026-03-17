@@ -20,7 +20,7 @@ import {
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
 import { createSecretService } from '@/secrets/secret-service.js';
 import { createApiKeyService } from '@/security/api-key-service.js';
-import { createDockerSocketService } from '@/provisioning/docker-socket-service.js';
+import { createDokployService } from '@/provisioning/dokploy-service.js';
 import { createProvisioningService } from '@/provisioning/provisioning-service.js';
 import { registerHealthRoutes } from '@/infrastructure/health.js';
 import { registerMetricsRoute, recordMessage, recordLatency } from '@/infrastructure/metrics.js';
@@ -180,9 +180,14 @@ async function start(): Promise<void> {
     // API key service — per-project and master API keys
     const apiKeyService = createApiKeyService({ prisma, logger });
 
-    // Docker provisioning — client container lifecycle management
-    const dockerSocketService = createDockerSocketService({ logger });
-    const provisioningService = createProvisioningService({ dockerSocketService, logger });
+    // Dokploy provisioning — client application lifecycle management
+    const dokployService = createDokployService({
+      logger,
+      dokployUrl: process.env['DOKPLOY_URL'] ?? 'https://panel.fomo.com.ar',
+      dokployApiKey: process.env['DOKPLOY_API_KEY'] ?? '',
+      dokployProjectId: process.env['DOKPLOY_PROJECT_ID'] ?? 'FB8vO-CROjg6mBFpnsuyU',
+    });
+    const provisioningService = createProvisioningService({ dokployService, logger });
 
     // Redis URL — read early for health checks and later for BullMQ services
     const redisUrl = process.env['REDIS_URL'];
@@ -649,7 +654,7 @@ async function start(): Promise<void> {
     registerHealthRoutes(server, {
       prisma,
       redisUrl,
-      dockerSocketService,
+      dokployService,
       logger,
     });
 
@@ -658,7 +663,7 @@ async function start(): Promise<void> {
 
     // Client container monitor — checks provisioned containers every 30s
     const clientMonitor = createClientMonitor({
-      dockerSocketService,
+      dokployService,
       logger,
     });
     clientMonitor.start();
@@ -763,7 +768,7 @@ async function start(): Promise<void> {
       sessionBroadcaster,
       resumeAfterApproval,
       provisioningService: provisioningService,
-      dockerSocketService: dockerSocketService,
+      dokployService: dokployService,
       logger,
     };
 

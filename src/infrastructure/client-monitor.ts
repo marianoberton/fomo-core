@@ -1,9 +1,9 @@
 /**
- * Client Monitor — periodic job that checks provisioned container health
- * and auto-restarts crashed containers (up to 3 attempts).
+ * Client Monitor — periodic job that checks provisioned application health
+ * and logs status of downed applications.
  */
 import type { Logger } from '@/observability/logger.js';
-import type { DockerSocketService } from '@/provisioning/docker-socket-service.js';
+import type { DokployService } from '@/provisioning/dokploy-service.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -14,7 +14,7 @@ export type ContainerEvent =
   | 'container_failed';
 
 export interface ClientMonitorDeps {
-  dockerSocketService: DockerSocketService;
+  dokployService: DokployService;
   logger: Logger;
   /** Check interval in milliseconds. Defaults to 30_000. */
   intervalMs?: number;
@@ -36,7 +36,7 @@ const COMPONENT = 'client-monitor';
 /** Create a client container monitor that checks health every intervalMs. */
 export function createClientMonitor(deps: ClientMonitorDeps): ClientMonitor {
   const {
-    dockerSocketService,
+    dokployService,
     logger,
     intervalMs = 30_000,
     maxRestartAttempts = 3,
@@ -47,48 +47,10 @@ export function createClientMonitor(deps: ClientMonitorDeps): ClientMonitor {
   /** Track restart attempts per clientId. */
   const restartCounts = new Map<string, number>();
 
-  /** Attempt to restart a container by stopping and starting it. */
-  async function restartContainer(clientId: string, containerId: string): Promise<boolean> {
-    try {
-      // Use Docker API directly to restart (via the docker-socket-service's
-      // underlying HTTP calls). Since DockerSocketService doesn't expose a
-      // restart method, we re-use getContainerStatus after Docker auto-restart
-      // policy kicks in, or we do a manual start.
-      const http = await import('node:http');
-      const result = await new Promise<number>((resolve, reject) => {
-        const req = http.request(
-          {
-            socketPath: '/var/run/docker.sock',
-            path: `/containers/${encodeURIComponent(containerId)}/restart?t=10`,
-            method: 'POST',
-            timeout: 30_000,
-          },
-          (res) => {
-            res.resume();
-            res.on('end', () => resolve(res.statusCode ?? 500));
-          },
-        );
-        req.on('error', reject);
-        req.on('timeout', () => { req.destroy(); reject(new Error('restart timeout')); });
-        req.end();
-      });
-
-      return result === 204;
-    } catch (e) {
-      logger.error('Container restart failed', {
-        component: COMPONENT,
-        clientId,
-        containerId,
-        error: e instanceof Error ? e.message : String(e),
-      });
-      return false;
-    }
-  }
-
-  /** Single monitoring pass: check all containers and restart downed ones. */
+  /** Single monitoring pass: check all containers and log downed ones. */
   async function checkContainers(): Promise<void> {
     try {
-      const containers = await dockerSocketService.listClientContainers();
+      const containers = await dokployService.listClientContainers();
 
       for (const container of containers) {
         if (container.status === 'running') {
@@ -126,33 +88,16 @@ export function createClientMonitor(deps: ClientMonitorDeps): ClientMonitor {
           continue;
         }
 
-        // Attempt restart
-        logger.info('Attempting container restart', {
+        restartCounts.set(container.clientId, attempts + 1);
+
+        logger.warn('Application down — manual redeploy may be needed', {
           component: COMPONENT,
           clientId: container.clientId,
           containerId: container.containerId,
           attempt: attempts + 1,
           maxRestartAttempts,
+          event: 'container_failed' satisfies ContainerEvent,
         });
-
-        const success = await restartContainer(container.clientId, container.containerId);
-        restartCounts.set(container.clientId, attempts + 1);
-
-        if (success) {
-          logger.info('Container restarted successfully', {
-            component: COMPONENT,
-            clientId: container.clientId,
-            attempt: attempts + 1,
-            event: 'container_restarted' satisfies ContainerEvent,
-          });
-        } else {
-          logger.error('Container restart attempt failed', {
-            component: COMPONENT,
-            clientId: container.clientId,
-            attempt: attempts + 1,
-            event: 'container_failed' satisfies ContainerEvent,
-          });
-        }
       }
     } catch (e) {
       logger.error('Client monitor check failed', {

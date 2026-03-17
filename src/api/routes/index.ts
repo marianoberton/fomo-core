@@ -86,7 +86,7 @@ export async function registerRoutes(
   apiKeyRoutes(fastify, { apiKeyService: deps.apiKeyService, logger: deps.logger });
   provisioningRoutes(fastify, {
     provisioningService: deps.provisioningService,
-    dockerSocketService: deps.dockerSocketService,
+    dokployService: deps.dokployService,
     logger: deps.logger,
   });
 }

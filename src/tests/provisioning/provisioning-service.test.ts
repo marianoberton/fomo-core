@@ -1,11 +1,11 @@
 /**
  * Tests for the provisioning service orchestrator.
- * Mocks the DockerSocketService to isolate orchestrator logic.
+ * Mocks the DokployService to isolate orchestrator logic.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createProvisioningService, ProvisioningError, ClientNotFoundError } from '@/provisioning/provisioning-service.js';
 import type { ProvisioningService } from '@/provisioning/provisioning-service.js';
-import type { DockerSocketService } from '@/provisioning/docker-socket-service.js';
+import type { DokployService } from '@/provisioning/dokploy-service.js';
 import type { Logger } from '@/observability/logger.js';
 import type { CreateClientRequest } from '@/provisioning/provisioning-types.js';
 
@@ -22,8 +22,8 @@ function createMockLogger(): Logger {
   };
 }
 
-function createMockDockerService(): {
-  [K in keyof DockerSocketService]: ReturnType<typeof vi.fn>;
+function createMockDokployService(): {
+  [K in keyof DokployService]: ReturnType<typeof vi.fn>;
 } {
   return {
     createClientContainer: vi.fn(),
@@ -47,15 +47,15 @@ function makeRequest(overrides?: Partial<CreateClientRequest>): CreateClientRequ
 
 describe('ProvisioningService', () => {
   let service: ProvisioningService;
-  let dockerService: ReturnType<typeof createMockDockerService>;
+  let dokployService: ReturnType<typeof createMockDokployService>;
   let logger: Logger;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    dockerService = createMockDockerService();
+    dokployService = createMockDokployService();
     logger = createMockLogger();
     service = createProvisioningService({
-      dockerSocketService: dockerService as unknown as DockerSocketService,
+      dokployService: dokployService as unknown as DokployService,
       logger,
     });
   });
@@ -63,24 +63,24 @@ describe('ProvisioningService', () => {
   // ─── provisionClient ───────────────────────────────────────
 
   describe('provisionClient', () => {
-    it('delegates to dockerSocketService and returns result', async () => {
+    it('delegates to dokployService and returns result', async () => {
       const expected = {
         success: true,
         containerId: 'abc123',
         containerName: 'fomo-client-client-001',
       };
-      dockerService.createClientContainer.mockResolvedValue(expected);
+      dokployService.createClientContainer.mockResolvedValue(expected);
 
       const result = await service.provisionClient(makeRequest());
 
       expect(result).toEqual(expected);
-      expect(dockerService.createClientContainer).toHaveBeenCalledWith(
+      expect(dokployService.createClientContainer).toHaveBeenCalledWith(
         expect.objectContaining({ clientId: 'client-001' }),
       );
     });
 
-    it('throws ProvisioningError when Docker returns failure', async () => {
-      dockerService.createClientContainer.mockResolvedValue({
+    it('throws ProvisioningError when Dokploy returns failure', async () => {
+      dokployService.createClientContainer.mockResolvedValue({
         success: false,
         containerName: 'fomo-client-client-001',
         error: 'Image not found',
@@ -93,7 +93,7 @@ describe('ProvisioningService', () => {
       const invalidReq = makeRequest({ clientId: '' });
 
       await expect(service.provisionClient(invalidReq)).rejects.toThrow(ProvisioningError);
-      expect(dockerService.createClientContainer).not.toHaveBeenCalled();
+      expect(dokployService.createClientContainer).not.toHaveBeenCalled();
     });
 
     it('throws ProvisioningError with empty channels', async () => {
@@ -103,13 +103,13 @@ describe('ProvisioningService', () => {
     });
 
     it('wraps unexpected errors in ProvisioningError', async () => {
-      dockerService.createClientContainer.mockRejectedValue(new Error('ENOENT'));
+      dokployService.createClientContainer.mockRejectedValue(new Error('ECONNREFUSED'));
 
       await expect(service.provisionClient(makeRequest())).rejects.toThrow(ProvisioningError);
     });
 
     it('logs provisioning request', async () => {
-      dockerService.createClientContainer.mockResolvedValue({
+      dokployService.createClientContainer.mockResolvedValue({
         success: true,
         containerId: 'abc123',
         containerName: 'fomo-client-client-001',
@@ -127,30 +127,30 @@ describe('ProvisioningService', () => {
   // ─── deprovisionClient ─────────────────────────────────────
 
   describe('deprovisionClient', () => {
-    it('delegates to dockerSocketService.destroyClientContainer', async () => {
-      dockerService.destroyClientContainer.mockResolvedValue(undefined);
+    it('delegates to dokployService.destroyClientContainer', async () => {
+      dokployService.destroyClientContainer.mockResolvedValue(undefined);
 
       await service.deprovisionClient('client-001');
 
-      expect(dockerService.destroyClientContainer).toHaveBeenCalledWith('client-001');
+      expect(dokployService.destroyClientContainer).toHaveBeenCalledWith('client-001');
     });
 
     it('throws ClientNotFoundError when container not found', async () => {
-      dockerService.destroyClientContainer.mockRejectedValue(
-        new Error('Container for client "client-999" not found'),
+      dokployService.destroyClientContainer.mockRejectedValue(
+        new Error('Application for client "client-999" not found'),
       );
 
       await expect(service.deprovisionClient('client-999')).rejects.toThrow(ClientNotFoundError);
     });
 
     it('throws ProvisioningError on unexpected failure', async () => {
-      dockerService.destroyClientContainer.mockRejectedValue(new Error('Permission denied'));
+      dokployService.destroyClientContainer.mockRejectedValue(new Error('Permission denied'));
 
       await expect(service.deprovisionClient('client-001')).rejects.toThrow(ProvisioningError);
     });
 
     it('logs deprovision request', async () => {
-      dockerService.destroyClientContainer.mockResolvedValue(undefined);
+      dokployService.destroyClientContainer.mockResolvedValue(undefined);
 
       await service.deprovisionClient('client-001');
 
@@ -164,14 +164,14 @@ describe('ProvisioningService', () => {
   // ─── getClientStatus ───────────────────────────────────────
 
   describe('getClientStatus', () => {
-    it('returns container status from docker service', async () => {
+    it('returns container status from dokploy service', async () => {
       const status = {
         clientId: 'client-001',
         containerId: 'abc123',
         status: 'running' as const,
         uptime: 3600,
       };
-      dockerService.getContainerStatus.mockResolvedValue(status);
+      dokployService.getContainerStatus.mockResolvedValue(status);
 
       const result = await service.getClientStatus('client-001');
 
@@ -179,7 +179,7 @@ describe('ProvisioningService', () => {
     });
 
     it('throws ClientNotFoundError when container not found', async () => {
-      dockerService.getContainerStatus.mockRejectedValue(
+      dokployService.getContainerStatus.mockRejectedValue(
         new Error('Container for client "client-999" not found'),
       );
 
@@ -187,7 +187,7 @@ describe('ProvisioningService', () => {
     });
 
     it('throws ProvisioningError on unexpected failure', async () => {
-      dockerService.getContainerStatus.mockRejectedValue(new Error('Socket timeout'));
+      dokployService.getContainerStatus.mockRejectedValue(new Error('Socket timeout'));
 
       await expect(service.getClientStatus('client-001')).rejects.toThrow(ProvisioningError);
     });

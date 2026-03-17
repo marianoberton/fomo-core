@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import type { Logger } from '@/observability/logger.js';
-import type { DockerSocketService } from '@/provisioning/docker-socket-service.js';
+import type { DokployService } from '@/provisioning/dokploy-service.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ export interface ClientsHealthResponse {
 export interface HealthDeps {
   prisma: PrismaClient;
   redisUrl: string | undefined;
-  dockerSocketService: DockerSocketService;
+  dokployService: DokployService;
   logger: Logger;
 }
 
@@ -139,7 +139,7 @@ const startedAt = Date.now();
 
 /** Register health check routes on the Fastify instance. */
 export function registerHealthRoutes(fastify: FastifyInstance, deps: HealthDeps): void {
-  const { prisma, redisUrl, dockerSocketService, logger } = deps;
+  const { prisma, redisUrl, dokployService, logger } = deps;
 
   fastify.get('/health', async (_request, reply) => {
     const [postgres, redis, docker] = await Promise.all([
@@ -164,7 +164,7 @@ export function registerHealthRoutes(fastify: FastifyInstance, deps: HealthDeps)
 
   fastify.get('/health/clients', async (_request, reply) => {
     try {
-      const containers = await dockerSocketService.listClientContainers();
+      const containers = await dokployService.listClientContainers();
 
       const clients: ClientHealthEntry[] = containers.map((c) => ({
         clientId: c.clientId,

@@ -16,7 +16,7 @@ import type {
 } from '@/provisioning/provisioning-types.js';
 import type { ProvisioningService } from '@/provisioning/provisioning-service.js';
 import { ProvisioningError, ClientNotFoundError } from '@/provisioning/provisioning-service.js';
-import type { DockerSocketService } from '@/provisioning/docker-socket-service.js';
+import type { DokployService } from '@/provisioning/dokploy-service.js';
 import { provisioningRoutes } from '@/api/routes/provisioning.js';
 import type { ProvisioningRouteDeps } from '@/api/routes/provisioning.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
@@ -44,8 +44,8 @@ function createMockProvisioningService(): {
   };
 }
 
-function createMockDockerSocketService(): {
-  [K in keyof DockerSocketService]: ReturnType<typeof vi.fn>;
+function createMockDokployService(): {
+  [K in keyof DokployService]: ReturnType<typeof vi.fn>;
 } {
   return {
     createClientContainer: vi.fn(),
@@ -210,18 +210,18 @@ describe('provisioning errors', () => {
 describe('provisioning routes', () => {
   let app: FastifyInstance;
   let mockProvisioningService: ReturnType<typeof createMockProvisioningService>;
-  let mockDockerSocketService: ReturnType<typeof createMockDockerSocketService>;
+  let mockDokployService: ReturnType<typeof createMockDokployService>;
 
   beforeEach(() => {
     mockProvisioningService = createMockProvisioningService();
-    mockDockerSocketService = createMockDockerSocketService();
+    mockDokployService = createMockDokployService();
 
     app = Fastify();
     registerErrorHandler(app);
 
     const deps: ProvisioningRouteDeps = {
       provisioningService: mockProvisioningService,
-      dockerSocketService: mockDockerSocketService,
+      dokployService: mockDokployService,
       logger: createMockLogger(),
     };
     provisioningRoutes(app, deps);
@@ -262,7 +262,7 @@ describe('provisioning routes', () => {
 
     it('returns 500 when provisioning service throws', async () => {
       mockProvisioningService.provisionClient.mockRejectedValue(
-        new ProvisioningError('Docker unavailable', 'client-1'),
+        new ProvisioningError('Dokploy unavailable', 'client-1'),
       );
 
       const res = await app.inject({
@@ -349,7 +349,7 @@ describe('provisioning routes', () => {
 
   describe('GET /api/v1/provisioning', () => {
     it('returns list of containers', async () => {
-      mockDockerSocketService.listClientContainers.mockResolvedValue([sampleStatus]);
+      mockDokployService.listClientContainers.mockResolvedValue([sampleStatus]);
 
       const res = await app.inject({
         method: 'GET',
@@ -364,7 +364,7 @@ describe('provisioning routes', () => {
     });
 
     it('returns empty array when no containers exist', async () => {
-      mockDockerSocketService.listClientContainers.mockResolvedValue([]);
+      mockDokployService.listClientContainers.mockResolvedValue([]);
 
       const res = await app.inject({
         method: 'GET',

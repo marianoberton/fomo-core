@@ -22,7 +22,7 @@ import {
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
 import { createSecretService } from '@/secrets/secret-service.js';
 import { createApiKeyService } from '@/security/api-key-service.js';
-import { createDockerSocketService } from '@/provisioning/docker-socket-service.js';
+import { createDokployService } from '@/provisioning/dokploy-service.js';
 import { createProvisioningService } from '@/provisioning/provisioning-service.js';
 import { createKnowledgeService } from '@/knowledge/knowledge-service.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
@@ -191,8 +191,8 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     prisma,
     sessionBroadcaster: { subscribe: () => () => { /* noop */ }, broadcast: () => { /* noop */ } },
     resumeAfterApproval: () => Promise.resolve(),
-    provisioningService: createProvisioningService({ dockerSocketService: createDockerSocketService({ logger }), logger }),
-    dockerSocketService: createDockerSocketService({ logger }),
+    provisioningService: createProvisioningService({ dokployService: createDokployService({ logger, dokployUrl: 'http://localhost:3000', dokployApiKey: 'test', dokployProjectId: 'test' }), logger }),
+    dokployService: createDokployService({ logger, dokployUrl: 'http://localhost:3000', dokployApiKey: 'test', dokployProjectId: 'test' }),
     logger,
   };
 

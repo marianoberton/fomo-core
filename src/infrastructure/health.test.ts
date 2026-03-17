@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Fastify from 'fastify';
 import { registerHealthRoutes } from './health.js';
 import type { Logger } from '@/observability/logger.js';
-import type { DockerSocketService } from '@/provisioning/docker-socket-service.js';
+import type { DokployService } from '@/provisioning/dokploy-service.js';
 import type { PrismaClient } from '@prisma/client';
 
 // ─── Mocks ──────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ function createMockPrisma(): PrismaClient {
   } as unknown as PrismaClient;
 }
 
-function createMockDockerSocketService(): DockerSocketService {
+function createMockDokployService(): DokployService {
   return {
     createClientContainer: vi.fn(),
     destroyClientContainer: vi.fn(),
@@ -41,12 +41,12 @@ function createMockDockerSocketService(): DockerSocketService {
 describe('registerHealthRoutes', () => {
   let logger: Logger;
   let prisma: PrismaClient;
-  let dockerSocketService: DockerSocketService;
+  let dokployService: DokployService;
 
   beforeEach(() => {
     logger = createMockLogger();
     prisma = createMockPrisma();
-    dockerSocketService = createMockDockerSocketService();
+    dokployService = createMockDokployService();
   });
 
   describe('GET /health', () => {
@@ -55,7 +55,7 @@ describe('registerHealthRoutes', () => {
       registerHealthRoutes(app, {
         prisma,
         redisUrl: undefined,
-        dockerSocketService,
+        dokployService,
         logger,
       });
 
@@ -86,7 +86,7 @@ describe('registerHealthRoutes', () => {
       registerHealthRoutes(app, {
         prisma: failingPrisma,
         redisUrl: undefined,
-        dockerSocketService,
+        dokployService,
         logger,
       });
 
@@ -107,7 +107,7 @@ describe('registerHealthRoutes', () => {
       registerHealthRoutes(app, {
         prisma,
         redisUrl: undefined,
-        dockerSocketService,
+        dokployService,
         logger,
       });
 
@@ -122,8 +122,8 @@ describe('registerHealthRoutes', () => {
     });
 
     it('returns degraded when a container is stopped', async () => {
-      const mockDockerService = createMockDockerSocketService();
-      vi.mocked(mockDockerService.listClientContainers).mockResolvedValue([
+      const mockService = createMockDokployService();
+      vi.mocked(mockService.listClientContainers).mockResolvedValue([
         { clientId: 'client-1', containerId: 'abc123', status: 'running', uptime: 3600 },
         { clientId: 'client-2', containerId: 'def456', status: 'stopped', uptime: undefined },
       ]);
@@ -132,7 +132,7 @@ describe('registerHealthRoutes', () => {
       registerHealthRoutes(app, {
         prisma,
         redisUrl: undefined,
-        dockerSocketService: mockDockerService,
+        dokployService: mockService,
         logger,
       });
 
@@ -148,15 +148,15 @@ describe('registerHealthRoutes', () => {
       await app.close();
     });
 
-    it('returns 503 when docker service throws', async () => {
-      const mockDockerService = createMockDockerSocketService();
-      vi.mocked(mockDockerService.listClientContainers).mockRejectedValue(new Error('Docker socket error'));
+    it('returns 503 when dokploy service throws', async () => {
+      const mockService = createMockDokployService();
+      vi.mocked(mockService.listClientContainers).mockRejectedValue(new Error('Dokploy API error'));
 
       const app = Fastify();
       registerHealthRoutes(app, {
         prisma,
         redisUrl: undefined,
-        dockerSocketService: mockDockerService,
+        dokployService: mockService,
         logger,
       });
 

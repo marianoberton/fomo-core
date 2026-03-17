@@ -457,7 +457,7 @@ export function createMockDeps(): RouteDependencies & {
       deprovisionClient: vi.fn(),
       getClientStatus: vi.fn(),
     },
-    dockerSocketService: {
+    dokployService: {
       createClientContainer: vi.fn(),
       destroyClientContainer: vi.fn(),
       getContainerStatus: vi.fn(),

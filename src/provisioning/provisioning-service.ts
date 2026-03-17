@@ -1,10 +1,10 @@
 /**
  * Provisioning Service — orchestrator for client container lifecycle.
- * Wraps DockerSocketService with validation, logging, and error handling.
+ * Wraps DokployService with validation, logging, and error handling.
  */
 import { NexusError } from '@/core/errors.js';
 import type { Logger } from '@/observability/logger.js';
-import type { DockerSocketService } from './docker-socket-service.js';
+import type { DokployService } from './dokploy-service.js';
 import { CreateClientRequestSchema } from './provisioning-types.js';
 import type {
   CreateClientRequest,
@@ -57,7 +57,7 @@ export interface ProvisioningService {
 
 /** Dependencies for the provisioning orchestrator. */
 export interface ProvisioningServiceDeps {
-  dockerSocketService: DockerSocketService;
+  dokployService: DokployService;
   logger: Logger;
 }
 
@@ -65,7 +65,7 @@ export interface ProvisioningServiceDeps {
 
 /** Create the provisioning orchestrator service. */
 export function createProvisioningService(deps: ProvisioningServiceDeps): ProvisioningService {
-  const { dockerSocketService, logger } = deps;
+  const { dokployService, logger } = deps;
   const COMPONENT = 'provisioning-service';
 
   return {
@@ -92,10 +92,10 @@ export function createProvisioningService(deps: ProvisioningServiceDeps): Provis
       });
 
       try {
-        const result = await dockerSocketService.createClientContainer(parsed.data);
+        const result = await dokployService.createClientContainer(parsed.data);
 
         if (!result.success) {
-          throw new ProvisioningError(result.error ?? 'Unknown Docker error', req.clientId);
+          throw new ProvisioningError(result.error ?? 'Unknown Dokploy error', req.clientId);
         }
 
         logger.info('Client provisioned successfully', {
@@ -117,7 +117,7 @@ export function createProvisioningService(deps: ProvisioningServiceDeps): Provis
       logger.info('Deprovisioning client', { component: COMPONENT, clientId });
 
       try {
-        await dockerSocketService.destroyClientContainer(clientId);
+        await dokployService.destroyClientContainer(clientId);
         logger.info('Client deprovisioned successfully', { component: COMPONENT, clientId });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -132,7 +132,7 @@ export function createProvisioningService(deps: ProvisioningServiceDeps): Provis
       logger.debug('Getting client status', { component: COMPONENT, clientId });
 
       try {
-        return await dockerSocketService.getContainerStatus(clientId);
+        return await dokployService.getContainerStatus(clientId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes('not found')) {
