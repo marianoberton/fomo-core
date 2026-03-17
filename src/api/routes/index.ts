@@ -40,6 +40,7 @@ import { mediaRoutes } from './media.js';
 import { vapiRoutes } from './vapi.js';
 import { whatsappTemplateRoutes } from './whatsapp-templates.js';
 import { apiKeyRoutes } from './api-keys.js';
+import { provisioningRoutes } from './provisioning.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -83,4 +84,9 @@ export async function registerRoutes(
   vapiRoutes(fastify, deps);
   whatsappTemplateRoutes(fastify, deps);
   apiKeyRoutes(fastify, { apiKeyService: deps.apiKeyService, logger: deps.logger });
+  provisioningRoutes(fastify, {
+    provisioningService: deps.provisioningService,
+    dockerSocketService: deps.dockerSocketService,
+    logger: deps.logger,
+  });
 }

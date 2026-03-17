@@ -452,6 +452,17 @@ export function createMockDeps(): RouteDependencies & {
     prisma: {} as RouteDependencies['prisma'],
     sessionBroadcaster: { subscribe: vi.fn().mockReturnValue(() => { /* noop */ }), broadcast: vi.fn() },
     resumeAfterApproval: () => Promise.resolve(),
+    provisioningService: {
+      provisionClient: vi.fn(),
+      deprovisionClient: vi.fn(),
+      getClientStatus: vi.fn(),
+    },
+    dockerSocketService: {
+      createClientContainer: vi.fn(),
+      destroyClientContainer: vi.fn(),
+      getContainerStatus: vi.fn(),
+      listClientContainers: vi.fn(),
+    },
     logger: createMockLogger(),
   };
 }

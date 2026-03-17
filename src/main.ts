@@ -20,6 +20,8 @@ import {
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
 import { createSecretService } from '@/secrets/secret-service.js';
 import { createApiKeyService } from '@/security/api-key-service.js';
+import { createDockerSocketService } from '@/provisioning/docker-socket-service.js';
+import { createProvisioningService } from '@/provisioning/provisioning-service.js';
 import { createKnowledgeService } from '@/knowledge/knowledge-service.js';
 import type { KnowledgeService } from '@/knowledge/types.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
@@ -175,6 +177,10 @@ async function start(): Promise<void> {
 
     // API key service — per-project and master API keys
     const apiKeyService = createApiKeyService({ prisma, logger });
+
+    // Docker provisioning — client container lifecycle management
+    const dockerSocketService = createDockerSocketService({ logger });
+    const provisioningService = createProvisioningService({ dockerSocketService, logger });
 
     // Channel resolver — per-project adapter resolution from DB + secrets
     const channelResolver = createChannelResolver({
@@ -728,6 +734,8 @@ async function start(): Promise<void> {
       prisma,
       sessionBroadcaster,
       resumeAfterApproval,
+      provisioningService: provisioningService,
+      dockerSocketService: dockerSocketService,
       logger,
     };
 
