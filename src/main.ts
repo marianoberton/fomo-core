@@ -22,6 +22,9 @@ import { createSecretService } from '@/secrets/secret-service.js';
 import { createApiKeyService } from '@/security/api-key-service.js';
 import { createDockerSocketService } from '@/provisioning/docker-socket-service.js';
 import { createProvisioningService } from '@/provisioning/provisioning-service.js';
+import { registerHealthRoutes } from '@/infrastructure/health.js';
+import { registerMetricsRoute, recordMessage, recordLatency } from '@/infrastructure/metrics.js';
+import { createClientMonitor } from '@/infrastructure/client-monitor.js';
 import { createKnowledgeService } from '@/knowledge/knowledge-service.js';
 import type { KnowledgeService } from '@/knowledge/types.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
@@ -140,9 +143,7 @@ server.addContentTypeParser(/^(?!application\/json|text\/).*/, { parseAs: 'buffe
   done(null, body);
 });
 
-server.get('/health', () => {
-  return { status: 'ok', timestamp: new Date().toISOString() };
-});
+// Health check routes registered after dependencies are ready (see registerHealthRoutes below)
 
 async function start(): Promise<void> {
   const port = Number(process.env['PORT'] ?? 3000);
@@ -182,6 +183,9 @@ async function start(): Promise<void> {
     // Docker provisioning — client container lifecycle management
     const dockerSocketService = createDockerSocketService({ logger });
     const provisioningService = createProvisioningService({ dockerSocketService, logger });
+
+    // Redis URL — read early for health checks and later for BullMQ services
+    const redisUrl = process.env['REDIS_URL'];
 
     // Channel resolver — per-project adapter resolution from DB + secrets
     const channelResolver = createChannelResolver({
@@ -399,6 +403,12 @@ async function start(): Promise<void> {
           { role: 'assistant', content: assistantText },
           trace.id,
         );
+
+        // Record metrics for observability
+        const agentIdForMetrics = params.agentId ?? 'default';
+        const channelForMetrics = params.sourceChannel ?? 'api';
+        recordMessage(agentIdForMetrics, channelForMetrics);
+        recordLatency(agentIdForMetrics, trace.totalDurationMs);
 
         logger.info('runAgent completed', {
           component: 'main',
@@ -635,12 +645,29 @@ async function start(): Promise<void> {
     // Register global error handler
     registerErrorHandler(server);
 
+    // Health checks (replaces the simple /health stub)
+    registerHealthRoutes(server, {
+      prisma,
+      redisUrl,
+      dockerSocketService,
+      logger,
+    });
+
+    // Prometheus metrics endpoint
+    registerMetricsRoute(server, { logger });
+
+    // Client container monitor — checks provisioned containers every 30s
+    const clientMonitor = createClientMonitor({
+      dockerSocketService,
+      logger,
+    });
+    clientMonitor.start();
+
     // Conditionally start Redis-dependent services (task runner + proactive messaging + webhook queue)
     let taskRunner: ReturnType<typeof createTaskRunner> | null = null;
     let proactiveMessenger: ProactiveMessenger | null = null;
     let campaignRunner: CampaignRunner | null = null;
     let webhookQueue: WebhookQueue | null = null;
-    const redisUrl = process.env['REDIS_URL'];
     if (redisUrl) {
       const parsedRedis = new URL(redisUrl);
       const redisConnection = {
@@ -826,6 +853,7 @@ async function start(): Promise<void> {
     // Graceful shutdown
     const shutdown = async (): Promise<void> => {
       logger.info('Shutting down...', { component: 'main' });
+      clientMonitor.stop();
       await mcpManager.disconnectAll();
       if (taskRunner) {
         await taskRunner.stop();

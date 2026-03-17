@@ -69,8 +69,19 @@ services:
       PROVISIONING_PORT_RANGE_END: "19999"
     volumes:
       - filedata:/app/data/files
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./templates:/app/templates:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3002/health | grep -q '\"status\"' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     depends_on:
       postgres:
         condition: service_healthy
