@@ -105,7 +105,8 @@ networks:
   default:
     name: ${COMPOSE_PROJECT_NAME:-fomo-core}_default
   fomo-network:
-    external: true
+    name: fomo-network
+    driver: bridge
 
 volumes:
   pgdata:
