@@ -141,6 +141,7 @@ type ChatSetupDeps = Pick<
   'projectRepository' | 'sessionRepository' | 'promptLayerRepository' | 'toolRegistry' | 'mcpManager' | 'longTermMemoryStore' | 'prisma' | 'logger' | 'skillService'
 > & {
   agentRegistry?: RouteDependencies['agentRegistry'];
+  secretService?: RouteDependencies['secretService'];
 };
 
 // ─── Setup Function ─────────────────────────────────────────────
@@ -414,6 +415,38 @@ Do not decline a request if your Manager might be able to approve it.
       statusCode: 400,
     });
   }
+
+  // 6a. Resolve apiKeySecretName → set the API key as an env var for the provider factory.
+  // This allows per-project secret-based API keys without hardcoding env vars.
+  if (agentConfig.provider.apiKeySecretName && deps.secretService) {
+    try {
+      const secretValue = await deps.secretService.get(project.id, agentConfig.provider.apiKeySecretName);
+      // Temporarily set the env var so the provider factory can pick it up.
+      // Use apiKeyEnvVar if set, otherwise derive from the secret name itself.
+      const envVarName = agentConfig.provider.apiKeyEnvVar ?? `_RUNTIME_${agentConfig.provider.apiKeySecretName}`;
+      process.env[envVarName] = secretValue;
+      agentConfig.provider.apiKeyEnvVar = envVarName;
+    } catch (secretErr) {
+      deps.logger.warn('Failed to resolve apiKeySecretName', {
+        component: 'chat-setup',
+        secretName: agentConfig.provider.apiKeySecretName,
+        error: secretErr instanceof Error ? secretErr.message : String(secretErr),
+      });
+      // Fall through — the factory will try the default env var
+    }
+  }
+
+  if (agentConfig.fallbackProvider?.apiKeySecretName && deps.secretService) {
+    try {
+      const secretValue = await deps.secretService.get(project.id, agentConfig.fallbackProvider.apiKeySecretName);
+      const envVarName = agentConfig.fallbackProvider.apiKeyEnvVar ?? `_RUNTIME_${agentConfig.fallbackProvider.apiKeySecretName}`;
+      process.env[envVarName] = secretValue;
+      agentConfig.fallbackProvider.apiKeyEnvVar = envVarName;
+    } catch {
+      // Fall through
+    }
+  }
+
   const provider = createProvider(agentConfig.provider);
   const fallbackProvider = agentConfig.fallbackProvider
     ? createProvider(agentConfig.fallbackProvider)
