@@ -304,7 +304,7 @@ export function webchatPublicRoutes(
       const { projectId } = request.params;
       const integration = await getWebchatIntegration(prisma, projectId);
 
-      if (!integration || integration.status !== 'active') {
+      if (integration?.status !== 'active') {
         return reply.code(404).send({ error: 'Webchat not configured or disabled' });
       }
 
@@ -326,7 +326,7 @@ export function webchatPublicRoutes(
       const body = request.body as { sessionToken?: unknown };
 
       const integration = await getWebchatIntegration(prisma, projectId);
-      if (!integration || integration.status !== 'active') {
+      if (integration?.status !== 'active') {
         return reply.code(403).send({ error: 'Webchat not enabled for this project' });
       }
 

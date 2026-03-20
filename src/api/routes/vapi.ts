@@ -34,7 +34,7 @@ import type { VapiIntegrationConfig } from '@/channels/types.js';
 /** VAPI custom LLM request — OpenAI-compatible chat completion format. */
 interface VapiCustomLlmBody {
   model?: string;
-  messages: Array<{ role: string; content: string }>;
+  messages: { role: string; content: string }[];
   call: {
     id: string;
     type?: string;
@@ -82,7 +82,7 @@ export function vapiRoutes(
 
       // 1. Load integration → get projectId + config
       const integration = await channelIntegrationRepository.findById(integrationId);
-      if (!integration || integration.status !== 'active') {
+      if (integration?.status !== 'active') {
         await reply.code(404).send({ error: 'Integration not found or inactive' });
         return;
       }

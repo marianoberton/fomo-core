@@ -233,7 +233,7 @@ describe('WhatsApp End-to-End Integration', () => {
 
     // Verify agent was called
     expect(runAgent).toHaveBeenCalledWith(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+       
       expect.objectContaining({
         projectId: 'test-project',
         sourceChannel: 'whatsapp',
@@ -338,7 +338,7 @@ describe('WhatsApp End-to-End Integration', () => {
     // Assertions
     expect(result.success).toBe(true);
     expect(runAgent).toHaveBeenCalledWith(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+       
       expect.objectContaining({
         projectId: 'test-project',
         sourceChannel: 'whatsapp',

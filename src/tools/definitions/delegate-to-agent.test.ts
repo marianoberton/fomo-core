@@ -141,7 +141,7 @@ describe('delegate-to-agent', () => {
       mockGetByName.mockResolvedValue({ name: 'ventas', id: 'agent_1' });
       await tool.dryRun({ agentName: 'ventas', task: 'do it' }, mockContext);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockAgentRegistry.getByName).toHaveBeenCalledWith('proj_test', 'ventas');
     });
   });

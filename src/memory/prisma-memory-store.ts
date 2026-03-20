@@ -233,7 +233,7 @@ export function createPrismaMemoryStore(
       let categoryWeightExpr: Prisma.Sql;
       if (query.categoryWeights && Object.keys(query.categoryWeights).length > 0) {
         const cases = Object.entries(query.categoryWeights).map(
-          ([cat, w]) => Prisma.sql`WHEN ${cat} THEN ${w as number}::float8`,
+          ([cat, w]) => Prisma.sql`WHEN ${cat} THEN ${w}::float8`,
         );
         categoryWeightExpr = Prisma.sql`CASE category ${Prisma.join(cases, ' ')} ELSE 1.0 END`;
       } else {

@@ -34,12 +34,14 @@ function seededRandom(seed: string): number {
  * Uses weighted random selection — deterministic for the same seed so
  * a contact always receives the same variant on re-sends.
  */
-export function selectVariant(variants: CampaignVariant[], seed: string = ''): CampaignVariant {
+export function selectVariant(variants: CampaignVariant[], seed = ''): CampaignVariant {
   if (variants.length === 0) {
     throw new Error('Cannot select variant from empty list');
   }
   if (variants.length === 1) {
-    return variants[0]!;
+    const first = variants[0];
+    if (!first) throw new Error('Variant array unexpectedly empty');
+    return first;
   }
 
   const rand = seededRandom(seed) * 100; // 0-100
@@ -53,7 +55,9 @@ export function selectVariant(variants: CampaignVariant[], seed: string = ''): C
   }
 
   // Fallback to last variant (handles floating point edge cases)
-  return variants[variants.length - 1]!;
+  const last = variants[variants.length - 1];
+  if (!last) throw new Error('Variant array unexpectedly empty');
+  return last;
 }
 
 // ─── Chi-Square Winner Calculation ─────────────────────────────
@@ -148,7 +152,7 @@ export async function getVariantMetrics(
 
   const abTest = campaign.metadata as Record<string, unknown> | null;
   const abConfig = (campaign.metadata as Record<string, unknown> | null)?.['abTest'] as {
-    variants?: Array<{ id: string; name: string; weight: number }>;
+    variants?: { id: string; name: string; weight: number }[];
   } | undefined;
 
   // Load all sends for this campaign
@@ -224,7 +228,7 @@ export async function checkAndSelectWinner(
   }
 
   // Persist winner into campaign metadata
-  const existingMeta = (campaign.metadata ?? {}) as Record<string, unknown>;
+  const existingMeta = (campaign.metadata ?? {});
   await prisma.campaign.update({
     where: { id: campaign.id },
     data: {

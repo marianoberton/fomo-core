@@ -119,7 +119,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { data: unknown[] };
+      const body = response.json();
       expect(body.data).toEqual([]);
     });
 
@@ -132,7 +132,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { data: MCPServerTemplate[] };
+      const body = response.json();
       expect(body.data).toHaveLength(1);
       expect(body.data[0]?.name).toBe('odoo-erp');
     });
@@ -145,7 +145,7 @@ describe('mcp-server routes', () => {
         url: '/api/v1/mcp-server-templates?category=erp',
       });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(repo.listTemplates).toHaveBeenCalledWith('erp');
     });
   });
@@ -160,7 +160,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { data: MCPServerTemplate };
+      const body = response.json();
       expect(body.data.name).toBe('odoo-erp');
     });
 
@@ -186,7 +186,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { data: unknown[] };
+      const body = response.json();
       expect(body.data).toEqual([]);
     });
 
@@ -199,7 +199,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { data: MCPServerInstance[] };
+      const body = response.json();
       expect(body.data).toHaveLength(1);
       expect(body.data[0]?.name).toBe('my-odoo');
     });
@@ -212,7 +212,7 @@ describe('mcp-server routes', () => {
         url: '/api/v1/projects/proj-1/mcp-servers?status=active',
       });
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(repo.listInstances).toHaveBeenCalledWith('proj-1', 'active');
     });
   });
@@ -227,7 +227,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { data: MCPServerInstance };
+      const body = response.json();
       expect(body.data.name).toBe('my-odoo');
     });
 
@@ -258,7 +258,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(201);
-      const body = response.json() as { data: MCPServerInstance };
+      const body = response.json();
       expect(body.data.name).toBe('my-odoo');
     });
 
@@ -277,7 +277,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(201);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(repo.createInstance).toHaveBeenCalledWith(
         expect.objectContaining({
           templateId: 'tmpl-1',
@@ -347,7 +347,7 @@ describe('mcp-server routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { data: MCPServerInstance };
+      const body = response.json();
       expect(body.data.displayName).toBe('Updated Name');
     });
 

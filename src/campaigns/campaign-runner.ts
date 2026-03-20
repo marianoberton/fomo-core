@@ -199,7 +199,7 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
         let chosenVariantId: string | null = null;
 
         if (abEnabled) {
-          const variant = selectVariant(abConfig!.variants, contact.id);
+          const variant = selectVariant(abConfig.variants, contact.id);
           templateToUse = variant.template;
           chosenVariantId = variant.id;
         }
@@ -225,8 +225,8 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
         try {
           const result = await proactiveMessenger.send({
             projectId: campaign.projectId as ProjectId,
-            contactId: contact.id as ContactId,
-            channel: channelProvider as ChannelType,
+            contactId: contact.id,
+            channel: channelProvider,
             recipientIdentifier: recipient,
             content: message,
             ...(templateConfig && { template: templateConfig }),

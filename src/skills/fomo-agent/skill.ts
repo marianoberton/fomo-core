@@ -84,7 +84,7 @@ export function createFomoAgentSkill(deps: FomoAgentSkillDeps): FomoAgentSkill {
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const timeoutId = setTimeout(() => { controller.abort(); }, timeoutMs);
 
       try {
         const response = await fetch(url, {

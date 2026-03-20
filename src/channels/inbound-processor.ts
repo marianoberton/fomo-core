@@ -269,7 +269,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
         // 3. If session is paused (operator takeover), persist message but skip agent
         if (session.status === 'paused') {
           const stored = await sessionRepository.addMessage(
-            session.id as import('@/core/types.js').SessionId,
+            session.id,
             { role: 'user', content: message.content, mediaUrls: message.mediaUrls },
           );
 

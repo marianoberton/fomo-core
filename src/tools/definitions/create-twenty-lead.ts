@@ -101,7 +101,7 @@ async function findCompany(
   const res = await twentyRequest(baseUrl, headers, 'GET', `/companies?filter=${filter}&limit=1`);
   if (!res.ok) return null;
   // Response is a plain array (not edges-based)
-  const body = res.data as { data?: { companies?: Array<{ id: string }> | { edges?: Array<{ node: { id: string } }> } } };
+  const body = res.data as { data?: { companies?: { id: string }[] | { edges?: { node: { id: string } }[] } } };
   const companies = body?.data?.companies;
   if (!companies) return null;
   if (Array.isArray(companies)) return companies[0]?.id ?? null;
@@ -133,7 +133,7 @@ async function findPerson(
   const filter = encodeURIComponent(`emails.primaryEmail[eq]:${email}`);
   const res = await twentyRequest(baseUrl, headers, 'GET', `/people?filter=${filter}&limit=1`);
   if (!res.ok) return null;
-  const body = res.data as { data?: { people?: Array<{ id: string }> | { edges?: Array<{ node: { id: string } }> } } };
+  const body = res.data as { data?: { people?: { id: string }[] | { edges?: { node: { id: string } }[] } } };
   const people = body?.data?.people;
   if (!people) return null;
   if (Array.isArray(people)) return people[0]?.id ?? null;

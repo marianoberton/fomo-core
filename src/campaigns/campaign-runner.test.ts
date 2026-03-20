@@ -133,7 +133,7 @@ describe('createCampaignRunner', () => {
 
     await runner.executeCampaign('c1');
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(prisma.contact.findMany).toHaveBeenCalledWith({
       where: {
         projectId: 'p1',
@@ -156,7 +156,7 @@ describe('createCampaignRunner', () => {
 
     await runner.executeCampaign('c1');
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(prisma.contact.findMany).toHaveBeenCalledWith({
       where: {
         projectId: 'p1',
@@ -219,7 +219,7 @@ describe('createCampaignRunner', () => {
     }
 
     // Verify message interpolation
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(messenger.send).toHaveBeenCalledTimes(2);
     const firstCall = messenger.send.mock.calls.at(0);
     expect(firstCall).toBeDefined();
@@ -243,7 +243,7 @@ describe('createCampaignRunner', () => {
 
     await runner.executeCampaign('c1');
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(prisma.campaign.update).toHaveBeenCalledWith({
       where: { id: 'c1' },
       data: expect.objectContaining({ status: 'completed' }),
@@ -275,7 +275,7 @@ describe('createCampaignRunner', () => {
     }
 
     // Verify send row marked as failed
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(prisma.campaignSend.update).toHaveBeenCalledWith({
       where: { id: 'send1' },
       data: { status: 'failed', error: 'Network error' },

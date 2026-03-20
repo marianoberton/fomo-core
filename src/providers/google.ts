@@ -78,21 +78,21 @@ function toGoogleMessages(messages: Message[]): Content[] {
             });
             break;
           case 'image': {
-            const imgPart = part as ImageContent;
+            const imgPart = part;
             parts.push({
               inlineData: { mimeType: imgPart.mimeType, data: imgPart.data },
             });
             break;
           }
           case 'audio': {
-            const audioPart = part as AudioContent;
+            const audioPart = part;
             parts.push({
               inlineData: { mimeType: audioPart.mimeType, data: audioPart.data },
             });
             break;
           }
           case 'video': {
-            const videoPart = part as VideoContent;
+            const videoPart = part;
             parts.push({
               fileData: { mimeType: videoPart.mimeType, fileUri: videoPart.fileUri },
             });
@@ -189,7 +189,7 @@ export function createGoogleProvider(options: GoogleProviderOptions): LLMProvide
         let hasToolCall = false;
 
         // Track tool calls accumulation
-        const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+        const toolCalls: { name: string; args: Record<string, unknown> }[] = [];
 
         for await (const chunk of result.stream) {
           const candidates = chunk.candidates ?? [];

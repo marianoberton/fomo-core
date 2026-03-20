@@ -17,7 +17,7 @@ import type { SkillRepository } from './types.js';
  */
 export async function seedOfficialTemplates(
   repository: SkillRepository,
-  projectId: string = 'system',
+  projectId = 'system',
 ): Promise<void> {
   const templates = getOfficialTemplates();
 

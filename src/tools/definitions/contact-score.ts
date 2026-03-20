@@ -117,7 +117,7 @@ export function createContactScoreTool(): ExecutableTool {
       const scoringCtx: ContactScoringContext = {
         contact: {
           id: contact.id,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+           
           projectId: contact.projectId as ProjectId,
           name: contact.name,
           displayName: contact.displayName ?? undefined,
@@ -128,7 +128,7 @@ export function createContactScoreTool(): ExecutableTool {
           timezone: contact.timezone ?? undefined,
           language: contact.language,
           role: contact.role ?? undefined,
-          tags: contact.tags as string[],
+          tags: contact.tags,
           metadata: (contact.metadata as Record<string, unknown>) ?? undefined,
           createdAt: contact.createdAt,
           updatedAt: contact.updatedAt,
@@ -143,7 +143,7 @@ export function createContactScoreTool(): ExecutableTool {
       // 4. Pick config
       const presetKey = configPreset ?? 'general';
       const config: ScoringConfig =
-        SCORING_PRESETS[presetKey] ?? (SCORING_PRESETS['general'] as ScoringConfig);
+        SCORING_PRESETS[presetKey] ?? (SCORING_PRESETS['general']!);
 
       // 5. Score
       const result = scoreContact(scoringCtx, config);

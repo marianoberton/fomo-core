@@ -137,7 +137,7 @@ describe('registerHealthRoutes', () => {
       });
 
       const response = await app.inject({ method: 'GET', url: '/health/clients' });
-      const body = JSON.parse(response.body) as { status: string; clients: Array<{ clientId: string; status: string }> };
+      const body = JSON.parse(response.body) as { status: string; clients: { clientId: string; status: string }[] };
 
       expect(response.statusCode).toBe(200);
       expect(body.status).toBe('degraded');

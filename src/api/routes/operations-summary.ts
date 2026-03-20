@@ -90,7 +90,7 @@ export function operationsSummaryRoutes(
   fastify.get<{ Params: { projectId: string } }>(
     '/projects/:projectId/operations-summary',
     async (request, reply) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- branded type
+       
       const projectId = request.params.projectId as ProjectId;
 
       // Verify project exists

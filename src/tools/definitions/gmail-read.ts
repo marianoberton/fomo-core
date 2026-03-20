@@ -46,7 +46,7 @@ function extractBody(payload: Record<string, unknown>): string {
   const body = payload['body'] as { data?: string } | undefined;
   if (body?.data) return decodeBase64(body.data).slice(0, 500);
 
-  const parts = payload['parts'] as Array<Record<string, unknown>> | undefined;
+  const parts = payload['parts'] as Record<string, unknown>[] | undefined;
   if (parts) {
     for (const part of parts) {
       const mimeType = part['mimeType'] as string;
@@ -103,7 +103,7 @@ export function createGmailReadTool(options: GmailReadOptions): ExecutableTool {
         const listRes = await fetch(listUrl, {
           headers: { 'Authorization': `Bearer ${accessToken}` },
         });
-        const listData = await listRes.json() as { messages?: Array<{ id: string }>; resultSizeEstimate?: number };
+        const listData = await listRes.json() as { messages?: { id: string }[]; resultSizeEstimate?: number };
         const messages = listData.messages ?? [];
 
         if (messages.length === 0) {
@@ -118,9 +118,9 @@ export function createGmailReadTool(options: GmailReadOptions): ExecutableTool {
           const msg = await msgRes.json() as {
             id: string;
             payload?: {
-              headers?: Array<{ name: string; value: string }>;
+              headers?: { name: string; value: string }[];
               body?: { data?: string };
-              parts?: Array<Record<string, unknown>>;
+              parts?: Record<string, unknown>[];
               mimeType?: string;
             };
             snippet?: string;

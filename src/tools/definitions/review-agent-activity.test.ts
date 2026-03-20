@@ -169,20 +169,20 @@ describe('review-agent-activity', () => {
 
       const output = result.value.output as {
         agentName: string;
-        recentSessions: Array<{
+        recentSessions: {
           sessionId: string;
           contactName?: string;
           channel?: string;
           messageCount: number;
-        }>;
-        recentToolExecutions: Array<{
+        }[];
+        recentToolExecutions: {
           toolName: string;
           success: boolean;
           durationMs?: number;
           inputPreview?: string;
           outputPreview?: string;
-        }>;
-        errors: Array<{ message: string }>;
+        }[];
+        errors: { message: string }[];
       };
 
       expect(output.agentName).toBe('Sales');
@@ -294,7 +294,7 @@ describe('review-agent-activity', () => {
       if (!result.ok) return;
 
       const output = result.value.output as {
-        recentToolExecutions: Array<{ inputPreview?: string; outputPreview?: string }>;
+        recentToolExecutions: { inputPreview?: string; outputPreview?: string }[];
       };
 
       // Truncated to 200 + "..."

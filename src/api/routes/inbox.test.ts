@@ -97,7 +97,7 @@ describe('inbox routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { data: { items: unknown[]; total: number } };
+      const body = response.json();
       expect(body.data.items).toEqual([]);
       expect(body.data.total).toBe(0);
     });
@@ -117,12 +117,7 @@ describe('inbox routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as {
-        data: {
-          items: { sessionId: string; contactName: string; channel: string; messageCount: number; lastMessage: { content: string } }[];
-          total: number;
-        };
-      };
+      const body = response.json();
       expect(body.data.total).toBe(2);
       expect(body.data.items[0]?.sessionId).toBe('session-1');
       expect(body.data.items[0]?.contactName).toBe('John Doe');
@@ -141,7 +136,7 @@ describe('inbox routes', () => {
         url: '/api/v1/projects/proj-1/inbox?channel=telegram',
       });
 
-      const body = response.json() as { data: { items: { channel: string }[]; total: number } };
+      const body = response.json();
       expect(body.data.total).toBe(1);
       expect(body.data.items[0]?.channel).toBe('telegram');
     });
@@ -156,7 +151,7 @@ describe('inbox routes', () => {
         url: '/api/v1/projects/proj-1/inbox?agentId=agent-1',
       });
 
-      const body = response.json() as { data: { items: { agentId: string }[]; total: number } };
+      const body = response.json();
       expect(body.data.total).toBe(1);
       expect(body.data.items[0]?.agentId).toBe('agent-1');
     });
@@ -171,7 +166,7 @@ describe('inbox routes', () => {
         url: '/api/v1/projects/proj-1/inbox?limit=1&offset=1',
       });
 
-      const body = response.json() as { data: { items: unknown[]; total: number; limit: number; offset: number } };
+      const body = response.json();
       expect(body.data.items).toHaveLength(1);
       expect(body.data.total).toBe(2);
       expect(body.data.offset).toBe(1);
@@ -226,16 +221,7 @@ describe('inbox routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as {
-        data: {
-          sessionId: string;
-          contact: { id: string; name: string };
-          messages: { id: string; role: string; content: string }[];
-          traces: { id: string }[];
-          channel: string;
-          agentId: string;
-        };
-      };
+      const body = response.json();
       expect(body.data.sessionId).toBe('session-1');
       expect(body.data.contact.name).toBe('John Doe');
       expect(body.data.messages).toHaveLength(2);

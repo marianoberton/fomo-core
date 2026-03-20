@@ -81,7 +81,7 @@ export async function markCampaignReply(
     reply: {
       id: r.id,
       campaignSendId: r.campaignSendId as CampaignSendId,
-      contactId: r.contactId as ContactId,
+      contactId: r.contactId,
       sessionId: r.sessionId,
       repliedAt: r.repliedAt,
       messageCount: r.messageCount,

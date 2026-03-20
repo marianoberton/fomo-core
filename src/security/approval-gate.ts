@@ -170,7 +170,7 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
     if (!timeoutConfig) return;
 
     const current = await store.get(approvalId);
-    if (!current || current.status !== 'pending') {
+    if (current?.status !== 'pending') {
       // Already resolved — nothing to do
       return;
     }

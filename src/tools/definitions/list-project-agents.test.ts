@@ -132,7 +132,7 @@ describe('list-project-agents', () => {
       mockList.mockResolvedValue([]);
       await tool.execute({}, mockContext);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockAgentRegistry.list).toHaveBeenCalledWith('proj_test');
     });
 

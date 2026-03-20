@@ -35,7 +35,7 @@ const DEFAULT_CHANNEL_CONFIG: ChannelConfig = {
 
 // ─── Mapper ─────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+ 
 type AgentRecord = Awaited<ReturnType<PrismaClient['agent']['findUniqueOrThrow']>>;
 
 function toAgentConfig(record: AgentRecord): AgentConfig {

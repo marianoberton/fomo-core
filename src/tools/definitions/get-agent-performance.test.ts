@@ -163,7 +163,7 @@ describe('get-agent-performance', () => {
         agentName: string;
         sessions: { total: number; active: number; closed: number };
         messages: { total: number; fromUser: number; fromAssistant: number };
-        toolCalls: { total: number; successful: number; failed: number; byTool: Array<{ toolName: string; count: number }> };
+        toolCalls: { total: number; successful: number; failed: number; byTool: { toolName: string; count: number }[] };
         cost: { totalUsd: number; avgPerSessionUsd: number };
         escalations: number;
       };

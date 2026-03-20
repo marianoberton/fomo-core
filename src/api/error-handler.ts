@@ -94,11 +94,11 @@ export function registerErrorHandler(fastify: FastifyInstance): void {
     logger.error('Unhandled error in request', {
       component: 'error-handler',
       errorType: typeof error,
-      errorConstructor: (error as { constructor?: { name?: string } })?.constructor?.name,
+      errorConstructor: (error as { constructor?: { name?: string } }).constructor?.name,
       error: message,
       stack,
     });
-    const devMessage = process.env['NODE_ENV'] !== 'production' ? message : 'An unexpected error occurred';
+    const devMessage = message; // TEMP: always show actual error for debugging
     await sendError(reply, 'INTERNAL_ERROR', devMessage, 500);
   });
 }

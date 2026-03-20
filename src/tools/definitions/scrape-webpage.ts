@@ -167,7 +167,7 @@ export function createScrapeWebpageTool(): ExecutableTool {
         const extracted = await page.evaluate((opts: { selector?: string; extractLinks: boolean; maxLen: number }) => {
           // Remove noise
           const noise = document.querySelectorAll('script, style, noscript, iframe, svg');
-          noise.forEach((el) => el.remove());
+          noise.forEach((el) => { el.remove(); });
 
           const title = document.title || undefined;
           const metaEl = document.querySelector('meta[name="description"]');
@@ -196,7 +196,7 @@ export function createScrapeWebpageTool(): ExecutableTool {
           const finalContent = truncated ? content.slice(0, opts.maxLen) + '...' : content;
 
           // Extract links if requested
-          let links: Array<{ text: string; href: string }> | undefined;
+          let links: { text: string; href: string }[] | undefined;
           if (opts.extractLinks) {
             const linkEls = (opts.selector ? root : document.body).querySelectorAll('a[href]');
             const seen = new Set<string>();

@@ -88,7 +88,7 @@ export function registerAuthMiddleware(
         return;
       }
 
-      const authHeader = request.headers['authorization'];
+      const authHeader = request.headers.authorization;
       if (!authHeader) {
         await reply.code(401).send({ error: 'Missing Authorization header' });
         return;

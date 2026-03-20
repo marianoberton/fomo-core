@@ -179,7 +179,7 @@ export function createReadFileTool(options: ReadFileToolOptions): ExecutableTool
         let resolvedFileId = parsed.fileId;
 
         if (!resolvedFileId && parsed.filename) {
-          const files = await fileService.listByProject(context.projectId as ProjectId);
+          const files = await fileService.listByProject(context.projectId);
           const match = files.find(
             (f) => f.originalFilename.toLowerCase() === parsed.filename!.toLowerCase(),
           );
@@ -257,7 +257,7 @@ export function createReadFileTool(options: ReadFileToolOptions): ExecutableTool
         let file = parsed.fileId ? await fileService.getById(parsed.fileId) : null;
 
         if (!file && parsed.filename) {
-          const files = await fileService.listByProject(context.projectId as ProjectId);
+          const files = await fileService.listByProject(context.projectId);
           file = files.find(
             (f) => f.originalFilename.toLowerCase() === parsed.filename!.toLowerCase(),
           ) ?? null;

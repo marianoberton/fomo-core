@@ -113,7 +113,7 @@ export function createAlertRuleTool(
           data: {
             id: alertId,
             projectId,
-            agentId: context.agentId as string | undefined,
+            agentId: context.agentId,
             scope: 'project',
             category: 'alert_rule',
             content: JSON.stringify(alertData),

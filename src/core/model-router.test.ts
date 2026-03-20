@@ -39,7 +39,7 @@ const defaultConfig: ModelRouterConfig = buildModelRouterConfig();
 // ─── Classification tests ────────────────────────────────────────
 
 describe('ModelRouter.classify', () => {
-  const cases: Array<{ message: string; expected: MessageComplexity; llmReply: string }> = [
+  const cases: { message: string; expected: MessageComplexity; llmReply: string }[] = [
     { message: 'Hola', expected: 'simple', llmReply: 'SIMPLE' },
     { message: 'Gracias!', expected: 'simple', llmReply: 'SIMPLE' },
     { message: 'Cuánto cuesta el producto X?', expected: 'standard', llmReply: 'STANDARD' },
@@ -99,7 +99,7 @@ describe('ModelRouter error fallback', () => {
       chat: vi.fn(() => {
         async function* gen() {
           throw new Error('network error');
-          // eslint-disable-next-line no-unreachable
+           
           yield { type: 'text_delta' as const, text: '' };
         }
         return gen();

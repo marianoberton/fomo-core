@@ -99,7 +99,7 @@ export function getVerticalsByIndustry(industry: string): VerticalConfig[] {
 function interpolate(template: string, params: Record<string, unknown>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => {
     if (Object.prototype.hasOwnProperty.call(params, key)) {
-      return String(params[key as keyof typeof params] ?? '');
+      return String(params[key] ?? '');
     }
     return match; // leave unresolved placeholders intact
   });

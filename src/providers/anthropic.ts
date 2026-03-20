@@ -68,7 +68,7 @@ function toAnthropicMessages(
           break;
         case 'image': {
           // Claude 3.5+ supports base64 images inline
-          const imgPart = part as ImageContent;
+          const imgPart = part;
           const validMime = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const;
           type AnthropicImageMime = (typeof validMime)[number];
           const mimeType: AnthropicImageMime = validMime.includes(imgPart.mimeType as AnthropicImageMime)

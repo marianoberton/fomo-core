@@ -101,7 +101,7 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
           ['state', '=', 'posted'],
           ['invoice_date_due', '<=', today2],
           ...partnerFilter,
-        ]], { fields: ['id', 'partner_id', 'amount_residual'], limit: 20 }) as Array<{ id: number; partner_id: [number, string]; amount_residual: number }>;
+        ]], { fields: ['id', 'partner_id', 'amount_residual'], limit: 20 }) as { id: number; partner_id: [number, string]; amount_residual: number }[];
 
         if (!overdueInvoices.length) throw new Error('No se encontraron facturas vencidas para este cliente');
         const invoiceIds = overdueInvoices.map(i => i.id);

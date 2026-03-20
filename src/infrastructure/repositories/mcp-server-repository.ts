@@ -105,7 +105,7 @@ export interface MCPServerRepository {
 
 // ─── Mappers ────────────────────────────────────────────────────
 
-type TemplateRecord = {
+interface TemplateRecord {
   id: string;
   name: string;
   displayName: string;
@@ -121,7 +121,7 @@ type TemplateRecord = {
   isOfficial: boolean;
   createdAt: Date;
   updatedAt: Date;
-};
+}
 
 function toTemplate(rec: TemplateRecord): MCPServerTemplate {
   return {
@@ -143,7 +143,7 @@ function toTemplate(rec: TemplateRecord): MCPServerTemplate {
   };
 }
 
-type InstanceRecord = {
+interface InstanceRecord {
   id: string;
   projectId: string;
   templateId: string | null;
@@ -160,7 +160,7 @@ type InstanceRecord = {
   status: string;
   createdAt: Date;
   updatedAt: Date;
-};
+}
 
 function toInstance(rec: InstanceRecord): MCPServerInstance {
   return {

@@ -147,7 +147,7 @@ export function createTwentyUpsertTool(options: TwentyUpsertToolOptions): Execut
         let company = await findCompany(baseUrl, headers, data.company);
 
         // ─── 2. Buscar oportunidad existente ────────────────────
-        let opportunity = person
+        const opportunity = person
           ? await findOpportunityByPerson(baseUrl, headers, person.id)
           : company
             ? await findOpportunityByCompany(baseUrl, headers, company.id)

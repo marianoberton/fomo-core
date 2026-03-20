@@ -164,7 +164,7 @@ describe('create-twenty-lead / execute', () => {
     vi.unstubAllGlobals();
   });
 
-  function mockFetchSequence(responses: Array<{ ok: boolean; status: number; data: unknown }>) {
+  function mockFetchSequence(responses: { ok: boolean; status: number; data: unknown }[]) {
     for (const resp of responses) {
       fetchMock.mockResolvedValueOnce({
         ok: resp.ok,

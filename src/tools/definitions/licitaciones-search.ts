@@ -100,7 +100,7 @@ export function createLicitacionesSearchTool(options: LicitacionesSearchOptions)
           throw new Error(`Supabase error ${res.status}: ${text}`);
         }
 
-        const items = await res.json() as Array<{
+        const items = await res.json() as {
           process_id: string;
           title: string;
           organismo: string;
@@ -111,7 +111,7 @@ export function createLicitacionesSearchTool(options: LicitacionesSearchOptions)
           currency: string;
           jurisdiccion: string;
           rubro: string;
-        }>;
+        }[];
 
         const totalHeader = res.headers.get('content-range');
         const total = totalHeader ? totalHeader.split('/')[1] : '?';

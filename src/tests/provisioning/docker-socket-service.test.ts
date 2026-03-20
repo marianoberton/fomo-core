@@ -53,7 +53,7 @@ function mockHttpResponse(statusCode: number, body: unknown): void {
 }
 
 /** Chain multiple mock responses for sequential Docker API calls. */
-function mockHttpResponses(responses: Array<{ statusCode: number; body: unknown }>): void {
+function mockHttpResponses(responses: { statusCode: number; body: unknown }[]): void {
   let callIndex = 0;
 
   vi.mocked(http.request).mockImplementation((_options, callback) => {

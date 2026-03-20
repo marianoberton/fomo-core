@@ -172,7 +172,7 @@ describe('HubSpotCRMMCPServer', () => {
 
       const opts = getLastFetchOptions();
       const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
-      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      const filterGroups = body['filterGroups'] as { filters: { propertyName: string; operator: string; value: string }[] }[];
       expect(filterGroups[0]?.filters[0]?.propertyName).toBe('email');
       expect(filterGroups[0]?.filters[0]?.operator).toBe('EQ');
     });
@@ -184,7 +184,7 @@ describe('HubSpotCRMMCPServer', () => {
 
       const opts = getLastFetchOptions();
       const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
-      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; value: string }> }>;
+      const filterGroups = body['filterGroups'] as { filters: { propertyName: string; value: string }[] }[];
       expect(filterGroups[0]?.filters[0]?.propertyName).toBe('phone');
       // Should contain normalized digits only
       expect(filterGroups[0]?.filters[0]?.value).toContain('5491155550001');
@@ -253,7 +253,7 @@ describe('HubSpotCRMMCPServer', () => {
 
       const opts = getLastFetchOptions();
       const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
-      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      const filterGroups = body['filterGroups'] as { filters: { propertyName: string; operator: string; value: string }[] }[];
       expect(filterGroups[0]?.filters).toContainEqual({
         propertyName: 'dealstage',
         operator: 'EQ',
@@ -268,7 +268,7 @@ describe('HubSpotCRMMCPServer', () => {
 
       const opts = getLastFetchOptions();
       const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
-      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      const filterGroups = body['filterGroups'] as { filters: { propertyName: string; operator: string; value: string }[] }[];
       expect(filterGroups[0]?.filters).toContainEqual({
         propertyName: 'pipeline',
         operator: 'EQ',
@@ -285,7 +285,7 @@ describe('HubSpotCRMMCPServer', () => {
 
       const opts = getLastFetchOptions();
       const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
-      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      const filterGroups = body['filterGroups'] as { filters: { propertyName: string; operator: string; value: string }[] }[];
       const inactiveFilter = filterGroups[0]?.filters.find((f) => f.propertyName === 'notes_last_updated');
       expect(inactiveFilter).toBeDefined();
       expect(inactiveFilter?.operator).toBe('LT');
@@ -303,7 +303,7 @@ describe('HubSpotCRMMCPServer', () => {
 
       const opts = getLastFetchOptions();
       const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
-      const filterGroups = body['filterGroups'] as Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }>;
+      const filterGroups = body['filterGroups'] as { filters: { propertyName: string; operator: string; value: string }[] }[];
       expect(filterGroups[0]?.filters).toContainEqual({
         propertyName: 'hubspot_owner_id',
         operator: 'EQ',
@@ -318,7 +318,7 @@ describe('HubSpotCRMMCPServer', () => {
 
       const opts = getLastFetchOptions();
       const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
-      const filterGroups = body['filterGroups'] as Array<{ filters: unknown[] }>;
+      const filterGroups = body['filterGroups'] as { filters: unknown[] }[];
       // All filters should be in one filterGroup (ANDed)
       expect(filterGroups).toHaveLength(1);
       expect(filterGroups[0]?.filters).toHaveLength(3);
@@ -331,7 +331,7 @@ describe('HubSpotCRMMCPServer', () => {
 
       const opts = getLastFetchOptions();
       const body = JSON.parse(opts?.body as string) as Record<string, unknown>;
-      const sorts = body['sorts'] as Array<{ propertyName: string; direction: string }>;
+      const sorts = body['sorts'] as { propertyName: string; direction: string }[];
       expect(sorts[0]?.direction).toBe('ASCENDING');
     });
 

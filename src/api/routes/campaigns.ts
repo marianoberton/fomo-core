@@ -12,7 +12,7 @@ import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
-import { paginationSchema, paginate } from '../pagination.js';
+import { paginationSchema } from '../pagination.js';
 import { getVariantMetrics, calculateWinner } from '../../campaigns/ab-test-engine.js';
 import { getCampaignMetrics } from '@/campaigns/campaign-tracker.js';
 import type { CampaignId, ABTestResult } from '../../campaigns/types.js';
@@ -76,7 +76,7 @@ export function campaignRoutes(
           channel: body.channel,
           audienceFilter: body.audienceFilter as Prisma.InputJsonValue,
           scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : null,
-          metadata: body.metadata as Prisma.InputJsonValue ?? undefined,
+          metadata: (body.metadata as Prisma.InputJsonValue) ?? undefined,
         },
       });
 
@@ -154,7 +154,7 @@ export function campaignRoutes(
         failed: campaign.sends.filter((s) => s.status === 'failed').length,
       };
 
-      const { sends: _sends, _count: _count, ...campaignData } = campaign;
+      const { sends: _sends, _count, ...campaignData } = campaign;
       await sendSuccess(reply, { ...campaignData, sendStats });
     },
   );
@@ -176,7 +176,7 @@ export function campaignRoutes(
         where: { id: request.params.id },
       });
 
-      if (!existing || existing.projectId !== request.params.projectId) {
+      if (existing?.projectId !== request.params.projectId) {
         await sendNotFound(reply, 'Campaign', request.params.id);
         return;
       }
@@ -217,7 +217,7 @@ export function campaignRoutes(
         where: { id: request.params.id },
       });
 
-      if (!campaign || campaign.projectId !== request.params.projectId) {
+      if (campaign?.projectId !== request.params.projectId) {
         await sendNotFound(reply, 'Campaign', request.params.id);
         return;
       }
@@ -258,7 +258,7 @@ export function campaignRoutes(
         select: { id: true, projectId: true },
       });
 
-      if (!campaign || campaign.projectId !== request.params.projectId) {
+      if (campaign?.projectId !== request.params.projectId) {
         await sendNotFound(reply, 'Campaign', request.params.id);
         return;
       }
@@ -289,7 +289,7 @@ export function campaignRoutes(
         where: { id: request.params.id },
       });
 
-      if (!campaign || campaign.projectId !== request.params.projectId) {
+      if (campaign?.projectId !== request.params.projectId) {
         await sendNotFound(reply, 'Campaign', request.params.id);
         return;
       }

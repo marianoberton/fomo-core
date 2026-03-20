@@ -145,7 +145,7 @@ export function createReviewAgentActivityTool(
 
         // 3. Recent execution traces
         const sessionIds = sessions.map((s) => s.id);
-        const toolExecutions: Array<{
+        const toolExecutions: {
           traceId: string;
           sessionId: string;
           toolName: string;
@@ -155,15 +155,15 @@ export function createReviewAgentActivityTool(
           inputPreview?: string;
           outputPreview?: string;
           error?: string;
-        }> = [];
+        }[] = [];
 
-        const errors: Array<{
+        const errors: {
           traceId: string;
           sessionId: string;
           type: string;
           message: string;
           timestamp: string;
-        }> = [];
+        }[] = [];
 
         if (sessionIds.length > 0) {
           const traces = await prisma.executionTrace.findMany({
@@ -194,7 +194,7 @@ export function createReviewAgentActivityTool(
                   traceId: trace.id,
                   sessionId: trace.sessionId,
                   toolName: (event.data['toolId'] as string) ?? 'unknown',
-                  success: resultEvent ? (resultEvent.data['success'] as boolean) !== false : true,
+                  success: resultEvent ? resultEvent.data['success'] as boolean : true,
                   durationMs: resultEvent?.data['durationMs'] as number | undefined,
                   timestamp: event.timestamp ?? trace.createdAt.toISOString(),
                   inputPreview: truncate(event.data['input'], 200),

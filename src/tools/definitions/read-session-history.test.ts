@@ -68,7 +68,7 @@ describe('read-session-history tool', () => {
     it('accepts valid input', () => {
       const repo = createMockSessionRepo();
       const tool = createReadSessionHistoryTool({ sessionRepository: repo });
-      const schema = tool.inputSchema as z.ZodType;
+      const schema = tool.inputSchema;
       const result = schema.safeParse({ sessionId: 'session-1' });
       expect(result.success).toBe(true);
     });
@@ -76,7 +76,7 @@ describe('read-session-history tool', () => {
     it('accepts sessionId + limit', () => {
       const repo = createMockSessionRepo();
       const tool = createReadSessionHistoryTool({ sessionRepository: repo });
-      const schema = tool.inputSchema as z.ZodType;
+      const schema = tool.inputSchema;
       const result = schema.safeParse({ sessionId: 'session-1', limit: 10 });
       expect(result.success).toBe(true);
     });
@@ -84,7 +84,7 @@ describe('read-session-history tool', () => {
     it('rejects missing sessionId', () => {
       const repo = createMockSessionRepo();
       const tool = createReadSessionHistoryTool({ sessionRepository: repo });
-      const schema = tool.inputSchema as z.ZodType;
+      const schema = tool.inputSchema;
       const result = schema.safeParse({});
       expect(result.success).toBe(false);
     });
@@ -92,7 +92,7 @@ describe('read-session-history tool', () => {
     it('rejects limit above 100', () => {
       const repo = createMockSessionRepo();
       const tool = createReadSessionHistoryTool({ sessionRepository: repo });
-      const schema = tool.inputSchema as z.ZodType;
+      const schema = tool.inputSchema;
       const result = schema.safeParse({ sessionId: 's', limit: 200 });
       expect(result.success).toBe(false);
     });

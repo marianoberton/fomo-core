@@ -73,7 +73,7 @@ async function findOpportunityByEmail(
   const res = await twentyRequest(baseUrl, headers, 'GET', `/people?filter=${filter}&limit=1`);
   if (!res.ok) return null;
 
-  const body = res.data as { data?: { people?: Array<{ id: string }> } };
+  const body = res.data as { data?: { people?: { id: string }[] } };
   const personId = body?.data?.people?.[0]?.id;
   if (!personId) return null;
 
@@ -82,7 +82,7 @@ async function findOpportunityByEmail(
   const resOpp = await twentyRequest(baseUrl, headers, 'GET', `/opportunities?filter=${filterOpp}&orderBy=createdAt[desc]&limit=1`);
   if (!resOpp.ok) return null;
 
-  const bodyOpp = resOpp.data as { data?: { opportunities?: Array<{ id: string; name: string; stage: string }> } };
+  const bodyOpp = resOpp.data as { data?: { opportunities?: { id: string; name: string; stage: string }[] } };
   return bodyOpp?.data?.opportunities?.[0] ?? null;
 }
 
@@ -96,7 +96,7 @@ async function findOpportunityByCompany(
   const res = await twentyRequest(baseUrl, headers, 'GET', `/companies?filter=${filter}&limit=1`);
   if (!res.ok) return null;
 
-  const body = res.data as { data?: { companies?: Array<{ id: string }> } };
+  const body = res.data as { data?: { companies?: { id: string }[] } };
   const companyId = body?.data?.companies?.[0]?.id;
   if (!companyId) return null;
 
@@ -104,7 +104,7 @@ async function findOpportunityByCompany(
   const resOpp = await twentyRequest(baseUrl, headers, 'GET', `/opportunities?filter=${filterOpp}&orderBy=createdAt[desc]&limit=1`);
   if (!resOpp.ok) return null;
 
-  const bodyOpp = resOpp.data as { data?: { opportunities?: Array<{ id: string; name: string; stage: string }> } };
+  const bodyOpp = resOpp.data as { data?: { opportunities?: { id: string; name: string; stage: string }[] } };
   return bodyOpp?.data?.opportunities?.[0] ?? null;
 }
 

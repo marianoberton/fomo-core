@@ -40,12 +40,12 @@ interface WorkforceMetrics {
     resolutionRate: number | null;
     cost: number | null;
   };
-  dailyBreakdown: Array<{
+  dailyBreakdown: {
     date: string;
     sessions: number;
     escalations: number;
     costUsd: number;
-  }>;
+  }[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -94,10 +94,10 @@ export function workforceMetricsRoutes(
       // ── Main period queries ──────────────────────────────────
 
       // Sessions in period
-      const sessionsRaw = await prisma.$queryRaw<Array<{
+      const sessionsRaw = await prisma.$queryRaw<{
         total: bigint;
         completed: bigint;
-      }>>`
+      }[]>`
         SELECT
           COUNT(*) AS total,
           COUNT(*) FILTER (WHERE s.status IN ('closed') AND NOT EXISTS (
@@ -117,7 +117,7 @@ export function workforceMetricsRoutes(
         totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 10000) / 10000 : null;
 
       // Escalation count
-      const escalationRaw = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      const escalationRaw = await prisma.$queryRaw<{ count: bigint }[]>`
         SELECT COUNT(*) AS count
         FROM execution_traces et
         WHERE et.project_id = ${pid}
@@ -128,7 +128,7 @@ export function workforceMetricsRoutes(
       const escalationCount = Number(escalationRaw[0]?.count ?? 0);
 
       // Total messages
-      const messagesRaw = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      const messagesRaw = await prisma.$queryRaw<{ count: bigint }[]>`
         SELECT COUNT(*) AS count
         FROM messages m
         JOIN sessions s ON s.id = m.session_id
@@ -139,7 +139,7 @@ export function workforceMetricsRoutes(
       const totalMessages = Number(messagesRaw[0]?.count ?? 0);
 
       // Avg turns per session (from execution_traces)
-      const turnsRaw = await prisma.$queryRaw<Array<{ avg_turns: number | null }>>`
+      const turnsRaw = await prisma.$queryRaw<{ avg_turns: number | null }[]>`
         SELECT AVG(et.turn_count) AS avg_turns
         FROM execution_traces et
         WHERE et.project_id = ${pid}
@@ -152,7 +152,7 @@ export function workforceMetricsRoutes(
           : null;
 
       // Avg response time (total_duration_ms per trace)
-      const responseTimeRaw = await prisma.$queryRaw<Array<{ avg_ms: number | null }>>`
+      const responseTimeRaw = await prisma.$queryRaw<{ avg_ms: number | null }[]>`
         SELECT AVG(et.total_duration_ms) AS avg_ms
         FROM execution_traces et
         WHERE et.project_id = ${pid}
@@ -165,7 +165,7 @@ export function workforceMetricsRoutes(
           : null;
 
       // Peak hour
-      const peakHourRaw = await prisma.$queryRaw<Array<{ hour: number; count: bigint }>>`
+      const peakHourRaw = await prisma.$queryRaw<{ hour: number; count: bigint }[]>`
         SELECT EXTRACT(HOUR FROM s.created_at)::int AS hour, COUNT(*) AS count
         FROM sessions s
         WHERE s.project_id = ${pid}
@@ -178,7 +178,7 @@ export function workforceMetricsRoutes(
       const peakHour = peakHourRaw[0]?.hour ?? null;
 
       // Cost
-      const costRaw = await prisma.$queryRaw<Array<{ total_cost: number | null }>>`
+      const costRaw = await prisma.$queryRaw<{ total_cost: number | null }[]>`
         SELECT SUM(ur.cost_usd) AS total_cost
         FROM usage_records ur
         WHERE ur.project_id = ${pid}
@@ -191,11 +191,11 @@ export function workforceMetricsRoutes(
 
       // ── Trend queries (current 7d vs prev 7d) ────────────────
 
-      const trendCurrentRaw = await prisma.$queryRaw<Array<{
+      const trendCurrentRaw = await prisma.$queryRaw<{
         sessions: bigint;
         completed: bigint;
         cost: number | null;
-      }>>`
+      }[]>`
         SELECT
           COUNT(DISTINCT s.id) AS sessions,
           COUNT(DISTINCT s.id) FILTER (WHERE s.status = 'closed' AND NOT EXISTS (
@@ -213,11 +213,11 @@ export function workforceMetricsRoutes(
           ${agentFilter}
       `;
 
-      const trendPrevRaw = await prisma.$queryRaw<Array<{
+      const trendPrevRaw = await prisma.$queryRaw<{
         sessions: bigint;
         completed: bigint;
         cost: number | null;
-      }>>`
+      }[]>`
         SELECT
           COUNT(DISTINCT s.id) AS sessions,
           COUNT(DISTINCT s.id) FILTER (WHERE s.status = 'closed' AND NOT EXISTS (

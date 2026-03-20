@@ -128,7 +128,7 @@ describe('trigger-campaign — dryRun', () => {
 
     await tool.dryRun({ campaignId: 'c1' }, ctx);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(prisma.contact.count).toHaveBeenCalledWith({
       where: {
         projectId: 'p1',
@@ -176,7 +176,7 @@ describe('trigger-campaign — execute', () => {
       expect(output['skipped']).toBe(1);
     }
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+     
     expect(campaignRunner.executeCampaign).toHaveBeenCalledWith('c1');
   });
 

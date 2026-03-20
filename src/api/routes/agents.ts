@@ -175,7 +175,7 @@ export function agentRoutes(
 
       const agent = await agentRegistry.get(agentId as AgentId);
 
-      if (!agent || agent.projectId !== projectId) {
+      if (agent?.projectId !== projectId) {
         return sendNotFound(reply, 'Agent', agentId);
       }
 
@@ -318,7 +318,7 @@ export function agentRoutes(
       }
 
       const existing = await agentRepository.findById(agentId as AgentId);
-      if (!existing || existing.projectId !== projectId) {
+      if (existing?.projectId !== projectId) {
         return sendNotFound(reply, 'Agent', agentId);
       }
 
@@ -377,7 +377,7 @@ export function agentRoutes(
       const { projectId, agentId } = request.params as { projectId: string; agentId: string };
 
       const existing = await agentRepository.findById(agentId as AgentId);
-      if (!existing || existing.projectId !== projectId) {
+      if (existing?.projectId !== projectId) {
         return sendNotFound(reply, 'Agent', agentId);
       }
 
@@ -498,7 +498,7 @@ export function agentRoutes(
     reply: FastifyReply,
     agentId: string,
     projectIdOverride?: string,
-  ) {
+  ): Promise<void> {
     const parseResult = invokeAgentSchema.safeParse(request.body);
 
     if (!parseResult.success) {

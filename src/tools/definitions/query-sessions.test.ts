@@ -53,14 +53,14 @@ describe('query-sessions tool', () => {
   describe('schema validation', () => {
     it('accepts empty input (all optional)', () => {
       const tool = createQuerySessionsTool({ prisma: createMockPrisma() as never });
-      const schema = tool.inputSchema as z.ZodType;
+      const schema = tool.inputSchema;
       const result = schema.safeParse({});
       expect(result.success).toBe(true);
     });
 
     it('accepts all filters', () => {
       const tool = createQuerySessionsTool({ prisma: createMockPrisma() as never });
-      const schema = tool.inputSchema as z.ZodType;
+      const schema = tool.inputSchema;
       const result = schema.safeParse({
         contactId: 'contact-1',
         contactName: 'John',
@@ -73,14 +73,14 @@ describe('query-sessions tool', () => {
 
     it('rejects invalid status', () => {
       const tool = createQuerySessionsTool({ prisma: createMockPrisma() as never });
-      const schema = tool.inputSchema as z.ZodType;
+      const schema = tool.inputSchema;
       const result = schema.safeParse({ status: 'invalid' });
       expect(result.success).toBe(false);
     });
 
     it('rejects limit above 50', () => {
       const tool = createQuerySessionsTool({ prisma: createMockPrisma() as never });
-      const schema = tool.inputSchema as z.ZodType;
+      const schema = tool.inputSchema;
       const result = schema.safeParse({ limit: 100 });
       expect(result.success).toBe(false);
     });

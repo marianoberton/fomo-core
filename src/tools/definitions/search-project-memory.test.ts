@@ -10,7 +10,7 @@ import { ok } from '@/core/result.js';
 // ─── Types ──────────────────────────────────────────────────────
 
 interface SearchOutput {
-  results: Array<{
+  results: {
     id: string;
     content: string;
     category: string;
@@ -19,7 +19,7 @@ interface SearchOutput {
     agentId: string | null;
     similarityScore: number;
     createdAt: string;
-  }>;
+  }[];
   totalResults: number;
   dryRun?: boolean;
   previewQuery?: string;

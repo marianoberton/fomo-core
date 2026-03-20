@@ -212,8 +212,8 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
               (a) => a.agentId === record.agentId,
             );
             if (existingAgentIdx >= 0 && clientData.agents[existingAgentIdx]) {
-              clientData.agents[existingAgentIdx]!.totalCostUSD += record.costUsd;
-              clientData.agents[existingAgentIdx]!.requestCount += 1;
+              clientData.agents[existingAgentIdx].totalCostUSD += record.costUsd;
+              clientData.agents[existingAgentIdx].requestCount += 1;
             } else {
               clientData.agents.push({
                 agentId: record.agentId,

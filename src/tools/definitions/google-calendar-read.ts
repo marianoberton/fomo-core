@@ -94,15 +94,15 @@ export function createGoogleCalendarReadTool(options: GoogleCalendarReadOptions)
         });
 
         const data = await res.json() as {
-          items?: Array<{
+          items?: {
             id: string;
             summary?: string;
             description?: string;
             location?: string;
             start?: { dateTime?: string; date?: string };
             end?: { dateTime?: string; date?: string };
-            attendees?: Array<{ email: string; displayName?: string }>;
-          }>;
+            attendees?: { email: string; displayName?: string }[];
+          }[];
           error?: { message?: string };
         };
 

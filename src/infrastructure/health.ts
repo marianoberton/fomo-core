@@ -104,7 +104,7 @@ async function checkDocker(): Promise<ServiceHealth> {
         (res) => {
           const chunks: Buffer[] = [];
           res.on('data', (chunk: Buffer) => chunks.push(chunk));
-          res.on('end', () => resolve(Buffer.concat(chunks).toString()));
+          res.on('end', () => { resolve(Buffer.concat(chunks).toString()); });
         },
       );
       req.on('error', reject);

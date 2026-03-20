@@ -45,9 +45,9 @@ export type MediaKind = 'image' | 'audio' | 'video' | 'unknown';
 /** Detect media kind + MIME type from a URL's file extension. */
 export function detectMediaMime(url: string): { kind: MediaKind; mimeType: string } {
   const ext = ((url.split('?')[0] ?? '').split('.').pop() ?? '').toLowerCase();
-  if (IMAGE_EXTS[ext]) return { kind: 'image', mimeType: IMAGE_EXTS[ext] as string };
-  if (AUDIO_EXTS[ext]) return { kind: 'audio', mimeType: AUDIO_EXTS[ext] as string };
-  if (VIDEO_EXTS[ext]) return { kind: 'video', mimeType: VIDEO_EXTS[ext] as string };
+  if (IMAGE_EXTS[ext]) return { kind: 'image', mimeType: IMAGE_EXTS[ext] };
+  if (AUDIO_EXTS[ext]) return { kind: 'audio', mimeType: AUDIO_EXTS[ext] };
+  if (VIDEO_EXTS[ext]) return { kind: 'video', mimeType: VIDEO_EXTS[ext] };
   return { kind: 'unknown', mimeType: 'application/octet-stream' };
 }
 

@@ -50,7 +50,7 @@ function sheetTo2D(sheet: XLSX.WorkSheet): CellValue[][] {
     for (let c = range.s.c; c <= Math.min(range.e.c, range.s.c + MAX_COLS - 1); c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
       const cell = sheet[addr] as XLSX.CellObject | undefined;
-      if (cell === undefined || cell.v === undefined) {
+      if (cell?.v === undefined) {
         row.push(null);
       } else {
         const v = cell.v;
@@ -117,7 +117,7 @@ function columnStats(values: CellValue[]): {
   const nonNullVals = values.filter((v) => v !== null && v !== '');
   if (nonNullVals.length === 0) return { type: 'empty', nonNull: 0, sample: [] };
 
-  const nums = nonNullVals.filter((v) => typeof v === 'number') as number[];
+  const nums = nonNullVals.filter((v) => typeof v === 'number');
   const strs = nonNullVals.filter((v) => typeof v === 'string');
 
   let type: 'number' | 'text' | 'mixed' | 'empty' = 'mixed';
@@ -189,7 +189,7 @@ Use this as the first step when a user uploads a spreadsheet — then analyze th
         // Resolve file
         let resolvedFileId = parsed.fileId;
         if (!resolvedFileId && parsed.filename) {
-          const files = await fileService.listByProject(context.projectId as ProjectId);
+          const files = await fileService.listByProject(context.projectId);
           const match = files.find(
             (f) => f.originalFilename.toLowerCase() === parsed.filename!.toLowerCase(),
           );

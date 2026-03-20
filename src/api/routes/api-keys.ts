@@ -2,8 +2,6 @@ import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from '@/api/types.js';
 import { sendSuccess, sendError, sendNotFound } from '@/api/error-handler.js';
-import type { Logger } from '@/observability/logger.js';
-import type { ApiKeyService } from '@/security/api-key-service.js';
 
 /** Schema for creating a project-scoped API key. */
 const createProjectKeySchema = z.object({

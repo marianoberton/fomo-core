@@ -11,9 +11,12 @@
  *   DATABASE_URL, FOMO_INTERNAL_PROJECT_ID (opcional, default: fomo-internal)
  */
 
+import { createLogger } from '@/observability/logger.js';
 import { FOMO_INTERNAL_AGENTS, FOMO_PROJECT_ID } from './agents.config.js';
 
-async function main() {
+const logger = createLogger({ component: 'fomo-internal-seed' });
+
+async function main(): Promise<void> {
   const API_BASE = process.env['FOMO_API_URL'] ?? 'http://localhost:3002';
   const API_KEY  = process.env['FOMO_API_KEY'] ?? '';
 
@@ -22,12 +25,10 @@ async function main() {
     ...(API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {}),
   };
 
-  console.log(`\n🚀 FOMO Internal Agents Seed`);
-  console.log(`   API: ${API_BASE}`);
-  console.log(`   Project: ${FOMO_PROJECT_ID}\n`);
+  logger.info('FOMO Internal Agents Seed', { component: 'fomo-internal-seed', apiBase: API_BASE, projectId: FOMO_PROJECT_ID });
 
   // 1. Crear proyecto (si no existe)
-  console.log('1️⃣  Creando proyecto fomo-internal...');
+  logger.info('Creating project fomo-internal', { component: 'fomo-internal-seed' });
   const projectRes = await fetch(`${API_BASE}/api/v1/projects`, {
     method: 'POST',
     headers,
@@ -39,19 +40,19 @@ async function main() {
   });
 
   if (projectRes.ok) {
-    console.log('   ✅ Proyecto creado');
+    logger.info('Project created', { component: 'fomo-internal-seed' });
   } else if (projectRes.status === 409) {
-    console.log('   ℹ️  Proyecto ya existe, continuando...');
+    logger.info('Project already exists, continuing', { component: 'fomo-internal-seed' });
   } else {
     const err = await projectRes.text();
-    console.error(`   ❌ Error creando proyecto: ${err}`);
+    logger.error('Error creating project', { component: 'fomo-internal-seed', error: err });
     process.exit(1);
   }
 
   // 2. Crear agentes
-  console.log('\n2️⃣  Creando agentes...\n');
+  logger.info('Creating agents', { component: 'fomo-internal-seed' });
   for (const agent of FOMO_INTERNAL_AGENTS) {
-    process.stdout.write(`   → ${agent.name}... `);
+    logger.info('Creating agent', { component: 'fomo-internal-seed', agentName: agent.name });
     const res = await fetch(`${API_BASE}/api/v1/projects/${FOMO_PROJECT_ID}/agents`, {
       method: 'POST',
       headers,
@@ -60,24 +61,19 @@ async function main() {
 
     if (res.ok) {
       const data = await res.json() as { id: string };
-      console.log(`✅  (id: ${data.id})`);
+      logger.info('Agent created', { component: 'fomo-internal-seed', agentName: agent.name, agentId: data.id });
     } else if (res.status === 409) {
-      console.log(`⚠️  ya existe`);
+      logger.warn('Agent already exists', { component: 'fomo-internal-seed', agentName: agent.name });
     } else {
       const err = await res.text();
-      console.log(`❌  ${err}`);
+      logger.error('Failed to create agent', { component: 'fomo-internal-seed', agentName: agent.name, error: err });
     }
   }
 
-  console.log('\n✅ Seed completo. Agentes FOMO listos.\n');
-  console.log('Próximos pasos:');
-  console.log('  1. Conectar canal WhatsApp para FAMA-Sales y FAMA-CS');
-  console.log('  2. Configurar Telegram para FAMA-Manager (modo mobile)');
-  console.log('  3. Activar schedules de FAMA-Ops (follow-ups, reportes)');
-  console.log('  4. Agregar knowledge base de FOMO a FAMA-CS\n');
+  logger.info('Seed complete. FOMO agents ready.', { component: 'fomo-internal-seed' });
 }
 
-main().catch((e) => {
-  console.error('Error:', e);
+main().catch((e: unknown) => {
+  logger.error('Seed failed', { component: 'fomo-internal-seed', error: e instanceof Error ? e.message : String(e) });
   process.exit(1);
 });

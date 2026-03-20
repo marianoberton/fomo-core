@@ -145,7 +145,7 @@ export function createExportConversationsTool(
 
         const conversations = filtered.map((s) => {
           const metadata = s.metadata as Record<string, unknown> | null;
-          const firstMsg = (s.messages as Array<{ content: unknown }>)[0];
+          const firstMsg = (s.messages as { content: unknown }[])[0];
           const firstContent = firstMsg
             ? typeof firstMsg.content === 'string'
               ? firstMsg.content.slice(0, 200)

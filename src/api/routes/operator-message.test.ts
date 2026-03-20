@@ -63,13 +63,13 @@ describe('operator message routes', () => {
       expect(body.data?.messageId).toBe('msg-op-1');
       expect(body.data?.delivered).toBe(true);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionRepository.addMessage).toHaveBeenCalledWith(
         'sess-1',
         expect.objectContaining({ role: 'assistant', content: 'Hello from the operator' }),
       );
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.channelResolver.send).toHaveBeenCalledWith(
         'proj-1',
         'whatsapp',
@@ -80,7 +80,7 @@ describe('operator message routes', () => {
         }),
       );
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionBroadcaster.broadcast).toHaveBeenCalledWith(
         'sess-1',
         expect.objectContaining({ type: 'message.new', fromOperator: true }),
@@ -182,7 +182,7 @@ describe('operator message routes', () => {
       expect(body.data?.channel).toBeNull();
 
       // Channel resolver should NOT be called
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.channelResolver.send).not.toHaveBeenCalled();
     });
 
@@ -205,7 +205,7 @@ describe('operator message routes', () => {
 
       expect(response.statusCode).toBe(200);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(deps.sessionBroadcaster.broadcast).toHaveBeenCalledWith(
         'sess-1',
         expect.objectContaining({ operatorName: 'Maria' }),

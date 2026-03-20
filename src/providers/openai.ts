@@ -98,7 +98,7 @@ function toOpenAIMessages(
       const imageParts: OpenAI.Chat.Completions.ChatCompletionContentPartImage[] = [];
       for (const part of msg.content) {
         if (part.type === 'image') {
-          const imgPart = part as ImageContent;
+          const imgPart = part;
           imageParts.push({
             type: 'image_url',
             image_url: { url: `data:${imgPart.mimeType};base64,${imgPart.data}` },

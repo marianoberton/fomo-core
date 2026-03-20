@@ -134,7 +134,7 @@ export function createHubSpotApiClient(config: HubSpotApiConfig): HubSpotApiClie
       phone?: string;
       limit?: number;
     }): Promise<HSSearchResponse<HSContact>> {
-      const filterGroups: Array<{ filters: Array<{ propertyName: string; operator: string; value: string }> }> = [];
+      const filterGroups: { filters: { propertyName: string; operator: string; value: string }[] }[] = [];
 
       if (params.email) {
         filterGroups.push({
@@ -185,7 +185,7 @@ export function createHubSpotApiClient(config: HubSpotApiConfig): HubSpotApiClie
       ownerId?: string;
       limit?: number;
     }): Promise<HSSearchResponse<HSDeal>> {
-      const filters: Array<{ propertyName: string; operator: string; value: string }> = [];
+      const filters: { propertyName: string; operator: string; value: string }[] = [];
 
       if (params.stage) {
         filters.push({ propertyName: 'dealstage', operator: 'EQ', value: params.stage });

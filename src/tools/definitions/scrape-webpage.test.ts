@@ -265,7 +265,7 @@ describe('scrape-webpage', () => {
       if (!result.ok) return;
 
       const output = result.value.output as {
-        links: Array<{ text: string; href: string }>;
+        links: { text: string; href: string }[];
       };
 
       expect(output.links).toBeDefined();

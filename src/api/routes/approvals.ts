@@ -108,11 +108,11 @@ export function approvalRoutes(
 
       // Fire-and-forget: resume agent execution with the decision
       resumeAfterApproval({ approvalId: request.params.id, decision, resolvedBy, note })
-        .catch((err: unknown) => logger.error('Failed to resume after approval', {
+        .catch((err: unknown) => { logger.error('Failed to resume after approval', {
           component: 'approval-routes',
           approvalId: request.params.id,
           error: err instanceof Error ? err.message : String(err),
-        }));
+        }); });
 
       return sendSuccess(reply, resolved);
     },
@@ -146,11 +146,11 @@ export function approvalRoutes(
 
       // Fire-and-forget: resume agent execution with the decision
       resumeAfterApproval({ approvalId: request.params.id, decision, resolvedBy: 'dashboard', note })
-        .catch((err: unknown) => logger.error('Failed to resume after approval', {
+        .catch((err: unknown) => { logger.error('Failed to resume after approval', {
           component: 'approval-routes',
           approvalId: request.params.id,
           error: err instanceof Error ? err.message : String(err),
-        }));
+        }); });
 
       return sendSuccess(reply, resolved);
     },

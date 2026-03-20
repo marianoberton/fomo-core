@@ -104,7 +104,7 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
           fields: ['id', 'name', 'partner_id', 'invoice_date_due', 'amount_total', 'amount_untaxed', 'amount_residual', 'payment_state', 'narration'],
           order: 'invoice_date_due asc',
           limit: 20,
-        }) as Array<{ id: number; name: string; partner_id: [number, string]; invoice_date_due: string; amount_total: number; amount_untaxed: number; amount_residual: number; payment_state: string; narration: string }>;
+        }) as { id: number; name: string; partner_id: [number, string]; invoice_date_due: string; amount_total: number; amount_untaxed: number; amount_residual: number; payment_state: string; narration: string }[];
 
         if (!invoices.length) {
           return ok({ success: true, output: { debts: [], message: 'No hay facturas pendientes' }, durationMs: Date.now() - start });
@@ -113,7 +113,7 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
         const partnerIds = [...new Set(invoices.map(i => i.partner_id[0]))];
         const partners = await odooCall(odooUrl, session, 'res.partner', 'search_read', [[['id', 'in', partnerIds]]], {
           fields: ['id', 'name', 'phone', 'email', 'comment'],
-        }) as Array<{ id: number; name: string; phone: string; email: string; comment: string }>;
+        }) as { id: number; name: string; phone: string; email: string; comment: string }[];
         const partnerMap = Object.fromEntries(partners.map(p => [p.id, p]));
 
         const debts = invoices.map(inv => {

@@ -259,7 +259,7 @@ If a user asks for something outside your permissions (like a large discount), o
 Do not decline a request if your Manager might be able to approve it.
 `;
       // We will append this during step 11, we pass it via metadata
-      if (!body.metadata) body.metadata = {};
+      body.metadata ??= {};
       body.metadata['_managerPrompt'] = escalationPrompt;
     }
 
@@ -274,7 +274,7 @@ Do not decline a request if your Manager might be able to approve it.
     // Store mode prompt overrides for later prompt building
     if (resolvedMode?.promptOverrides) {
       // Stash on metadata so prompt builder can access it (step 11)
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+       
       if (!body.metadata) {
         body.metadata = {};
       }
@@ -305,11 +305,11 @@ Do not decline a request if your Manager might be able to approve it.
       if (composition.mergedMcpServers.length > 0) {
         // Add skill-required MCP servers that aren't already configured
         const existingNames = new Set(
-          (agentConfig.mcpServers as Array<{ name: string }>).map((s) => s.name),
+          (agentConfig.mcpServers as { name: string }[]).map((s) => s.name),
         );
         for (const mcpName of composition.mergedMcpServers) {
           if (!existingNames.has(mcpName)) {
-            (agentConfig.mcpServers as Array<{ name: string }>).push({ name: mcpName } as never);
+            (agentConfig.mcpServers as { name: string }[]).push({ name: mcpName } as never);
           }
         }
       }

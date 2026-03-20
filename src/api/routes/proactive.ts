@@ -59,7 +59,7 @@ export function proactiveRoutes(
 
       const messageRequest = {
         projectId: projectId as ProjectId,
-        contactId: (body.contactId ?? 'manual') as ContactId,
+        contactId: (body.contactId ?? 'manual'),
         channel: body.channel,
         recipientIdentifier: body.recipientIdentifier,
         content: body.content,

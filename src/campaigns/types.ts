@@ -150,7 +150,7 @@ export interface CampaignMetrics {
   /** Average milliseconds until first reply, or null if no replies yet. */
   avgResponseTimeMs: number | null;
   breakdown: {
-    byDay: Array<{ date: string; sent: number; replied: number; converted: number }>;
+    byDay: { date: string; sent: number; replied: number; converted: number }[];
   };
 }
 

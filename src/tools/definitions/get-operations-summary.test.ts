@@ -115,12 +115,12 @@ describe('get-operations-summary', () => {
       if (!result.ok) return;
 
       const output = result.value.output as {
-        agents: { total: number; active: number; paused: number; disabled: number; list: Array<{ name: string; activeSessions: number }> };
+        agents: { total: number; active: number; paused: number; disabled: number; list: { name: string; activeSessions: number }[] };
         sessions: { active: number; total: number };
         messages: { today: number; thisWeek: number };
         approvals: { pending: number };
         cost: { todayUsd: number; thisWeekUsd: number };
-        escalations: { recent: Array<{ sessionId: string }>; totalPending: number };
+        escalations: { recent: { sessionId: string }[]; totalPending: number };
       };
 
       expect(output.agents.total).toBe(3);

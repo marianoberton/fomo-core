@@ -65,8 +65,8 @@ export function createLicitacionesDetailTool(options: LicitacionesDetailOptions)
         const basicInfo = data['basic_info'] as Record<string, string> | undefined;
         const amountDuration = data['amount_duration'] as Record<string, string> | undefined;
         const cronograma = data['cronograma'] as Record<string, string> | undefined;
-        const availableFiles = data['available_files'] as Array<{ file_id: string; titulo: string; tipo: string }> | undefined;
-        const products = data['products'] as Array<Record<string, string>> | undefined;
+        const availableFiles = data['available_files'] as { file_id: string; titulo: string; tipo: string }[] | undefined;
+        const products = data['products'] as Record<string, string>[] | undefined;
         const requirements = data['requirements'] as Record<string, unknown> | undefined;
 
         return ok({

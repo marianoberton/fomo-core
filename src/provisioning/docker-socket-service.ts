@@ -137,7 +137,7 @@ async function allocatePort(): Promise<number> {
 
   const usedPorts = new Set<number>();
   if (res.statusCode === 200 && Array.isArray(res.body)) {
-    for (const container of res.body as Array<{ Labels?: Record<string, string> }>) {
+    for (const container of res.body as { Labels?: Record<string, string> }[]) {
       const portLabel = container.Labels?.['com.fomo.port'];
       if (portLabel) {
         usedPorts.add(Number(portLabel));
@@ -338,13 +338,13 @@ export function createDockerSocketService(deps: DockerSocketServiceDeps): Docker
 
       if (res.statusCode !== 200) return [];
 
-      const containers = res.body as Array<{
+      const containers = res.body as {
         Id: string;
         State: string;
         Status: string;
         Created: number;
         Labels: Record<string, string>;
-      }>;
+      }[];
 
       return containers.map((c) => ({
         clientId: c.Labels['fomo.client-id'] ?? 'unknown',

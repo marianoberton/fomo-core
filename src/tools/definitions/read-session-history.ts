@@ -90,7 +90,7 @@ export function createReadSessionHistoryTool(
         const allMessages = await sessionRepository.getMessages(parsed.sessionId as SessionId);
         const messages = allMessages.slice(-limit);
 
-        const metadata = session.metadata as Record<string, unknown> | undefined;
+        const metadata = session.metadata;
 
         const output = {
           sessionId: session.id,
