@@ -91,6 +91,9 @@ export async function registerRoutes(
     logger: deps.logger,
   });
 
-  // Cost monitoring routes
-  await fastify.register(costRoutes, deps);
+  // Cost monitoring routes (prefix /cost to avoid collision with /agents)
+  await fastify.register(
+    async (f) => { await costRoutes(f, deps); },
+    { prefix: '/cost' },
+  );
 }
