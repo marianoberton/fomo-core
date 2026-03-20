@@ -226,6 +226,9 @@ export function createTwentyUpsertTool(options: TwentyUpsertToolOptions): Execut
           }
         }
 
+        // At this point person is guaranteed non-null (guarded by throw above)
+        if (!person) throw new Error('person is unexpectedly null');
+
         // Opportunity
         const oppName = data.opportunityName ?? `${data.company} - ${new Date().toISOString().slice(0, 10)}`;
         const resO = await req(baseUrl, headers, 'POST', '/opportunities', {

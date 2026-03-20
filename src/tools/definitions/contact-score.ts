@@ -142,8 +142,9 @@ export function createContactScoreTool(): ExecutableTool {
 
       // 4. Pick config
       const presetKey = configPreset ?? 'general';
-      const config: ScoringConfig =
-        SCORING_PRESETS[presetKey] ?? SCORING_PRESETS['general'];
+      const generalPreset = SCORING_PRESETS['general'];
+      if (!generalPreset) throw new Error('Missing general scoring preset');
+      const config: ScoringConfig = SCORING_PRESETS[presetKey] ?? generalPreset;
 
       // 5. Score
       const result = scoreContact(scoringCtx, config);

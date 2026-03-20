@@ -100,7 +100,7 @@ export async function registerRoutes(
 
   // Platform bridge routes (Workforce + Copilot dashboard)
   await fastify.register(
-    async (f) => { platformBridgeRoutes(f, deps); },
+    (f) => { platformBridgeRoutes(f, deps); },
     { prefix: '/platform' },
   );
 }

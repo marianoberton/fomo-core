@@ -3,10 +3,8 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
-import type { ProjectId } from '@/core/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -247,7 +245,7 @@ export function platformBridgeRoutes(
         return sendNotFound(reply, 'Session', sessionId);
       }
 
-      const existingMeta = (session.metadata as Record<string, unknown>) ?? {};
+      const existingMeta = (session.metadata as Record<string, unknown> | null) ?? {};
 
       await prisma.session.update({
         where: { id: sessionId },
@@ -357,18 +355,20 @@ export function platformBridgeRoutes(
             status: injectResult.statusCode,
             body: injectResult.body,
           });
-          return sendError(
+          await sendError(
             reply,
             'COPILOT_CHAT_FAILED',
             parsed.error?.message ?? 'Failed to process copilot message',
             500,
           );
+          return;
         }
 
-        return sendSuccess(reply, {
+        await sendSuccess(reply, {
           response: parsed.data.response,
           sessionId: parsed.data.sessionId,
         });
+        return;
       } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error);
         logger.error('Copilot chat error', {
