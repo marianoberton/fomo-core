@@ -194,7 +194,7 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
 
         // Determine template (A/B test or default)
         const abConfig = (campaign.metadata as Record<string, unknown> | null)?.['abTest'] as ABTestConfig | undefined;
-        const abEnabled = abConfig?.enabled && abConfig.variants && abConfig.variants.length > 0;
+        const abEnabled = abConfig?.enabled && abConfig.variants.length > 0;
         let templateToUse = campaign.template;
         let chosenVariantId: string | null = null;
 

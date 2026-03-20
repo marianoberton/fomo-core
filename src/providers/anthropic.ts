@@ -10,7 +10,6 @@ import { getModelMeta } from './models.js';
 import type {
   ChatEvent,
   ChatParams,
-  ImageContent,
   LLMProvider,
   Message,
   ToolDefinitionForProvider,

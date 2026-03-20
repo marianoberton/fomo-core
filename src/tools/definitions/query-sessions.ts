@@ -4,7 +4,7 @@
  */
 import { z } from 'zod';
 import type { PrismaClient } from '@prisma/client';
-import type { ExecutionContext, ProjectId } from '@/core/types.js';
+import type { ExecutionContext } from '@/core/types.js';
 import type { Result } from '@/core/result.js';
 import { ok, err } from '@/core/result.js';
 import { ToolExecutionError } from '@/core/errors.js';
@@ -167,6 +167,7 @@ export function createQuerySessionsTool(
       }
     },
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(
       input: unknown,
       _context: ExecutionContext,

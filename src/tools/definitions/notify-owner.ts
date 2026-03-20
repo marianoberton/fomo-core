@@ -46,6 +46,7 @@ export function createNotifyOwnerTool(options: NotifyOwnerOptions): ExecutableTo
     supportsDryRun: false,
     inputSchema,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       return ok({ success: true, output: { dryRun: true, input }, durationMs: 0 });
     },

@@ -38,6 +38,7 @@ export function createEscalateToHumanTool(): ExecutableTool {
         sideEffects: true,
         supportsDryRun: false,
 
+        // eslint-disable-next-line @typescript-eslint/require-await
         async execute(
             input: unknown,
             context: ExecutionContext,

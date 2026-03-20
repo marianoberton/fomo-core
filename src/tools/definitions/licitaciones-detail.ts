@@ -33,7 +33,9 @@ export function createLicitacionesDetailTool(options: LicitacionesDetailOptions)
     supportsDryRun: false,
     inputSchema,
 
-    async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async dryRun(_input: unknown): Promise<Result<ToolResult, NexusError>> {
+      void _input;
       return ok({ success: true, output: { dryRun: true }, durationMs: 0 });
     },
 
@@ -45,9 +47,7 @@ export function createLicitacionesDetailTool(options: LicitacionesDetailOptions)
       const { process_id, jurisdiccion } = parsed.data;
       const { projectId } = context;
 
-      const apiUrl = await options.secretService.get(projectId, 'LICITACIONES_API_URL')
-        ?? options.licitacionesApiUrl
-        ?? 'http://72.61.44.62:18000';
+      const apiUrl = await options.secretService.get(projectId, 'LICITACIONES_API_URL');
 
       try {
         const encodedId = encodeURIComponent(process_id);

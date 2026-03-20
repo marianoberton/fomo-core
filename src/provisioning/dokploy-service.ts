@@ -299,9 +299,9 @@ export function createDokployService(deps: DokployServiceDeps): DokployService {
         if (!project) return [];
 
         return project.applications
-          .filter((app) => (app.appName ?? app.name).startsWith(CONTAINER_PREFIX))
+          .filter((app) => app.appName.startsWith(CONTAINER_PREFIX))
           .map((app) => ({
-            clientId: (app.appName ?? app.name).replace(CONTAINER_PREFIX, ''),
+            clientId: app.appName.replace(CONTAINER_PREFIX, ''),
             containerId: app.applicationId,
             status: mapStatus(app.applicationStatus),
             uptime: undefined,

@@ -300,14 +300,10 @@ export function createMCPServerRepository(prisma: PrismaClient): MCPServerReposi
       if (input.command !== undefined) data['command'] = input.command;
       if (input.args !== undefined) data['args'] = input.args;
       if (input.envSecretKeys !== undefined) {
-        data['envSecretKeys'] = input.envSecretKeys
-          ? (input.envSecretKeys as unknown as Prisma.InputJsonValue)
-          : Prisma.JsonNull;
+        data['envSecretKeys'] = input.envSecretKeys as unknown as Prisma.InputJsonValue;
       }
       if (input.envVars !== undefined) {
-        data['envVars'] = input.envVars
-          ? (input.envVars as unknown as Prisma.InputJsonValue)
-          : Prisma.JsonNull;
+        data['envVars'] = input.envVars as unknown as Prisma.InputJsonValue;
       }
       if (input.url !== undefined) data['url'] = input.url;
       if (input.toolPrefix !== undefined) data['toolPrefix'] = input.toolPrefix;

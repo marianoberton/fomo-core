@@ -34,6 +34,7 @@ export function createWahaSendMessageTool(options: WahaSendMessageOptions): Exec
     supportsDryRun: true,
     inputSchema,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) return err(new ToolExecutionError('waha-send-message', parsed.error.message));
@@ -49,13 +50,9 @@ export function createWahaSendMessageTool(options: WahaSendMessageOptions): Exec
       const { projectId } = context;
 
       // Leer WAHA_BASE_URL desde secrets del proyecto, fallback a env o default
-      const wahaBaseUrl =
-        await options.secretService.get(projectId, 'WAHA_BASE_URL') ??
-        options.wahaBaseUrl ??
-        process.env['WAHA_BASE_URL'] ??
-        'http://localhost:3100';
+      const wahaBaseUrl = await options.secretService.get(projectId, 'WAHA_BASE_URL');
 
-      const wahaApiKey = await options.secretService.get(projectId, 'WAHA_API_KEY') ?? '';
+      const wahaApiKey = await options.secretService.get(projectId, 'WAHA_API_KEY');
 
       // Formato chatId para WAHA: <phone>@c.us
       const chatId = phone.replace(/\D/g, '').replace(/^0+/, '') + '@c.us';

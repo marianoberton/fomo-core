@@ -129,7 +129,7 @@ export function createContactScoreTool(): ExecutableTool {
           language: contact.language,
           role: contact.role ?? undefined,
           tags: contact.tags,
-          metadata: (contact.metadata as Record<string, unknown>) ?? undefined,
+          metadata: contact.metadata as Record<string, unknown> | undefined,
           createdAt: contact.createdAt,
           updatedAt: contact.updatedAt,
         },
@@ -143,7 +143,7 @@ export function createContactScoreTool(): ExecutableTool {
       // 4. Pick config
       const presetKey = configPreset ?? 'general';
       const config: ScoringConfig =
-        SCORING_PRESETS[presetKey] ?? (SCORING_PRESETS['general']!);
+        SCORING_PRESETS[presetKey] ?? SCORING_PRESETS['general'];
 
       // 5. Score
       const result = scoreContact(scoringCtx, config);

@@ -18,6 +18,7 @@ import type { RouteDependencies } from '../types.js';
 /** Register media proxy route. */
 export function mediaRoutes(
   fastify: FastifyInstance,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _deps: RouteDependencies,
 ): void {
   fastify.get(

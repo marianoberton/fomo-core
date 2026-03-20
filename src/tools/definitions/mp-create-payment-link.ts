@@ -37,6 +37,7 @@ export function createMpCreatePaymentLinkTool(options: MpPaymentLinkOptions): Ex
     supportsDryRun: false,
     inputSchema,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       return ok({ success: true, output: { dryRun: true, input }, durationMs: 0 });
     },
@@ -110,7 +111,8 @@ export function createMpCreatePaymentLinkTool(options: MpPaymentLinkOptions): Ex
 
         // sandbox_init_point para pruebas, init_point para producción
         const isSandbox = accessToken.startsWith('TEST-') || accessToken.includes('-030514-');
-        const paymentLink = isSandbox ? (data.sandbox_init_point ?? data.init_point!) : data.init_point!;
+        const initPoint = data.init_point ?? '';
+        const paymentLink = isSandbox ? (data.sandbox_init_point ?? initPoint) : initPoint;
 
         return ok({
           success: true,

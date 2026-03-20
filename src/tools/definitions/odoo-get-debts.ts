@@ -21,7 +21,7 @@ const inputSchema = z.object({
   onlyOverdue: z.boolean().default(true).describe('Si true, solo facturas vencidas. Si false, incluye las próximas 7 días'),
 });
 
-async function odooAuth(baseUrl: string, db: string, user: string, password: string) {
+async function odooAuth(baseUrl: string, db: string, user: string, password: string): Promise<{ cookie: string }> {
   const res = await fetch(`${baseUrl}/web/session/authenticate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -32,7 +32,7 @@ async function odooAuth(baseUrl: string, db: string, user: string, password: str
   return { cookie: res.headers.get('set-cookie') ?? '' };
 }
 
-async function odooCall(baseUrl: string, session: { cookie: string }, model: string, method: string, args: unknown[], kwargs: Record<string, unknown> = {}) {
+async function odooCall(baseUrl: string, session: { cookie: string }, model: string, method: string, args: unknown[], kwargs: Record<string, unknown> = {}): Promise<unknown> {
   const res = await fetch(`${baseUrl}/web/dataset/call_kw`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: session.cookie },
@@ -55,6 +55,7 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
     supportsDryRun: true,
     inputSchema,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       return ok({ success: true, output: { dryRun: true, input }, durationMs: 0 });
     },
@@ -71,15 +72,15 @@ export function createOdooGetDebtsTool(options: OdooToolOptions): ExecutableTool
       const odooUser = await options.secretService.get(projectId, 'ODOO_USER');
       const odooPass = await options.secretService.get(projectId, 'ODOO_PASSWORD');
       const odooDB   = await options.secretService.get(projectId, 'ODOO_DB');
-      const odooUrl  = (await options.secretService.get(projectId, 'ODOO_BASE_URL')) ?? options.odooBaseUrl;
+      const odooUrl  = await options.secretService.get(projectId, 'ODOO_BASE_URL');
       if (!odooUser || !odooPass || !odooDB) {
         return err(new ToolExecutionError('odoo-get-debts', 'Faltan credenciales Odoo (ODOO_USER, ODOO_PASSWORD, ODOO_DB)'));
       }
 
       try {
         const session = await odooAuth(odooUrl, odooDB, odooUser, odooPass);
-        const today   = new Date().toISOString().split('T')[0]!;
-        const in7days = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]!;
+        const today   = new Date().toISOString().split('T')[0] ?? '';
+        const in7days = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] ?? '';
 
         let partnerFilter: unknown[] = [];
         if (email) {

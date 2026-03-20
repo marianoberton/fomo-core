@@ -51,8 +51,8 @@ function toAgentConfig(record: AgentRecord): AgentConfig {
     mcpServers: (rec.mcpServers as MCPServerConfig[] | null) ?? [],
     channelConfig: (rec.channelConfig as ChannelConfig | null) ?? DEFAULT_CHANNEL_CONFIG,
     modes: (rec.modes as AgentMode[] | null) ?? [],
-    operatingMode: ((rec as AgentRecord & { operatingMode?: string }).operatingMode ?? 'customer-facing') as AgentOperatingMode,
-    skillIds: (rec as AgentRecord & { skillIds?: string[] }).skillIds ?? [],
+    operatingMode: (rec as AgentRecord & { operatingMode: string }).operatingMode as AgentOperatingMode,
+    skillIds: (rec as AgentRecord & { skillIds: string[] }).skillIds,
     limits: {
       maxTurns: rec.maxTurns,
       maxTokensPerTurn: rec.maxTokensPerTurn,
@@ -182,9 +182,7 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
       // llmConfig + modes require `prisma generate` — cast to add them to updateData
       if (input.llmConfig !== undefined) {
         const extended = updateData as Prisma.AgentUpdateInput & { llmConfig: unknown };
-        extended.llmConfig = input.llmConfig
-          ? (input.llmConfig as unknown as Prisma.InputJsonValue)
-          : Prisma.JsonNull;
+        extended.llmConfig = input.llmConfig as unknown as Prisma.InputJsonValue;
       }
       if (input.modes !== undefined) {
         const extended = updateData as Prisma.AgentUpdateInput & { modes: unknown };

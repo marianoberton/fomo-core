@@ -483,13 +483,13 @@ export function integrationRoutes(
           headers: getWahaHeaders(),
         });
         if (!response.ok) {
-          return sendSuccess(reply, { sessionStatus: 'STOPPED', sessionName });
+          await sendSuccess(reply, { sessionStatus: 'STOPPED', sessionName }); return;
         }
         const data = (await response.json()) as unknown as WahaSessionStatus;
-        return sendSuccess(reply, {
+        await sendSuccess(reply, {
           sessionStatus: data.status ?? 'UNKNOWN',
           sessionName: data.name ?? sessionName,
-        });
+        }); return;
       } catch {
         return sendSuccess(reply, { sessionStatus: 'UNREACHABLE', sessionName });
       }
@@ -519,7 +519,7 @@ export function integrationRoutes(
           { headers: getWahaHeaders() },
         );
         if (!response.ok) {
-          return sendError(reply, 'QR_UNAVAILABLE', 'QR code not available (session may already be connected)', 404);
+          await sendError(reply, 'QR_UNAVAILABLE', 'QR code not available (session may already be connected)', 404); return;
         }
         const contentType = response.headers.get('content-type') ?? 'image/png';
         const buffer = Buffer.from(await response.arrayBuffer());
@@ -574,7 +574,7 @@ export function integrationRoutes(
               body: JSON.stringify({ name: sessionName }),
             }),
           );
-          return sendSuccess(reply, { action: 'stop', success: true });
+          await sendSuccess(reply, { action: 'stop', success: true }); return;
         }
 
         if (action === 'restart') {
@@ -595,7 +595,7 @@ export function integrationRoutes(
 
         if (pathStartRes.ok) {
           logger.info(`WAHA session ${action}ed (path API)`, { component: 'integrations', sessionName, webhookUrl });
-          return sendSuccess(reply, { action, success: true });
+          await sendSuccess(reply, { action, success: true }); return;
         }
 
         // Fall back to legacy API (POST /api/sessions/start with name in body)
@@ -610,11 +610,11 @@ export function integrationRoutes(
 
         if (!legacyStartRes.ok) {
           const text = await legacyStartRes.text();
-          return sendError(reply, 'WAHA_ERROR', `WAHA returned ${String(legacyStartRes.status)}: ${text}`, 502);
+          await sendError(reply, 'WAHA_ERROR', `WAHA returned ${String(legacyStartRes.status)}: ${text}`, 502); return;
         }
 
         logger.info(`WAHA session ${action}ed (legacy API)`, { component: 'integrations', sessionName, webhookUrl });
-        return sendSuccess(reply, { action, success: true });
+        await sendSuccess(reply, { action, success: true }); return;
       } catch {
         return sendError(reply, 'WAHA_UNREACHABLE', 'Cannot reach WAHA service', 502);
       }

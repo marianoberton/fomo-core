@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
-import type { ExecutionContext, ProjectId } from '@/core/types.js';
+import type { ExecutionContext } from '@/core/types.js';
 import type { Result } from '@/core/result.js';
 import { ok, err } from '@/core/result.js';
 import { ToolExecutionError } from '@/core/errors.js';
@@ -69,7 +69,8 @@ function sheetTo2D(sheet: XLSX.WorkSheet): CellValue[][] {
     for (let r = merge.s.r; r <= merge.e.r; r++) {
       for (let c = merge.s.c; c <= merge.e.c; c++) {
         if (r !== merge.s.r || c !== merge.s.c) {
-          if (rows[r]) rows[r]![c] = topLeft;
+          const row = rows[r];
+          if (row) row[c] = topLeft;
         }
       }
     }
@@ -189,9 +190,10 @@ Use this as the first step when a user uploads a spreadsheet — then analyze th
         // Resolve file
         let resolvedFileId = parsed.fileId;
         if (!resolvedFileId && parsed.filename) {
+          const filenameToMatch = parsed.filename;
           const files = await fileService.listByProject(context.projectId);
           const match = files.find(
-            (f) => f.originalFilename.toLowerCase() === parsed.filename!.toLowerCase(),
+            (f) => f.originalFilename.toLowerCase() === filenameToMatch.toLowerCase(),
           );
           if (!match) {
             const available = files.map((f) => f.originalFilename).join(', ');
@@ -203,7 +205,10 @@ Use this as the first step when a user uploads a spreadsheet — then analyze th
           resolvedFileId = match.id;
         }
 
-        const { file, content } = await fileService.download(resolvedFileId!);
+        if (!resolvedFileId) {
+          return err(new ToolExecutionError('excel-analyze', 'Could not resolve file ID'));
+        }
+        const { file, content } = await fileService.download(resolvedFileId);
 
         if (file.sizeBytes > MAX_FILE_SIZE) {
           return err(new ToolExecutionError(
@@ -225,9 +230,11 @@ Use this as the first step when a user uploads a spreadsheet — then analyze th
           return err(new ToolExecutionError('excel-analyze', 'Excel file has no sheets'));
         }
 
-        const targetSheet = parsed.sheetName
-          ? sheets.find((s) => s.toLowerCase() === parsed.sheetName!.toLowerCase()) ?? sheets[0]!
-          : sheets[0]!;
+        const firstSheet = sheets[0] ?? '';
+        const sheetNameToFind = parsed.sheetName;
+        const targetSheet = sheetNameToFind
+          ? sheets.find((s) => s.toLowerCase() === sheetNameToFind.toLowerCase()) ?? firstSheet
+          : firstSheet;
 
         const sheet = workbook.Sheets[targetSheet];
         if (!sheet) {
@@ -274,7 +281,8 @@ Use this as the first step when a user uploads a spreadsheet — then analyze th
         const records: Record<string, CellValue>[] = limitedRows.map((row) => {
           const record: Record<string, CellValue> = {};
           for (let c = 0; c < colNames.length; c++) {
-            record[colNames[c]!] = row[c] ?? null;
+            const colName = colNames[c] ?? `column_${c}`;
+            record[colName] = row[c] ?? null;
           }
           return record;
         });

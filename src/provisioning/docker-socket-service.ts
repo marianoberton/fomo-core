@@ -163,7 +163,7 @@ function computeUptime(startedAt: string | undefined): number | undefined {
 /** Extract an error message from a Docker API response body. */
 function extractDockerError(body: unknown, fallbackStatusCode: number): string {
   if (typeof body === 'object' && body !== null && 'message' in body) {
-    return String((body as { message: string }).message);
+    return (body as { message: string }).message;
   }
   return `Docker API returned ${fallbackStatusCode}`;
 }

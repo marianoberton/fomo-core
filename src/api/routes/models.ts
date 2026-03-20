@@ -60,6 +60,7 @@ function buildModelEntries(): ModelEntry[] {
 /** Register model routes. */
 export function modelRoutes(
   fastify: FastifyInstance,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _deps: RouteDependencies,
 ): void {
   fastify.get(

@@ -70,6 +70,7 @@ export function createGmailSendTool(options: GmailSendOptions): ExecutableTool {
     supportsDryRun: true,
     inputSchema,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) return err(new ToolExecutionError('gmail-send', parsed.error.message));
@@ -87,7 +88,7 @@ export function createGmailSendTool(options: GmailSendOptions): ExecutableTool {
       const clientId = await options.secretService.get(projectId, 'GOOGLE_CLIENT_ID');
       const clientSecret = await options.secretService.get(projectId, 'GOOGLE_CLIENT_SECRET');
       const refreshToken = await options.secretService.get(projectId, 'GOOGLE_REFRESH_TOKEN');
-      const fromEmail = await options.secretService.get(projectId, 'GOOGLE_USER_EMAIL') ?? 'me';
+      const fromEmail = await options.secretService.get(projectId, 'GOOGLE_USER_EMAIL');
 
       if (!clientId || !clientSecret || !refreshToken) {
         return err(new ToolExecutionError('gmail-send', 'Faltan secrets: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN'));

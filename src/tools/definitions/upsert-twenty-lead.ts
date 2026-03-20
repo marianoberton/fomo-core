@@ -62,35 +62,45 @@ async function req(
   return { ok: res.ok, status: res.status, data };
 }
 
-async function findByEmail(baseUrl: string, headers: TwentyHeaders, email: string) {
+interface TwentyRecord {
+  id: string;
+  name?: unknown;
+  [key: string]: unknown;
+}
+
+async function findByEmail(baseUrl: string, headers: TwentyHeaders, email: string): Promise<TwentyRecord | null> {
   const filter = encodeURIComponent(`emails.primaryEmail[eq]:${email}`);
   const res = await req(baseUrl, headers, 'GET', `/people?filter=${filter}&limit=1`);
   if (!res.ok) return null;
-  const people = (res.data as any)?.data?.people;
+  const body = res.data as { data?: { people?: TwentyRecord[] | { edges?: { node: TwentyRecord }[] } } } | null;
+  const people = body?.data?.people;
   return Array.isArray(people) ? people[0] ?? null : people?.edges?.[0]?.node ?? null;
 }
 
-async function findCompany(baseUrl: string, headers: TwentyHeaders, name: string) {
+async function findCompany(baseUrl: string, headers: TwentyHeaders, name: string): Promise<TwentyRecord | null> {
   const filter = encodeURIComponent(`name[like]:%${name}%`);
   const res = await req(baseUrl, headers, 'GET', `/companies?filter=${filter}&limit=1`);
   if (!res.ok) return null;
-  const companies = (res.data as any)?.data?.companies;
+  const body = res.data as { data?: { companies?: TwentyRecord[] | { edges?: { node: TwentyRecord }[] } } } | null;
+  const companies = body?.data?.companies;
   return Array.isArray(companies) ? companies[0] ?? null : companies?.edges?.[0]?.node ?? null;
 }
 
-async function findOpportunityByPerson(baseUrl: string, headers: TwentyHeaders, personId: string) {
+async function findOpportunityByPerson(baseUrl: string, headers: TwentyHeaders, personId: string): Promise<TwentyRecord | null> {
   const filter = encodeURIComponent(`pointOfContactId[eq]:${personId}`);
   const res = await req(baseUrl, headers, 'GET', `/opportunities?filter=${filter}&orderBy=createdAt[desc]&limit=1`);
   if (!res.ok) return null;
-  const opps = (res.data as any)?.data?.opportunities;
+  const body = res.data as { data?: { opportunities?: TwentyRecord[] | { edges?: { node: TwentyRecord }[] } } } | null;
+  const opps = body?.data?.opportunities;
   return Array.isArray(opps) ? opps[0] ?? null : opps?.edges?.[0]?.node ?? null;
 }
 
-async function findOpportunityByCompany(baseUrl: string, headers: TwentyHeaders, companyId: string) {
+async function findOpportunityByCompany(baseUrl: string, headers: TwentyHeaders, companyId: string): Promise<TwentyRecord | null> {
   const filter = encodeURIComponent(`companyId[eq]:${companyId}`);
   const res = await req(baseUrl, headers, 'GET', `/opportunities?filter=${filter}&orderBy=createdAt[desc]&limit=1`);
   if (!res.ok) return null;
-  const opps = (res.data as any)?.data?.opportunities;
+  const body = res.data as { data?: { opportunities?: TwentyRecord[] | { edges?: { node: TwentyRecord }[] } } } | null;
+  const opps = body?.data?.opportunities;
   return Array.isArray(opps) ? opps[0] ?? null : opps?.edges?.[0]?.node ?? null;
 }
 
@@ -113,6 +123,7 @@ export function createTwentyUpsertTool(options: TwentyUpsertToolOptions): Execut
     sideEffects: true,
     supportsDryRun: true,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) {
@@ -157,7 +168,7 @@ export function createTwentyUpsertTool(options: TwentyUpsertToolOptions): Execut
         if (opportunity) {
           const updatePayload: Record<string, unknown> = { stage: data.stage };
           if (data.notes) {
-            updatePayload['name'] = `${opportunity.name} | ${data.notes}`;
+            updatePayload['name'] = `${String(opportunity.name)} | ${data.notes}`;
           }
           const resUpdate = await req(baseUrl, headers, 'PATCH', `/opportunities/${opportunity.id}`, updatePayload);
           if (!resUpdate.ok) {
@@ -189,7 +200,9 @@ export function createTwentyUpsertTool(options: TwentyUpsertToolOptions): Execut
         if (!company) {
           const resC = await req(baseUrl, headers, 'POST', '/companies', { name: data.company });
           if (!resC.ok) throw new Error(`createCompany failed: ${JSON.stringify(resC.data)}`);
-          company = (resC.data as any)?.data?.createCompany;
+          const companyBody = resC.data as { data?: { createCompany?: TwentyRecord } } | null;
+          company = companyBody?.data?.createCompany ?? null;
+          if (!company) throw new Error('createCompany returned no data');
         }
 
         // Person
@@ -204,7 +217,8 @@ export function createTwentyUpsertTool(options: TwentyUpsertToolOptions): Execut
           try {
             const resP = await req(baseUrl, headers, 'POST', '/people', personPayload);
             if (!resP.ok) throw new Error(`createPerson failed: ${JSON.stringify(resP.data)}`);
-            person = (resP.data as any)?.data?.createPerson;
+            const personBody = resP.data as { data?: { createPerson?: TwentyRecord } } | null;
+            person = personBody?.data?.createPerson ?? null;
           } catch {
             // Duplicate email — find existing
             if (data.email) person = await findByEmail(baseUrl, headers, data.email);
@@ -221,7 +235,8 @@ export function createTwentyUpsertTool(options: TwentyUpsertToolOptions): Execut
           pointOfContactId: person.id,
         });
         if (!resO.ok) throw new Error(`createOpportunity failed: ${JSON.stringify(resO.data)}`);
-        const newOpp = (resO.data as any)?.data?.createOpportunity;
+        const oppBody = resO.data as { data?: { createOpportunity?: TwentyRecord } } | null;
+        const newOpp = oppBody?.data?.createOpportunity;
 
         logger.info('Twenty lead created', {
           component: 'upsert-twenty-lead',

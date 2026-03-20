@@ -21,9 +21,6 @@ import type {
   LLMProvider,
   Message,
   ToolDefinitionForProvider,
-  ImageContent,
-  AudioContent,
-  VideoContent,
 } from './types.js';
 
 const logger = createLogger({ name: 'google-provider' });
@@ -194,17 +191,17 @@ export function createGoogleProvider(options: GoogleProviderOptions): LLMProvide
         for await (const chunk of result.stream) {
           const candidates = chunk.candidates ?? [];
           for (const candidate of candidates) {
-            for (const part of candidate.content?.parts ?? []) {
+            for (const part of candidate.content.parts) {
               if ('text' in part && part.text) {
                 yield { type: 'content_delta', text: part.text };
               } else if ('functionCall' in part && part.functionCall) {
                 hasToolCall = true;
                 const fc = part.functionCall;
                 const toolId = `tool-${Date.now()}-${toolCalls.length}`;
-                const args = (fc.args ?? {}) as Record<string, unknown>;
-                toolCalls.push({ name: fc.name ?? '', args });
+                const args = fc.args as Record<string, unknown>;
+                toolCalls.push({ name: fc.name, args });
 
-                yield { type: 'tool_use_start', id: toolId, name: fc.name ?? '' };
+                yield { type: 'tool_use_start', id: toolId, name: fc.name };
                 yield {
                   type: 'tool_use_delta',
                   id: toolId,
@@ -213,7 +210,7 @@ export function createGoogleProvider(options: GoogleProviderOptions): LLMProvide
                 yield {
                   type: 'tool_use_end',
                   id: toolId,
-                  name: fc.name ?? '',
+                  name: fc.name,
                   input: args,
                 };
               }
@@ -222,16 +219,16 @@ export function createGoogleProvider(options: GoogleProviderOptions): LLMProvide
 
           // Collect token usage if available
           if (chunk.usageMetadata) {
-            inputTokens = chunk.usageMetadata.promptTokenCount ?? inputTokens;
-            outputTokens = chunk.usageMetadata.candidatesTokenCount ?? outputTokens;
+            inputTokens = chunk.usageMetadata.promptTokenCount;
+            outputTokens = chunk.usageMetadata.candidatesTokenCount;
           }
         }
 
         // Get final usage from the aggregated response
         const response = await result.response;
         if (response.usageMetadata) {
-          inputTokens = response.usageMetadata.promptTokenCount ?? inputTokens;
-          outputTokens = response.usageMetadata.candidatesTokenCount ?? outputTokens;
+          inputTokens = response.usageMetadata.promptTokenCount;
+          outputTokens = response.usageMetadata.candidatesTokenCount;
         }
 
         const stopReason = hasToolCall ? 'tool_use' as const : 'end_turn' as const;

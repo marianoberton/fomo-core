@@ -301,15 +301,15 @@ export function createInMemoryUsageStore(): UsageStore {
 
     // In-memory store does not support detailed cost aggregation
     // Use PrismaUsageStore instead
-    async getCostSummary(): Promise<CostSummary> {
+    getCostSummary(): Promise<CostSummary> {
       throw new Error('getCostSummary not implemented for in-memory store');
     },
 
-    async getAgentSpend(): Promise<AgentSpend> {
+    getAgentSpend(): Promise<AgentSpend> {
       throw new Error('getAgentSpend not implemented for in-memory store');
     },
 
-    async getClientSpend(): Promise<ClientSpend> {
+    getClientSpend(): Promise<ClientSpend> {
       throw new Error('getClientSpend not implemented for in-memory store');
     },
   };

@@ -15,7 +15,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient, ChannelIntegration } from '@prisma/client';
 import type { SessionRepository } from '@/infrastructure/repositories/session-repository.js';
 import type { ProjectId, SessionId } from '@/core/types.js';
 import type { Logger } from '@/observability/logger.js';
@@ -75,7 +75,7 @@ const SendMessageSchema = z.object({
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
-async function getWebchatIntegration(prisma: PrismaClient, projectId: string) {
+async function getWebchatIntegration(prisma: PrismaClient, projectId: string): Promise<ChannelIntegration | null> {
   return prisma.channelIntegration.findFirst({
     where: { projectId, provider: WEBCHAT_PROVIDER },
   });
@@ -412,7 +412,7 @@ export function webchatPublicRoutes(
           sourceChannel: 'webchat',
           userMessage: message,
         });
-        return reply.send({ response: result.response });
+        return await reply.send({ response: result.response });
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
         logger.error('Webchat agent error', { component: 'webchat', projectId, error: msg });

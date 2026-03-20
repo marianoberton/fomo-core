@@ -193,7 +193,7 @@ export function createReviewAgentActivityTool(
                 toolExecutions.push({
                   traceId: trace.id,
                   sessionId: trace.sessionId,
-                  toolName: (event.data['toolId'] as string) ?? 'unknown',
+                  toolName: (event.data['toolId'] as string | undefined) ?? 'unknown',
                   success: resultEvent ? resultEvent.data['success'] as boolean : true,
                   durationMs: resultEvent?.data['durationMs'] as number | undefined,
                   timestamp: event.timestamp ?? trace.createdAt.toISOString(),
@@ -208,7 +208,7 @@ export function createReviewAgentActivityTool(
                   traceId: trace.id,
                   sessionId: trace.sessionId,
                   type: 'error',
-                  message: (event.data['message'] as string) ?? 'Unknown error',
+                  message: (event.data['message'] as string | undefined) ?? 'Unknown error',
                   timestamp: event.timestamp ?? trace.createdAt.toISOString(),
                 });
               }

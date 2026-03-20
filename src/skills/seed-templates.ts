@@ -7,6 +7,9 @@
 
 import { getOfficialTemplates } from './official-templates.js';
 import type { SkillRepository } from './types.js';
+import { createLogger } from '@/observability/logger.js';
+
+const logger = createLogger({ name: 'seed-templates' });
 
 /**
  * Inserta todos los templates oficiales en el repositorio como instancias
@@ -50,15 +53,16 @@ export async function seedOfficialTemplates(
 
   if (failed.length > 0) {
     const errors = failed
-      .map((r) => (r.status === 'rejected' ? r.reason : null))
-      .filter(Boolean)
-      .map((e) => (e instanceof Error ? e.message : String(e)))
+      .map((r) => {
+        const reason: unknown = r.reason;
+        return reason instanceof Error ? reason.message : String(reason);
+      })
       .join(', ');
-    console.warn(`[seedOfficialTemplates] ${failed.length} template(s) fallaron: ${errors}`);
+    logger.warn(`${failed.length} template(s) fallaron: ${errors}`);
   }
 
-  console.log(
-    `[seedOfficialTemplates] ${succeeded} templates insertados, ${existingNames.size} ya existían.`,
+  logger.info(
+    `${succeeded} templates insertados, ${existingNames.size} ya existían.`,
   );
 }
 

@@ -133,7 +133,7 @@ export function mcpServerRoutes(
         // Fill transport, command, args, url from template if not provided
         input = {
           ...input,
-          transport: input.transport ?? template.transport,
+          transport: input.transport,
           command: input.command ?? template.command,
           args: input.args ?? template.args,
           url: input.url ?? template.url,

@@ -34,7 +34,9 @@ export function createLicitacionesDocumentTool(options: LicitacionesDocumentOpti
     supportsDryRun: false,
     inputSchema,
 
-    async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async dryRun(_input: unknown): Promise<Result<ToolResult, NexusError>> {
+      void _input;
       return ok({ success: true, output: { dryRun: true }, durationMs: 0 });
     },
 
@@ -46,9 +48,7 @@ export function createLicitacionesDocumentTool(options: LicitacionesDocumentOpti
       const { process_id, jurisdiccion, file_id } = parsed.data;
       const { projectId } = context;
 
-      const apiUrl = await options.secretService.get(projectId, 'LICITACIONES_API_URL')
-        ?? options.licitacionesApiUrl
-        ?? 'http://72.61.44.62:18000';
+      const apiUrl = await options.secretService.get(projectId, 'LICITACIONES_API_URL');
 
       try {
         const encodedId = encodeURIComponent(process_id);
@@ -67,7 +67,7 @@ export function createLicitacionesDocumentTool(options: LicitacionesDocumentOpti
           output: {
             file_id: data.file_id,
             pages: data.pages,
-            content: data.content?.slice(0, 8000), // primeras 8k chars
+            content: data.content.slice(0, 8000), // primeras 8k chars
             message: `Documento "${file_id}" extraído (${data.pages} páginas)`,
           },
           durationMs: Date.now() - start,

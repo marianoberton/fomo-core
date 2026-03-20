@@ -211,7 +211,7 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
         projectId: current.projectId,
         timeoutMs: timeoutConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       });
-    } else if (onTimeout === 'escalate') {
+    } else {
       const resolved: ApprovalRequest = {
         ...current,
         status: 'denied',
@@ -229,7 +229,7 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
         timeoutMs: timeoutConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       });
       // Emit escalation event via optional callback
-      if (options?.onEscalate) {
+      if (options.onEscalate) {
         await options.onEscalate(resolved).catch((err: unknown) => {
           logger.error('onEscalate callback failed', {
             component: 'approval-gate',
@@ -252,7 +252,7 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
       const reminderDelay = timeoutMs - timeoutConfig.reminderMs;
       const minutesLeft = Math.round(timeoutConfig.reminderMs / 60_000);
       const reminderTimer = setTimeout(() => {
-        if (options?.reminderNotifier) {
+        if (options.reminderNotifier) {
           options.reminderNotifier(request.id, minutesLeft).catch((err: unknown) => {
             logger.error('reminderNotifier failed', {
               component: 'approval-gate',

@@ -9,7 +9,6 @@ import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError } from '../error-handler.js';
 import type { ProjectId } from '@/core/types.js';
-import type { ContactId } from '@/contacts/types.js';
 
 // ─── Schema ─────────────────────────────────────────────────────
 

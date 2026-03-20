@@ -143,9 +143,11 @@ export function createScrapeWebpageTool(): ExecutableTool {
 
         // Set viewport and user agent
         await page.setViewport({ width: 1280, height: 900 });
-        await page.setUserAgent(
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        );
+        // setUserAgent is deprecated; use CDP UserAgentOverride instead
+        const client = await page.createCDPSession();
+        await client.send('Network.setUserAgentOverride', {
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        });
 
         // Navigate to URL
         await page.goto(data.url, {
@@ -169,21 +171,17 @@ export function createScrapeWebpageTool(): ExecutableTool {
           const noise = document.querySelectorAll('script, style, noscript, iframe, svg');
           noise.forEach((el) => { el.remove(); });
 
-          const title = document.title || undefined;
+          const title = document.title.length > 0 ? document.title : undefined;
           const metaEl = document.querySelector('meta[name="description"]');
-          const metaDescription = metaEl?.getAttribute('content')?.trim() || undefined;
+          const metaDescription = metaEl?.getAttribute('content')?.trim() ?? undefined;
 
           // Find content root
           let root: Element | null = null;
           if (opts.selector) {
             root = document.querySelector(opts.selector);
           }
-          if (!root) {
-            root = document.querySelector('main, article, [role="main"]');
-          }
-          if (!root) {
-            root = document.body;
-          }
+          root ??= document.querySelector('main, article, [role="main"]');
+          root ??= document.body;
 
           // Extract text
           const rawText = (root as HTMLElement).innerText || root.textContent || '';
@@ -203,10 +201,10 @@ export function createScrapeWebpageTool(): ExecutableTool {
             links = [];
             linkEls.forEach((a) => {
               const href = (a as HTMLAnchorElement).href;
-              const text = (a as HTMLAnchorElement).innerText?.trim();
+              const text = (a as HTMLAnchorElement).innerText.trim();
               if (!href || !text || !href.startsWith('http') || seen.has(href)) return;
               seen.add(href);
-              links!.push({ text: text.slice(0, 100), href });
+              links?.push({ text: text.slice(0, 100), href });
             });
             links = links.slice(0, 50);
           }

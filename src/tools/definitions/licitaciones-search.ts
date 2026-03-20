@@ -38,7 +38,9 @@ export function createLicitacionesSearchTool(options: LicitacionesSearchOptions)
     supportsDryRun: false,
     inputSchema,
 
-    async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async dryRun(_input: unknown): Promise<Result<ToolResult, NexusError>> {
+      void _input;
       return ok({ success: true, output: { dryRun: true }, durationMs: 0 });
     },
 
@@ -50,12 +52,8 @@ export function createLicitacionesSearchTool(options: LicitacionesSearchOptions)
       const { q, jurisdiccion, estado, tipo_proceso, organismo, soloActivos, limit } = parsed.data;
       const { projectId } = context;
 
-      const supabaseUrl = await options.secretService.get(projectId, 'SUPABASE_LICI_URL')
-        ?? process.env['SUPABASE_LICI_URL']
-        ?? 'http://inted-pre0225supabase-4b1638-72-61-44-62.traefik.me';
-      const supabaseKey = await options.secretService.get(projectId, 'SUPABASE_LICI_KEY')
-        ?? process.env['SUPABASE_LICI_KEY']
-        ?? '';
+      const supabaseUrl = await options.secretService.get(projectId, 'SUPABASE_LICI_URL');
+      const supabaseKey = await options.secretService.get(projectId, 'SUPABASE_LICI_KEY');
 
       if (!supabaseKey) {
         return err(new ToolExecutionError('licitaciones-search', 'Falta secret SUPABASE_LICI_KEY'));

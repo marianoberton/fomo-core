@@ -49,7 +49,9 @@ export function createGoogleCalendarReadTool(options: GoogleCalendarReadOptions)
     supportsDryRun: false,
     inputSchema,
 
-    async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async dryRun(_input: unknown): Promise<Result<ToolResult, NexusError>> {
+      void _input;
       return ok({ success: true, output: { dryRun: true }, durationMs: 0 });
     },
 

@@ -20,7 +20,7 @@ const inputSchema = z.object({
   promiseDate:  z.string().optional().describe('Fecha prometida YYYY-MM-DD. Solo si isPromise=true'),
 });
 
-async function odooAuth(baseUrl: string, db: string, user: string, password: string) {
+async function odooAuth(baseUrl: string, db: string, user: string, password: string): Promise<{ cookie: string }> {
   const res = await fetch(`${baseUrl}/web/session/authenticate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -31,7 +31,7 @@ async function odooAuth(baseUrl: string, db: string, user: string, password: str
   return { cookie: res.headers.get('set-cookie') ?? '' };
 }
 
-async function odooCall(baseUrl: string, session: { cookie: string }, model: string, method: string, args: unknown[], kwargs: Record<string, unknown> = {}) {
+async function odooCall(baseUrl: string, session: { cookie: string }, model: string, method: string, args: unknown[], kwargs: Record<string, unknown> = {}): Promise<unknown> {
   const res = await fetch(`${baseUrl}/web/dataset/call_kw`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: session.cookie },
@@ -54,6 +54,7 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
     supportsDryRun: false,
     inputSchema,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       return ok({ success: true, output: { dryRun: true, input }, durationMs: 0 });
     },
@@ -73,14 +74,14 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
       const odooUser = await options.secretService.get(projectId, 'ODOO_USER');
       const odooPass = await options.secretService.get(projectId, 'ODOO_PASSWORD');
       const odooDB   = await options.secretService.get(projectId, 'ODOO_DB');
-      const odooUrl  = (await options.secretService.get(projectId, 'ODOO_BASE_URL')) ?? options.odooBaseUrl;
+      const odooUrl  = await options.secretService.get(projectId, 'ODOO_BASE_URL');
       if (!odooUser || !odooPass || !odooDB) {
         return err(new ToolExecutionError('odoo-register-payment', 'Faltan credenciales Odoo'));
       }
 
       try {
         const session = await odooAuth(odooUrl, odooDB, odooUser, odooPass);
-        const today = new Date().toISOString().split('T')[0]!;
+        const today = new Date().toISOString().split('T')[0] ?? '';
 
         // Buscar facturas del cliente por email o nombre
         let partnerFilter: unknown[] = [];
@@ -94,7 +95,7 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
           partnerFilter = [['partner_id', 'in', ids]];
         }
 
-        const today2 = new Date().toISOString().split('T')[0]!;
+        const today2 = new Date().toISOString().split('T')[0] ?? '';
         const overdueInvoices = await odooCall(odooUrl, session, 'account.move', 'search_read', [[
           ['move_type', '=', 'out_invoice'],
           ['payment_state', 'in', ['not_paid', 'partial']],
@@ -123,7 +124,8 @@ export function createOdooRegisterPaymentTool(options: OdooToolOptions): Executa
         if (!journals.length) throw new Error('No hay journal de banco/caja configurado');
 
         const totalResidual = overdueInvoices.reduce((s, i) => s + i.amount_residual, 0);
-        const invoice = overdueInvoices[0]!;
+        const invoice = overdueInvoices[0];
+        if (!invoice) throw new Error('No overdue invoices found');
 
         const paymentId = await odooCall(odooUrl, session, 'account.payment', 'create', [{
           payment_type: 'inbound',

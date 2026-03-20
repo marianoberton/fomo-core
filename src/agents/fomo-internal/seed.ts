@@ -14,7 +14,7 @@
 import { createLogger } from '@/observability/logger.js';
 import { FOMO_INTERNAL_AGENTS, FOMO_PROJECT_ID } from './agents.config.js';
 
-const logger = createLogger({ component: 'fomo-internal-seed' });
+const logger = createLogger({ name: 'fomo-internal-seed' });
 
 async function main(): Promise<void> {
   const API_BASE = process.env['FOMO_API_URL'] ?? 'http://localhost:3002';

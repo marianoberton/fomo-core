@@ -61,7 +61,7 @@ export class TemplateError extends NexusError {
 export function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(TEMPLATE_VAR_PATTERN, (_match, key: string) => {
     const value = vars[key];
-    return value !== undefined ? value : `{{${key}}}`;
+    return value ?? `{{${key}}}`;
   });
 }
 

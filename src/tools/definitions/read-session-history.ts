@@ -121,6 +121,7 @@ export function createReadSessionHistoryTool(
       }
     },
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(
       input: unknown,
       _context: ExecutionContext,

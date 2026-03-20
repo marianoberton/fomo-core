@@ -26,7 +26,7 @@ import {
   extractAssistantResponse,
   extractToolCalls,
 } from './chat-setup.js';
-import type { ProjectId, SessionId } from '@/core/types.js';
+import type { SessionId } from '@/core/types.js';
 import type { VapiIntegrationConfig } from '@/channels/types.js';
 
 // ─── VAPI Request Body Types ─────────────────────────────────────

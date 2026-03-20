@@ -76,7 +76,7 @@ export function campaignRoutes(
           channel: body.channel,
           audienceFilter: body.audienceFilter as Prisma.InputJsonValue,
           scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : null,
-          metadata: (body.metadata as Prisma.InputJsonValue) ?? undefined,
+          metadata: body.metadata as Prisma.InputJsonValue,
         },
       });
 
@@ -154,6 +154,7 @@ export function campaignRoutes(
         failed: campaign.sends.filter((s) => s.status === 'failed').length,
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { sends: _sends, _count, ...campaignData } = campaign;
       await sendSuccess(reply, { ...campaignData, sendStats });
     },

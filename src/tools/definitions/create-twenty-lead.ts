@@ -102,10 +102,10 @@ async function findCompany(
   if (!res.ok) return null;
   // Response is a plain array (not edges-based)
   const body = res.data as { data?: { companies?: { id: string }[] | { edges?: { node: { id: string } }[] } } };
-  const companies = body?.data?.companies;
+  const companies = body.data?.companies;
   if (!companies) return null;
   if (Array.isArray(companies)) return companies[0]?.id ?? null;
-  return companies.edges?.[0]?.node?.id ?? null;
+  return companies.edges?.[0]?.node.id ?? null;
 }
 
 /** Crea una empresa. Retorna el ID. */
@@ -119,7 +119,7 @@ async function createCompany(
     throw new Error(`Twenty createCompany failed (${res.status}): ${JSON.stringify(res.data)}`);
   }
   const body = res.data as { data?: { createCompany?: { id: string } } };
-  const id = body?.data?.createCompany?.id;
+  const id = body.data?.createCompany?.id;
   if (!id) throw new Error('Twenty createCompany returned no ID');
   return id;
 }
@@ -134,10 +134,10 @@ async function findPerson(
   const res = await twentyRequest(baseUrl, headers, 'GET', `/people?filter=${filter}&limit=1`);
   if (!res.ok) return null;
   const body = res.data as { data?: { people?: { id: string }[] | { edges?: { node: { id: string } }[] } } };
-  const people = body?.data?.people;
+  const people = body.data?.people;
   if (!people) return null;
   if (Array.isArray(people)) return people[0]?.id ?? null;
-  return people.edges?.[0]?.node?.id ?? null;
+  return people.edges?.[0]?.node.id ?? null;
 }
 
 /** Crea un contacto vinculado a una empresa. Retorna el ID. */
@@ -171,7 +171,7 @@ async function createPerson(
     throw new Error(`Twenty createPerson failed (${res.status}): ${JSON.stringify(res.data)}`);
   }
   const body = res.data as { data?: { createPerson?: { id: string } } };
-  const id = body?.data?.createPerson?.id;
+  const id = body.data?.createPerson?.id;
   if (!id) throw new Error('Twenty createPerson returned no ID');
   return id;
 }
@@ -204,7 +204,7 @@ async function createOpportunity(
     );
   }
   const body = res.data as { data?: { createOpportunity?: { id: string } } };
-  const id = body?.data?.createOpportunity?.id;
+  const id = body.data?.createOpportunity?.id;
   if (!id) throw new Error('Twenty createOpportunity returned no ID');
   return id;
 }
@@ -230,6 +230,7 @@ export function createTwentyCrmTool(options: TwentyCrmToolOptions): ExecutableTo
     sideEffects: true,
     supportsDryRun: true,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) {

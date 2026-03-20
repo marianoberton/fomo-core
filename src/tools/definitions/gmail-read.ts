@@ -71,7 +71,9 @@ export function createGmailReadTool(options: GmailReadOptions): ExecutableTool {
     supportsDryRun: false,
     inputSchema,
 
-    async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async dryRun(_input: unknown): Promise<Result<ToolResult, NexusError>> {
+      void _input;
       return ok({ success: true, output: { dryRun: true }, durationMs: 0 });
     },
 
@@ -128,7 +130,7 @@ export function createGmailReadTool(options: GmailReadOptions): ExecutableTool {
           };
 
           const headers = msg.payload?.headers ?? [];
-          const getHeader = (name: string) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
+          const getHeader = (name: string): string => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
 
           return {
             id: msg.id,

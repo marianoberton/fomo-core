@@ -113,7 +113,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
         const isOpenClawSource = rawPayload?.['sourceChannel'] === 'openclaw';
 
         if (isOpenClawSource) {
-          const openclawAgentId = rawPayload?.['agentId'] as string | undefined;
+          const openclawAgentId = rawPayload['agentId'] as string | undefined;
 
           logger.info('Routing decision: OpenClaw Manager message — direct agent invocation', {
             component: 'inbound-processor',
@@ -133,7 +133,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
             },
           });
 
-          const agentResult = await runAgent({
+          await runAgent({
             projectId,
             sessionId: session.id,
             agentId: openclawAgentId,

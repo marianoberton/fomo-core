@@ -38,7 +38,7 @@ const inputSchema = z.object({
     'Nuevo estado: NEW | CONTACTED | MEETING | PROPOSAL | WON | LOST'
   ),
   notes: z.string().max(2000).optional().describe('Notas adicionales a agregar al nombre de la oportunidad'),
-}).refine(d => d.email || d.company, {
+}).refine(d => d.email ?? d.company, {
   message: 'Se requiere email o company para identificar el lead',
 });
 
@@ -74,7 +74,7 @@ async function findOpportunityByEmail(
   if (!res.ok) return null;
 
   const body = res.data as { data?: { people?: { id: string }[] } };
-  const personId = body?.data?.people?.[0]?.id;
+  const personId = body.data?.people?.[0]?.id;
   if (!personId) return null;
 
   // Luego buscar oportunidad por pointOfContactId
@@ -83,7 +83,7 @@ async function findOpportunityByEmail(
   if (!resOpp.ok) return null;
 
   const bodyOpp = resOpp.data as { data?: { opportunities?: { id: string; name: string; stage: string }[] } };
-  return bodyOpp?.data?.opportunities?.[0] ?? null;
+  return bodyOpp.data?.opportunities?.[0] ?? null;
 }
 
 /** Busca oportunidad por nombre de empresa */
@@ -97,7 +97,7 @@ async function findOpportunityByCompany(
   if (!res.ok) return null;
 
   const body = res.data as { data?: { companies?: { id: string }[] } };
-  const companyId = body?.data?.companies?.[0]?.id;
+  const companyId = body.data?.companies?.[0]?.id;
   if (!companyId) return null;
 
   const filterOpp = encodeURIComponent(`companyId[eq]:${companyId}`);
@@ -105,7 +105,7 @@ async function findOpportunityByCompany(
   if (!resOpp.ok) return null;
 
   const bodyOpp = resOpp.data as { data?: { opportunities?: { id: string; name: string; stage: string }[] } };
-  return bodyOpp?.data?.opportunities?.[0] ?? null;
+  return bodyOpp.data?.opportunities?.[0] ?? null;
 }
 
 export function createTwentyUpdateTool(options: TwentyUpdateToolOptions): ExecutableTool {
@@ -126,6 +126,7 @@ export function createTwentyUpdateTool(options: TwentyUpdateToolOptions): Execut
     sideEffects: true,
     supportsDryRun: true,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) {

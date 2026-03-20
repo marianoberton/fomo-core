@@ -8,6 +8,9 @@ import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { VerticalConfig } from './vertical-config.schema.js';
+import { createLogger } from '@/observability/logger.js';
+
+const logger = createLogger({ name: 'vertical-registry' });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIGS_DIR = join(__dirname, 'configs');
@@ -31,7 +34,7 @@ function loadJsonVerticals(): VerticalConfig[] {
       const config = JSON.parse(raw) as VerticalConfig;
       configs.push(config);
     } catch (err) {
-      console.warn(`[vertical-registry] Failed to load ${file}:`, err);
+      logger.warn('Failed to load vertical config', { component: 'vertical-registry', file, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -99,7 +102,11 @@ export function getVerticalsByIndustry(industry: string): VerticalConfig[] {
 function interpolate(template: string, params: Record<string, unknown>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => {
     if (Object.prototype.hasOwnProperty.call(params, key)) {
-      return String(params[key] ?? '');
+      const val = params[key];
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'string') return val;
+      if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+      return JSON.stringify(val);
     }
     return match; // leave unresolved placeholders intact
   });

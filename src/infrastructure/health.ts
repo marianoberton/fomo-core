@@ -186,7 +186,7 @@ export function registerHealthRoutes(fastify: FastifyInstance, deps: HealthDeps)
         clients,
       };
 
-      return reply.code(200).send(response);
+      return await reply.code(200).send(response);
     } catch (e) {
       logger.error('Health clients check failed', {
         component: COMPONENT,

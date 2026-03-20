@@ -3,7 +3,7 @@
  * Retrieves files via the FileService and extracts text or structured data.
  */
 import { z } from 'zod';
-import type { ExecutionContext, ProjectId } from '@/core/types.js';
+import type { ExecutionContext } from '@/core/types.js';
 import type { Result } from '@/core/result.js';
 import { ok, err } from '@/core/result.js';
 import { ToolExecutionError } from '@/core/errors.js';
@@ -179,9 +179,10 @@ export function createReadFileTool(options: ReadFileToolOptions): ExecutableTool
         let resolvedFileId = parsed.fileId;
 
         if (!resolvedFileId && parsed.filename) {
+          const filenameToMatch = parsed.filename;
           const files = await fileService.listByProject(context.projectId);
           const match = files.find(
-            (f) => f.originalFilename.toLowerCase() === parsed.filename!.toLowerCase(),
+            (f) => f.originalFilename.toLowerCase() === filenameToMatch.toLowerCase(),
           );
           if (!match) {
             const available = files.map((f) => f.originalFilename).join(', ');
@@ -193,8 +194,11 @@ export function createReadFileTool(options: ReadFileToolOptions): ExecutableTool
           resolvedFileId = match.id;
         }
 
+        if (!resolvedFileId) {
+          return err(new ToolExecutionError('read-file', 'Could not resolve file ID'));
+        }
         // Download file via FileService
-        const { file, content } = await fileService.download(resolvedFileId!);
+        const { file, content } = await fileService.download(resolvedFileId);
 
         // Validate file size
         if (file.sizeBytes > MAX_FILE_SIZE) {
@@ -257,9 +261,10 @@ export function createReadFileTool(options: ReadFileToolOptions): ExecutableTool
         let file = parsed.fileId ? await fileService.getById(parsed.fileId) : null;
 
         if (!file && parsed.filename) {
+          const filenameToMatch = parsed.filename;
           const files = await fileService.listByProject(context.projectId);
           file = files.find(
-            (f) => f.originalFilename.toLowerCase() === parsed.filename!.toLowerCase(),
+            (f) => f.originalFilename.toLowerCase() === filenameToMatch.toLowerCase(),
           ) ?? null;
         }
 

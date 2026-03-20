@@ -4,7 +4,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
-import { sendSuccess, sendError } from '../error-handler.js';
+import { sendSuccess } from '../error-handler.js';
 import { createPrismaUsageStore } from '@/cost/prisma-usage-store.js';
 import type { ProjectId } from '@/core/types.js';
 

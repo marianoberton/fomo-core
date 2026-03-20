@@ -120,7 +120,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
     ): Promise<CostSummary> {
       const startDate = getStartDate(period);
 
-      const whereClause: any = {
+      const whereClause: { timestamp: { gte: Date }; projectId?: string } = {
         timestamp: { gte: startDate },
       };
       if (projectId) {
@@ -147,7 +147,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
 
       for (const record of records) {
         // By model
-        const modelData = modelMap.get(record.model) || { costUSD: 0, requests: 0 };
+        const modelData = modelMap.get(record.model) ?? { costUSD: 0, requests: 0 };
         modelMap.set(record.model, {
           costUSD: modelData.costUSD + record.costUsd,
           requests: modelData.requests + 1,
@@ -155,7 +155,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
 
         // By project (always present)
         {
-          const existing = projectMap.get(record.projectId) || {
+          const existing = projectMap.get(record.projectId) ?? {
             projectId: record.projectId,
             projectName: `Project ${record.projectId.slice(0, 8)}`,
             totalCostUSD: 0,
@@ -170,7 +170,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
 
         // By agent (if agentId exists)
         if (record.agentId) {
-          const existing = agentMap.get(record.agentId) || {
+          const existing = agentMap.get(record.agentId) ?? {
             agentId: record.agentId,
             agentName: `Agent ${record.agentId.slice(0, 8)}`,
             totalCostUSD: 0,
@@ -194,7 +194,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
 
           // By client (if clientId exists)
           if (record.clientId) {
-            const clientData = clientMap.get(record.clientId) || {
+            const clientData = clientMap.get(record.clientId) ?? {
               clientId: record.clientId,
               clientName: `Client ${record.clientId.slice(0, 8)}`,
               totalCostUSD: 0,
@@ -332,7 +332,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
 
         return {
           agentId,
-          agentName: agentRecord?.name || `Agent ${agentId.slice(0, 8)}`,
+          agentName: agentRecord?.name ?? `Agent ${agentId.slice(0, 8)}`,
           totalCostUSD: 0,
           inputTokens: 0,
           outputTokens: 0,
@@ -362,7 +362,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
 
         return {
           clientId,
-          clientName: clientRecord?.name || `Client ${clientId.slice(0, 8)}`,
+          clientName: clientRecord?.name ?? `Client ${clientId.slice(0, 8)}`,
           totalCostUSD: 0,
           requestCount: 0,
           agents: [],

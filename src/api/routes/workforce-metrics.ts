@@ -275,7 +275,7 @@ export function workforceMetricsRoutes(
         date: row.date,
         sessions: Number(row.sessions),
         escalations: Number(row.escalations),
-        costUsd: Number(row.cost_usd),
+        costUsd: row.cost_usd,
       }));
 
       // ── Assemble response ────────────────────────────────────
@@ -286,7 +286,7 @@ export function workforceMetricsRoutes(
           to: now.toISOString(),
         },
         totalSessions,
-        totalMessages: totalMessages ?? null,
+        totalMessages,
         resolutionRate,
         escalationCount,
         avgTurnsPerSession,

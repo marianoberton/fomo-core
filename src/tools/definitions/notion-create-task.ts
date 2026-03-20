@@ -35,6 +35,7 @@ export function createNotionCreateTaskTool(options: NotionCreateTaskOptions): Ex
     supportsDryRun: true,
     inputSchema,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) return err(new ToolExecutionError('notion-create-task', parsed.error.message));

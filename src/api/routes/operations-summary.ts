@@ -49,20 +49,16 @@ function getAgentChannelProviders(agent: AgentConfig): string[] {
   const providers = new Set<string>();
 
   // From channelConfig.allowedChannels
-  if (agent.channelConfig?.allowedChannels) {
-    for (const ch of agent.channelConfig.allowedChannels) {
-      providers.add(ch);
-    }
+  for (const ch of agent.channelConfig.allowedChannels) {
+    providers.add(ch);
   }
 
   // From modes[].channelMapping
-  if (agent.modes) {
-    for (const mode of agent.modes) {
-      for (const ch of mode.channelMapping) {
-        // channelMapping entries may be "whatsapp", "telegram", or "slack:C05ABCDEF"
-        const provider = ch.includes(':') ? ch.split(':')[0] : ch;
-        if (provider) providers.add(provider);
-      }
+  for (const mode of agent.modes) {
+    for (const ch of mode.channelMapping) {
+      // channelMapping entries may be "whatsapp", "telegram", or "slack:C05ABCDEF"
+      const provider = ch.includes(':') ? ch.split(':')[0] : ch;
+      if (provider) providers.add(provider);
     }
   }
 

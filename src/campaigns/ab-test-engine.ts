@@ -114,8 +114,11 @@ export function calculateWinner(variantMetrics: CampaignVariantMetrics[]): {
 
   // Sort by reply rate descending
   const sorted = [...variantMetrics].sort((a, b) => b.replyRate - a.replyRate);
-  const best = sorted[0]!;
-  const second = sorted[1]!;
+  const best = sorted[0];
+  const second = sorted[1];
+  if (!best || !second) {
+    return { winner: null, confidence: 0 };
+  }
 
   const chi2 = chiSquare2x2(
     best.totalReplies, best.totalSent,
@@ -150,7 +153,6 @@ export async function getVariantMetrics(
   const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) return [];
 
-  const abTest = campaign.metadata as Record<string, unknown> | null;
   const abConfig = (campaign.metadata as Record<string, unknown> | null)?.['abTest'] as {
     variants?: { id: string; name: string; weight: number }[];
   } | undefined;

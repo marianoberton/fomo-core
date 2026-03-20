@@ -26,7 +26,6 @@ import {
 import type {
   FomoAgentInvokeInput,
   FomoAgentInvokeOutput,
-  FomoAgentSkillConfig,
 } from './types.js';
 
 // ─── Types ───────────────────────────────────────────────────────

@@ -274,10 +274,8 @@ Do not decline a request if your Manager might be able to approve it.
     // Store mode prompt overrides for later prompt building
     if (resolvedMode?.promptOverrides) {
       // Stash on metadata so prompt builder can access it (step 11)
-       
-      if (!body.metadata) {
-        body.metadata = {};
-      }
+
+      body.metadata ??= {};
       body.metadata['_modePromptOverrides'] = resolvedMode.promptOverrides;
       body.metadata['_modeName'] = resolvedMode.modeName;
     }
@@ -292,7 +290,7 @@ Do not decline a request if your Manager might be able to approve it.
       const composition = await deps.skillService.composeForAgent(agent.skillIds);
 
       if (composition.mergedInstructions) {
-        if (!body.metadata) body.metadata = {};
+        body.metadata ??= {};
         body.metadata['_skillInstructions'] = composition.mergedInstructions;
       }
 

@@ -53,6 +53,7 @@ export function createGoogleCalendarEventTool(options: GoogleCalendarEventOption
     supportsDryRun: true,
     inputSchema,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) return err(new ToolExecutionError('google-calendar-event', parsed.error.message));

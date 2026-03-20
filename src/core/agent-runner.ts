@@ -185,7 +185,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
             contentParts.push(...mediaParts);
             conversation.push({ role: 'user', content: contentParts });
           } else {
-            conversation.push({ role: 'user', content: message! });
+            conversation.push({ role: 'user', content: message ?? '' });
           }
         }
 

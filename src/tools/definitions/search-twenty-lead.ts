@@ -29,7 +29,7 @@ export interface TwentySearchToolOptions {
 const inputSchema = z.object({
   email: z.string().email().optional().describe('Email del contacto'),
   company: z.string().optional().describe('Nombre de la empresa'),
-}).refine(d => d.email || d.company, {
+}).refine(d => d.email ?? d.company, {
   message: 'Se requiere email o company para buscar',
 });
 
@@ -66,6 +66,7 @@ export function createTwentySearchTool(options: TwentySearchToolOptions): Execut
     sideEffects: false,
     supportsDryRun: false,
 
+    // eslint-disable-next-line @typescript-eslint/require-await
     async dryRun(input: unknown): Promise<Result<ToolResult, NexusError>> {
       const parsed = inputSchema.safeParse(input);
       if (!parsed.success) {
@@ -103,7 +104,8 @@ export function createTwentySearchTool(options: TwentySearchToolOptions): Execut
           const filter = encodeURIComponent(`emails.primaryEmail[eq]:${data.email}`);
           const res = await req(baseUrl, headers, `/people?filter=${filter}&limit=1`);
           if (res.ok) {
-            const people = (res.data as any)?.data?.people;
+            const body = res.data as { data?: { people?: Record<string, unknown>[] | { edges?: { node: Record<string, unknown> }[] } } } | null;
+            const people = body?.data?.people;
             person = Array.isArray(people) ? people[0] ?? null : people?.edges?.[0]?.node ?? null;
           }
         }
@@ -113,14 +115,19 @@ export function createTwentySearchTool(options: TwentySearchToolOptions): Execut
           const filter = encodeURIComponent(`name[like]:%${data.company}%`);
           const res = await req(baseUrl, headers, `/companies?filter=${filter}&limit=1`);
           if (res.ok) {
-            const companies = (res.data as any)?.data?.companies;
+            const body = res.data as { data?: { companies?: Record<string, unknown>[] | { edges?: { node: Record<string, unknown> }[] } } } | null;
+            const companies = body?.data?.companies;
             company = Array.isArray(companies) ? companies[0] ?? null : companies?.edges?.[0]?.node ?? null;
           }
         } else if (person) {
           // Obtener empresa del contacto
-          if (person['companyId']) {
-            const res = await req(baseUrl, headers, `/companies/${person['companyId']}`);
-            if (res.ok) company = (res.data as any)?.data?.company ?? null;
+          const companyId = person['companyId'] as string | undefined;
+          if (companyId) {
+            const res = await req(baseUrl, headers, `/companies/${companyId}`);
+            if (res.ok) {
+              const body = res.data as { data?: { company?: Record<string, unknown> } } | null;
+              company = body?.data?.company ?? null;
+            }
           }
         }
 
@@ -134,19 +141,23 @@ export function createTwentySearchTool(options: TwentySearchToolOptions): Execut
 
         // Buscar oportunidad
         let opportunity: Record<string, unknown> | null = null;
-        if (person?.['id']) {
-          const filter = encodeURIComponent(`pointOfContactId[eq]:${person['id']}`);
+        const personId = person?.['id'] as string | undefined;
+        if (personId) {
+          const filter = encodeURIComponent(`pointOfContactId[eq]:${personId}`);
           const res = await req(baseUrl, headers, `/opportunities?filter=${filter}&orderBy=createdAt[desc]&limit=1`);
           if (res.ok) {
-            const opps = (res.data as any)?.data?.opportunities;
+            const body = res.data as { data?: { opportunities?: Record<string, unknown>[] | { edges?: { node: Record<string, unknown> }[] } } } | null;
+            const opps = body?.data?.opportunities;
             opportunity = Array.isArray(opps) ? opps[0] ?? null : opps?.edges?.[0]?.node ?? null;
           }
         }
-        if (!opportunity && company?.['id']) {
-          const filter = encodeURIComponent(`companyId[eq]:${company['id']}`);
+        const companySearchId = company?.['id'] as string | undefined;
+        if (!opportunity && companySearchId) {
+          const filter = encodeURIComponent(`companyId[eq]:${companySearchId}`);
           const res = await req(baseUrl, headers, `/opportunities?filter=${filter}&orderBy=createdAt[desc]&limit=1`);
           if (res.ok) {
-            const opps = (res.data as any)?.data?.opportunities;
+            const body = res.data as { data?: { opportunities?: Record<string, unknown>[] | { edges?: { node: Record<string, unknown> }[] } } } | null;
+            const opps = body?.data?.opportunities;
             opportunity = Array.isArray(opps) ? opps[0] ?? null : opps?.edges?.[0]?.node ?? null;
           }
         }
@@ -163,15 +174,18 @@ export function createTwentySearchTool(options: TwentySearchToolOptions): Execut
             found: true,
             person: person ? {
               id: person['id'],
-              name: (person['name'] as any)?.firstName + ' ' + (person['name'] as any)?.lastName,
-              email: (person['emails'] as any)?.primaryEmail,
+              name: (() => {
+                const nameObj = person['name'] as Record<string, string> | undefined;
+                return `${nameObj?.['firstName'] ?? ''} ${nameObj?.['lastName'] ?? ''}`.trim();
+              })(),
+              email: (person['emails'] as Record<string, string> | undefined)?.['primaryEmail'],
             } : null,
             company: company ? { id: company['id'], name: company['name'] } : null,
             opportunity: opportunity ? {
               id: opportunity['id'],
               name: opportunity['name'],
               stage: opportunity['stage'],
-              crmUrl: `${baseUrl}/crm/opportunities/${opportunity['id']}`,
+              crmUrl: `${baseUrl}/crm/opportunities/${String(opportunity['id'])}`,
             } : null,
           },
           durationMs: Date.now() - start,

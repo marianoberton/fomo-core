@@ -49,7 +49,7 @@ function rowToRetrievedMemory(row: RawMemoryRow): RetrievedMemory {
     projectId: row.project_id as ProjectId,
     agentId: (row.agent_id as AgentId | undefined) ?? undefined,
     sessionId: (row.session_id as SessionId | undefined) ?? undefined,
-    scope: (row.scope as MemoryScope) || 'agent',
+    scope: row.scope as MemoryScope,
     category: row.category as MemoryCategory,
     content: row.content,
     embedding: [], // Embeddings not returned in search results for efficiency
@@ -82,7 +82,7 @@ export function createPrismaMemoryStore(
     ): Promise<MemoryEntry> {
       const id = nanoid();
       const now = new Date();
-      const scope: MemoryScope = entry.scope || 'agent';
+      const scope: MemoryScope = entry.scope ?? 'agent';
       // Auto-generate embedding from content when the caller provides an empty array.
       // This allows callers (e.g. store-memory tool, auto-store) to skip pre-generating embeddings.
       const resolvedEmbedding =
@@ -162,7 +162,7 @@ export function createPrismaMemoryStore(
       `;
       const counts = countResult[0];
 
-      logger.info(`retrieve() called: projectId=${query.projectId ?? 'NONE'}, scope=${query.scope ?? 'NONE'}, agentId=${query.agentId ?? 'NONE'}, topK=${query.topK}, dbTotal=${Number(counts?.total ?? 0)}, dbWithEmb=${Number(counts?.with_embedding ?? 0)}, embLen=${queryEmbedding.length}`, {
+      logger.info(`retrieve() called: projectId=${query.projectId ?? 'NONE'}, scope=${query.scope ?? 'NONE'}, agentId=${query.agentId ?? 'NONE'}, topK=${String(query.topK)}, dbTotal=${Number(counts.total)}, dbWithEmb=${Number(counts.with_embedding)}, embLen=${String(queryEmbedding.length)}`, {
         component: 'prisma-memory-store',
       });
 

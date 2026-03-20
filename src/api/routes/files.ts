@@ -35,7 +35,7 @@ export function fileRoutes(
       bodyType: typeof body,
       isBuffer: Buffer.isBuffer(body),
       hasData: body && typeof body === 'object' && 'data' in (body),
-      bodyPreview: Buffer.isBuffer(body) ? body.slice(0, 20).toString('hex') : JSON.stringify(body)?.slice(0, 100),
+      bodyPreview: Buffer.isBuffer(body) ? body.subarray(0, 20).toString('hex') : JSON.stringify(body).slice(0, 100),
       contentType: request.headers['content-type'],
     });
   });

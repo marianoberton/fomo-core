@@ -185,6 +185,11 @@ function setupDashboardSocket(
 
   /** Execute a single message.send and drain the queue on completion. */
   function runMessage(msg: MessageSendMessage): void {
+    if (!sessionId) {
+      sendError('NO_SESSION', 'No active session');
+      return;
+    }
+    const currentSessionId = sessionId;
     running = true;
     traceId = `trace-${Date.now()}`;
     const messageAbort = new AbortController();
@@ -206,7 +211,7 @@ function setupDashboardSocket(
     handleChatStreamMessage(
       {
         projectId,
-        sessionId: sessionId!,
+        sessionId: currentSessionId,
         agentId: agentId ?? undefined,
         sourceChannel: msg.sourceChannel ?? sourceChannel ?? undefined,
         contactRole: msg.contactRole ?? contactRole ?? undefined,

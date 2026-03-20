@@ -87,10 +87,10 @@ export function createVapiAdapter(config: VapiAdapterConfig): ChannelAdapter {
      * VAPI inbound turns are handled directly by the custom-llm route.
      * This method always returns null.
      */
-    async parseInbound(_payload: unknown): Promise<InboundMessage | null> {
+    parseInbound(_payload: unknown): Promise<InboundMessage | null> {
       void _payload;
       void projectId;
-      return null;
+      return Promise.resolve(null);
     },
 
     /** Check VAPI API reachability. */

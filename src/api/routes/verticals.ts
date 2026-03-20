@@ -10,6 +10,7 @@ import { getAllVerticals, getVertical } from '@/verticals/index.js';
 
 export function verticalRoutes(
   fastify: FastifyInstance,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _deps: RouteDependencies,
 ): void {
   /**
