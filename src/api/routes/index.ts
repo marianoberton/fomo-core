@@ -42,6 +42,7 @@ import { vapiRoutes } from './vapi.js';
 import { whatsappTemplateRoutes } from './whatsapp-templates.js';
 import { apiKeyRoutes } from './api-keys.js';
 import { provisioningRoutes } from './provisioning.js';
+import { platformBridgeRoutes } from './platform-bridge.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -95,5 +96,11 @@ export async function registerRoutes(
   await fastify.register(
     (f) => { costRoutes(f, deps); },
     { prefix: '/cost' },
+  );
+
+  // Platform bridge routes (Workforce + Copilot dashboard)
+  await fastify.register(
+    async (f) => { platformBridgeRoutes(f, deps); },
+    { prefix: '/platform' },
   );
 }
