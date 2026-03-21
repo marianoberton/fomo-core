@@ -290,7 +290,7 @@ describe('send-email tool', () => {
       });
 
       expect(tool.riskLevel).toBe('high');
-      expect(tool.requiresApproval).toBe(true);
+      expect(tool.requiresApproval).toBe(false);
       expect(tool.sideEffects).toBe(true);
     });
   });

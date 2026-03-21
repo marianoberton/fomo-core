@@ -66,12 +66,12 @@ describe('knowledge-search', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects invalid category', () => {
+    it('accepts any string category (open-ended list)', () => {
       const result = tool.inputSchema.safeParse({
         query: 'test',
-        categories: ['invalid_category'],
+        categories: ['custom_category'],
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
     it('rejects minImportance out of range', () => {

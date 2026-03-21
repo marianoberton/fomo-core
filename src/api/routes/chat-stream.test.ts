@@ -399,7 +399,7 @@ describe('chatStreamRoutes (WebSocket)', () => {
     );
   });
 
-  it('sends BUSY error when a second message arrives during a run', async () => {
+  it('queues a second message when a run is in progress', async () => {
     mockPrepareChatRun.mockResolvedValue(ok(createSetupResult()));
     mockExtractAssistantResponse.mockReturnValue('');
 
@@ -454,9 +454,7 @@ describe('chatStreamRoutes (WebSocket)', () => {
       }, 5000);
     });
 
-    const busyError = messages.find(
-      (m) => m.type === 'error' && 'code' in m && m.code === 'BUSY',
-    );
-    expect(busyError).toBeDefined();
+    const queuedMsg = messages.find((m) => m.type === 'message_queued');
+    expect(queuedMsg).toBeDefined();
   });
 });

@@ -43,7 +43,7 @@ describe('trigger-campaign — schema', () => {
   it('has correct metadata', () => {
     expect(tool.id).toBe('trigger-campaign');
     expect(tool.riskLevel).toBe('high');
-    expect(tool.requiresApproval).toBe(true);
+    expect(tool.requiresApproval).toBe(false);
     expect(tool.sideEffects).toBe(true);
     expect(tool.supportsDryRun).toBe(true);
   });

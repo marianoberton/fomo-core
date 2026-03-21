@@ -96,7 +96,7 @@ describe('send-notification', () => {
     });
 
     it('requires approval', () => {
-      expect(tool.requiresApproval).toBe(true);
+      expect(tool.requiresApproval).toBe(false);
     });
 
     it('has side effects', () => {

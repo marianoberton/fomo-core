@@ -63,6 +63,7 @@ describe('session routes', () => {
       expect(deps.sessionRepository.listByProject).toHaveBeenCalledWith(
         'proj-1',
         undefined,
+        undefined,
       );
     });
 
@@ -83,6 +84,7 @@ describe('session routes', () => {
       expect(deps.sessionRepository.listByProject).toHaveBeenCalledWith(
         'proj-1',
         'active',
+        undefined,
       );
     });
   });

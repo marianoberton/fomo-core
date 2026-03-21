@@ -99,7 +99,10 @@ describe('PrismaLongTermMemoryStore', () => {
           similarity_score: 0.95,
         },
       ];
-      vi.mocked(mockPrisma.$queryRaw).mockResolvedValue(rawRows);
+      // First call: diagnostic count query; second call: vector search
+      vi.mocked(mockPrisma.$queryRaw)
+        .mockResolvedValueOnce([{ total: 1n, with_embedding: 1n }])
+        .mockResolvedValueOnce(rawRows);
 
       const store = createPrismaMemoryStore(mockPrisma, mockEmbGen);
       const results = await store.retrieve({
@@ -108,8 +111,7 @@ describe('PrismaLongTermMemoryStore', () => {
       });
 
       expect(mockEmbGen).toHaveBeenCalledWith('What color is the sky?');
-       
-      expect(mockPrisma.$queryRaw).toHaveBeenCalledOnce();
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
       expect(results).toHaveLength(1);
       expect(results[0]?.content).toBe('The sky is blue');
       expect(results[0]?.similarityScore).toBe(0.95);
@@ -144,19 +146,25 @@ describe('PrismaLongTermMemoryStore', () => {
     });
 
     it('returns empty array when no results', async () => {
-      vi.mocked(mockPrisma.$queryRaw).mockResolvedValue([]);
+      // First call: diagnostic count; second call: vector search (empty)
+      vi.mocked(mockPrisma.$queryRaw)
+        .mockResolvedValueOnce([{ total: 0n, with_embedding: 0n }])
+        .mockResolvedValueOnce([]);
 
       const store = createPrismaMemoryStore(mockPrisma, mockEmbGen);
       const results = await store.retrieve({ query: 'nothing', topK: 5 });
 
       expect(results).toHaveLength(0);
       // No access count update when no results
-       
+
       expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
     });
 
     it('passes filter parameters to the query', async () => {
-      vi.mocked(mockPrisma.$queryRaw).mockResolvedValue([]);
+      // First call: diagnostic count; second call: vector search (empty)
+      vi.mocked(mockPrisma.$queryRaw)
+        .mockResolvedValueOnce([{ total: 0n, with_embedding: 0n }])
+        .mockResolvedValueOnce([]);
 
       const store = createPrismaMemoryStore(mockPrisma, mockEmbGen);
       await store.retrieve({
@@ -168,8 +176,7 @@ describe('PrismaLongTermMemoryStore', () => {
       });
 
       expect(mockEmbGen).toHaveBeenCalledWith('test');
-       
-      expect(mockPrisma.$queryRaw).toHaveBeenCalledOnce();
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
     });
   });
 

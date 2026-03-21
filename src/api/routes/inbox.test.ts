@@ -108,8 +108,8 @@ describe('inbox routes', () => {
         .mockResolvedValueOnce({ name: 'John Doe', role: null })
         .mockResolvedValueOnce({ name: 'Jane Smith', role: 'owner' });
       mockPrisma.message.findFirst
-        .mockResolvedValueOnce({ role: 'user', content: 'Hello', createdAt: new Date('2026-02-19T11:00:00Z') })
-        .mockResolvedValueOnce({ role: 'assistant', content: 'Hi!', createdAt: new Date('2026-02-18T15:00:00Z') });
+        .mockResolvedValueOnce({ role: 'user', content: 'Hello', mediaUrls: [], createdAt: new Date('2026-02-19T11:00:00Z') })
+        .mockResolvedValueOnce({ role: 'assistant', content: 'Hi!', mediaUrls: [], createdAt: new Date('2026-02-18T15:00:00Z') });
 
       const response = await server.inject({
         method: 'GET',
@@ -129,7 +129,7 @@ describe('inbox routes', () => {
     it('filters by channel', async () => {
       mockPrisma.session.findMany.mockResolvedValue(mockSessions);
       mockPrisma.contact.findUnique.mockResolvedValue({ name: 'Jane', role: null });
-      mockPrisma.message.findFirst.mockResolvedValue({ role: 'user', content: 'test', createdAt: new Date() });
+      mockPrisma.message.findFirst.mockResolvedValue({ role: 'user', content: 'test', mediaUrls: [], createdAt: new Date() });
 
       const response = await server.inject({
         method: 'GET',
@@ -144,7 +144,7 @@ describe('inbox routes', () => {
     it('filters by agentId', async () => {
       mockPrisma.session.findMany.mockResolvedValue(mockSessions);
       mockPrisma.contact.findUnique.mockResolvedValue({ name: 'John', role: null });
-      mockPrisma.message.findFirst.mockResolvedValue({ role: 'user', content: 'test', createdAt: new Date() });
+      mockPrisma.message.findFirst.mockResolvedValue({ role: 'user', content: 'test', mediaUrls: [], createdAt: new Date() });
 
       const response = await server.inject({
         method: 'GET',
@@ -159,7 +159,7 @@ describe('inbox routes', () => {
     it('supports pagination', async () => {
       mockPrisma.session.findMany.mockResolvedValue(mockSessions);
       mockPrisma.contact.findUnique.mockResolvedValue({ name: 'Test', role: null });
-      mockPrisma.message.findFirst.mockResolvedValue({ role: 'user', content: 'test', createdAt: new Date() });
+      mockPrisma.message.findFirst.mockResolvedValue({ role: 'user', content: 'test', mediaUrls: [], createdAt: new Date() });
 
       const response = await server.inject({
         method: 'GET',
@@ -197,12 +197,12 @@ describe('inbox routes', () => {
       });
 
       mockPrisma.contact.findUnique.mockResolvedValue({
-        id: 'contact-1', name: 'John Doe', role: null, phone: '+1234567890', email: null,
+        id: 'contact-1', name: 'John Doe', role: null, phone: '+1234567890', email: null, tags: [],
       });
 
       mockPrisma.message.findMany.mockResolvedValue([
-        { id: 'msg-1', role: 'user', content: 'Hello', toolCalls: null, createdAt: new Date('2026-02-19T10:00:00Z') },
-        { id: 'msg-2', role: 'assistant', content: 'Hi!', toolCalls: null, createdAt: new Date('2026-02-19T10:00:05Z') },
+        { id: 'msg-1', role: 'user', content: 'Hello', mediaUrls: [], toolCalls: null, createdAt: new Date('2026-02-19T10:00:00Z') },
+        { id: 'msg-2', role: 'assistant', content: 'Hi!', mediaUrls: [], toolCalls: null, createdAt: new Date('2026-02-19T10:00:05Z') },
       ]);
 
       mockPrisma.executionTrace.findMany.mockResolvedValue([

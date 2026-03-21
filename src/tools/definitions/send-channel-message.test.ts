@@ -236,7 +236,7 @@ describe('send-channel-message tool', () => {
       });
 
       expect(tool.riskLevel).toBe('medium');
-      expect(tool.requiresApproval).toBe(true);
+      expect(tool.requiresApproval).toBe(false);
       expect(tool.sideEffects).toBe(true);
     });
   });

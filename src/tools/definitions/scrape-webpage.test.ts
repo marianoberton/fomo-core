@@ -21,9 +21,13 @@ vi.mock('puppeteer', () => ({
 }));
 
 function setupMockBrowser(evaluateResult: Record<string, unknown>) {
+  const mockCDPSession = {
+    send: vi.fn().mockResolvedValue(undefined),
+  };
   const mockPage = {
     setViewport: mockSetViewport.mockResolvedValue(undefined),
     setUserAgent: mockSetUserAgent.mockResolvedValue(undefined),
+    createCDPSession: vi.fn().mockResolvedValue(mockCDPSession),
     goto: mockGoto.mockResolvedValue(undefined),
     waitForSelector: mockWaitForSelector,
     evaluate: mockEvaluate,

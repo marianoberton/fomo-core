@@ -98,7 +98,6 @@ export function registerErrorHandler(fastify: FastifyInstance): void {
       error: message,
       stack,
     });
-    const devMessage = message; // TEMP: always show actual error for debugging
-    await sendError(reply, 'INTERNAL_ERROR', devMessage, 500);
+    await sendError(reply, 'INTERNAL_ERROR', 'An unexpected error occurred', 500);
   });
 }

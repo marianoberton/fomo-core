@@ -17,10 +17,18 @@ vi.mock('./openai.js', () => ({
   })),
 }));
 
+vi.mock('./google.js', () => ({
+  createGoogleProvider: vi.fn(() => ({
+    id: 'google:gemini-2.5-pro',
+    displayName: 'Google gemini-2.5-pro',
+  })),
+}));
+
 // Import after mocks are set up
 const { createProvider } = await import('./factory.js');
 const { createAnthropicProvider } = await import('./anthropic.js');
 const { createOpenAIProvider } = await import('./openai.js');
+const { createGoogleProvider } = await import('./google.js');
 
 describe('createProvider', () => {
   const originalEnv = process.env;
@@ -71,7 +79,7 @@ describe('createProvider', () => {
     });
   });
 
-  it('creates a Google provider via OpenAI-compatible adapter', () => {
+  it('creates a Google provider via native Google adapter', () => {
     process.env['GOOGLE_API_KEY'] = 'test-key';
 
     const config: LLMProviderConfig = {
@@ -82,11 +90,9 @@ describe('createProvider', () => {
 
     createProvider(config);
 
-    expect(createOpenAIProvider).toHaveBeenCalledWith({
+    expect(createGoogleProvider).toHaveBeenCalledWith({
       apiKey: 'test-key',
       model: 'gemini-2.5-pro',
-      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-      providerLabel: 'google',
     });
   });
 

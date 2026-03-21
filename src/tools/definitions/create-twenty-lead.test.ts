@@ -124,7 +124,7 @@ describe('create-twenty-lead / dryRun', () => {
         contact: 'Juan Pérez',
         email: 'juan@example.com',
         phone: '+5491155551234',
-        opportunity: 'Acme SA - Lead',
+        opportunity: 'Acme SA - Demo Request',
         source: 'whatsapp',
       },
     });
