@@ -29,6 +29,7 @@ import type { CampaignRunner } from '@/campaigns/campaign-runner.js';
 import type { ApiKeyService } from '@/security/api-key-service.js';
 import type { ProvisioningService } from '@/provisioning/provisioning-service.js';
 import type { DokployService } from '@/provisioning/dokploy-service.js';
+import type { AgentRunRepository } from '@/infrastructure/repositories/agent-run-repository.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -141,5 +142,7 @@ export interface RouteDependencies {
   provisioningService: ProvisioningService;
   /** Dokploy API client for application management. */
   dokployService: DokployService;
+  /** Agent run repository for generic pipeline monitoring. */
+  agentRunRepository: AgentRunRepository;
   logger: Logger;
 }

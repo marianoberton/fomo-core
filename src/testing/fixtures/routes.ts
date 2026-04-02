@@ -26,10 +26,13 @@ import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-serv
 import type { SecretService } from '@/secrets/types.js';
 import type { SkillService } from '@/skills/skill-service.js';
 import type { ApiKeyService } from '@/security/api-key-service.js';
+import type { AgentRunRepository, AgentRun, AgentRunStep } from '@/infrastructure/repositories/agent-run-repository.js';
 import type { Logger } from '@/observability/logger.js';
 import type {
   ExecutionTrace,
   ProjectId,
+  AgentRunId,
+  AgentRunStepId,
   PromptLayerId,
   PromptSnapshot,
   ScheduledTaskId,
@@ -393,6 +396,21 @@ export function createMockSkillService(): { [K in keyof SkillService]: ReturnTyp
   };
 }
 
+/** Create a mock AgentRunRepository with all methods as vi.fn(). */
+export function createMockAgentRunRepository(): {
+  [K in keyof AgentRunRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    create: vi.fn(),
+    findById: vi.fn(),
+    update: vi.fn(),
+    list: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    createStep: vi.fn(),
+    updateStep: vi.fn(),
+    listSteps: vi.fn().mockResolvedValue([]),
+  };
+}
+
 /** Assemble a complete RouteDependencies with all mocks. */
 export function createMockDeps(): RouteDependencies & {
   projectRepository: ReturnType<typeof createMockProjectRepository>;
@@ -419,6 +437,7 @@ export function createMockDeps(): RouteDependencies & {
   channelIntegrationRepository: ReturnType<typeof createMockChannelIntegrationRepository>;
   mcpServerRepository: ReturnType<typeof createMockMCPServerRepository>;
   skillService: ReturnType<typeof createMockSkillService>;
+  agentRunRepository: ReturnType<typeof createMockAgentRunRepository>;
 } {
   return {
     projectRepository: createMockProjectRepository(),
@@ -449,6 +468,7 @@ export function createMockDeps(): RouteDependencies & {
     channelIntegrationRepository: createMockChannelIntegrationRepository(),
     mcpServerRepository: createMockMCPServerRepository(),
     skillService: createMockSkillService(),
+    agentRunRepository: createMockAgentRunRepository(),
     prisma: {} as RouteDependencies['prisma'],
     sessionBroadcaster: { subscribe: vi.fn().mockReturnValue(() => { /* noop */ }), broadcast: vi.fn() },
     resumeAfterApproval: () => Promise.resolve(),
@@ -579,6 +599,34 @@ export function createSampleScheduledTask(overrides?: Partial<ScheduledTask>): S
     runCount: 0,
     createdAt: new Date('2025-01-01'),
     updatedAt: new Date('2025-01-01'),
+    ...overrides,
+  };
+}
+
+/** Create a sample AgentRun for tests. */
+export function createSampleAgentRun(overrides?: Partial<AgentRun>): AgentRun {
+  return {
+    id: 'run-1' as AgentRunId,
+    projectId: 'proj-1' as ProjectId,
+    runType: 'feature',
+    description: 'Test pipeline run',
+    status: 'running',
+    totalSteps: 3,
+    currentStep: 0,
+    startedAt: new Date('2025-01-01'),
+    steps: [],
+    ...overrides,
+  };
+}
+
+/** Create a sample AgentRunStep for tests. */
+export function createSampleAgentRunStep(overrides?: Partial<AgentRunStep>): AgentRunStep {
+  return {
+    id: 'step-1' as AgentRunStepId,
+    runId: 'run-1' as AgentRunId,
+    stepIndex: 0,
+    agentName: 'tech-lead',
+    status: 'pending',
     ...overrides,
   };
 }

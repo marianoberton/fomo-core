@@ -28,3 +28,6 @@ export type { AgentRepository } from '@/agents/types.js';
 
 export { createChannelIntegrationRepository } from './channel-integration-repository.js';
 export type { ChannelIntegrationRepository } from '@/channels/types.js';
+
+export { createAgentRunRepository } from './agent-run-repository.js';
+export type { AgentRunRepository, AgentRun, AgentRunStep, AgentRunCreateInput, AgentRunUpdateInput, AgentRunStepCreateInput, AgentRunStepUpdateInput, AgentRunFilters } from './agent-run-repository.js';

@@ -40,6 +40,7 @@ model Project {
   skillInstances       SkillInstance[]
   campaigns            Campaign[]
   clients              Client[]
+  agentRuns            AgentRun[]
 
   @@map("projects")
 }
@@ -700,4 +701,49 @@ model Client {
   @@unique([projectId, externalId])
   @@index([projectId])
   @@map("clients")
+}
+
+// ─── Agent Runs (generic pipeline monitoring) ─────────────────
+
+model AgentRun {
+  id              String    @id @default(cuid())
+  projectId       String    @map("project_id")
+  externalProject String?   @map("external_project")
+  runType         String    @map("run_type")
+  description     String?
+  status          String    @default("running") // running, done, failed, killed
+  totalSteps      Int       @map("total_steps")
+  currentStep     Int       @default(0) @map("current_step")
+  startedAt       DateTime  @default(now()) @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  durationMs      Int?      @map("duration_ms")
+  metadata        Json?
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  steps   AgentRunStep[]
+
+  @@index([projectId, status, startedAt])
+  @@index([externalProject, status])
+  @@index([status, startedAt])
+  @@map("agent_runs")
+}
+
+model AgentRunStep {
+  id          String    @id @default(cuid())
+  runId       String    @map("run_id")
+  stepIndex   Int       @map("step_index")
+  agentName   String    @map("agent_name")
+  status      String    @default("pending") // pending, working, done, failed, skipped
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  durationMs  Int?      @map("duration_ms")
+  input       String?
+  output      String?
+  metadata    Json?
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, stepIndex])
+  @@index([runId, status])
+  @@map("agent_run_steps")
 }

@@ -43,6 +43,9 @@ import { whatsappTemplateRoutes } from './whatsapp-templates.js';
 import { apiKeyRoutes } from './api-keys.js';
 import { provisioningRoutes } from './provisioning.js';
 import { platformBridgeRoutes } from './platform-bridge.js';
+import { agentRunRoutes } from './agent-runs.js';
+import { manychatWebhookRoutes } from './manychat-webhook.js';
+import { reactivationCampaignRoutes } from './reactivation-campaign.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -91,6 +94,13 @@ export async function registerRoutes(
     dokployService: deps.dokployService,
     logger: deps.logger,
   });
+  agentRunRoutes(fastify, deps);
+
+  // ManyChat webhook for customer service
+  manychatWebhookRoutes(fastify, deps);
+
+  // HubSpot lead reactivation campaign routes
+  reactivationCampaignRoutes(fastify, deps);
 
   // Cost monitoring routes (prefix /cost to avoid collision with /agents)
   await fastify.register(

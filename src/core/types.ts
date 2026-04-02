@@ -14,6 +14,8 @@ export type PromptLayerId = Brand<string, 'PromptLayerId'>;
 export type UsageRecordId = Brand<string, 'UsageRecordId'>;
 export type ScheduledTaskId = Brand<string, 'ScheduledTaskId'>;
 export type ScheduledTaskRunId = Brand<string, 'ScheduledTaskRunId'>;
+export type AgentRunId = Brand<string, 'AgentRunId'>;
+export type AgentRunStepId = Brand<string, 'AgentRunStepId'>;
 
 // ─── LLM Provider Config ────────────────────────────────────────
 

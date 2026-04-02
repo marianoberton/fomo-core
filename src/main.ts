@@ -16,6 +16,7 @@ import {
   createWebhookRepository,
   createFileRepository,
   createAgentRepository,
+  createAgentRunRepository,
 } from '@/infrastructure/repositories/index.js';
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
 import { createSecretService } from '@/secrets/secret-service.js';
@@ -169,6 +170,7 @@ async function start(): Promise<void> {
     const fileRepository = createFileRepository(prisma);
     const agentRepository = createAgentRepository(prisma);
     const channelIntegrationRepository = createChannelIntegrationRepository(prisma);
+    const agentRunRepository = createAgentRunRepository(prisma);
     const secretRepository = createSecretRepository(prisma);
     const mcpServerRepository = createMCPServerRepository(prisma);
     const skillRepository = createSkillRepository(prisma);
@@ -769,6 +771,7 @@ async function start(): Promise<void> {
       resumeAfterApproval,
       provisioningService: provisioningService,
       dokployService: dokployService,
+      agentRunRepository,
       logger,
     };
 
