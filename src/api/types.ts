@@ -30,6 +30,7 @@ import type { ApiKeyService } from '@/security/api-key-service.js';
 import type { ProvisioningService } from '@/provisioning/provisioning-service.js';
 import type { DokployService } from '@/provisioning/dokploy-service.js';
 import type { AgentRunRepository } from '@/infrastructure/repositories/agent-run-repository.js';
+import type { TaskRegistry } from '@/channels/openclaw-task-registry.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -144,5 +145,7 @@ export interface RouteDependencies {
   dokployService: DokployService;
   /** Agent run repository for generic pipeline monitoring. */
   agentRunRepository: AgentRunRepository;
+  /** OpenClaw task lifecycle registry. */
+  taskRegistry: TaskRegistry;
   logger: Logger;
 }

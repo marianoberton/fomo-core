@@ -25,6 +25,7 @@ import { createSecretService } from '@/secrets/secret-service.js';
 import { createApiKeyService } from '@/security/api-key-service.js';
 import { createDokployService } from '@/provisioning/dokploy-service.js';
 import { createProvisioningService } from '@/provisioning/provisioning-service.js';
+import { createTaskRegistry } from '@/channels/openclaw-task-registry.js';
 import { createKnowledgeService } from '@/knowledge/knowledge-service.js';
 import { createApprovalGate } from '@/security/approval-gate.js';
 import { createToolRegistry } from '@/tools/registry/tool-registry.js';
@@ -195,6 +196,7 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     provisioningService: createProvisioningService({ dokployService: createDokployService({ logger, dokployUrl: 'http://localhost:3000', dokployApiKey: 'test', dokployProjectId: 'test' }), logger }),
     dokployService: createDokployService({ logger, dokployUrl: 'http://localhost:3000', dokployApiKey: 'test', dokployProjectId: 'test' }),
     agentRunRepository: createAgentRunRepository(prisma),
+    taskRegistry: createTaskRegistry(),
     logger,
   };
 

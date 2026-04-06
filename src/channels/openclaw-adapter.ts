@@ -3,28 +3,29 @@
  *
  * OpenClaw Manager containers call fomo-core when they need a specialized agent
  * to handle a task. This adapter:
- * 1. Validates the OPENCLAW_INTERNAL_KEY for service-to-service auth
- * 2. Parses the incoming request into an InboundMessage
- * 3. Routes through the InboundProcessor with sourceChannel=openclaw
- * 4. Returns the agent's response synchronously
+ * 1. Resolves the caller's project scope (Bearer auth or X-OpenClaw-Key fallback)
+ * 2. Enforces project access (client keys can only call their own project's agents)
+ * 3. Parses the incoming request into an InboundMessage
+ * 4. Routes through the InboundProcessor with sourceChannel=openclaw
+ * 5. Returns the agent's response synchronously
  *
  * Endpoint: POST /api/v1/openclaw/inbound
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { timingSafeEqual } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import type { Logger } from '@/observability/logger.js';
 import type { ProjectId } from '@/core/types.js';
 import type { InboundProcessor } from './inbound-processor.js';
 import { sendSuccess, sendError } from '@/api/error-handler.js';
+import { resolveOpenClawScope, assertProjectAccess } from '@/api/openclaw-auth.js';
 
 // ─── Types ───────────────────────────────────────────────────────
 
 /** Dependencies for the OpenClaw adapter routes. */
 export interface OpenClawAdapterDeps {
-  /** The internal API key for authenticating OpenClaw → fomo-core calls. */
-  openclawInternalKey: string;
+  /** Optional fallback key for backward compat (OPENCLAW_INTERNAL_KEY). */
+  openclawInternalKey?: string;
   /** The inbound processor for routing messages. */
   inboundProcessor: InboundProcessor;
   /** Function to run the agent directly (for synchronous response). */
@@ -73,20 +74,19 @@ export function openclawAdapterRoutes(
    * POST /api/v1/openclaw/inbound
    *
    * Called by OpenClaw Manager to invoke a fomo-core agent.
-   * Auth: X-OpenClaw-Key header must match OPENCLAW_INTERNAL_KEY.
+   * Auth: Bearer token (project-scoped or master) or X-OpenClaw-Key fallback.
    */
   fastify.post(
     '/openclaw/inbound',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      // 1. Authenticate with internal key
-      const providedKey = request.headers['x-openclaw-key'] as string | undefined;
-
-      if (!providedKey || !safeEqual(providedKey, openclawInternalKey)) {
-        logger.warn('OpenClaw adapter: invalid or missing internal key', {
+      // 1. Resolve scope (Bearer auth already ran via middleware)
+      const scope = resolveOpenClawScope(request, openclawInternalKey);
+      if (!scope) {
+        logger.warn('OpenClaw adapter: unauthenticated request', {
           component: 'openclaw-adapter',
           ip: request.ip,
         });
-        return sendError(reply, 'UNAUTHORIZED', 'Invalid or missing X-OpenClaw-Key header', 401);
+        return sendError(reply, 'UNAUTHORIZED', 'Authentication required', 401);
       }
 
       // 2. Parse and validate request body
@@ -102,14 +102,22 @@ export function openclawAdapterRoutes(
 
       const { projectId, agentId, message, sessionId, metadata } = parsed.data;
 
+      // 3. Enforce project access
+      try {
+        assertProjectAccess(scope, projectId);
+      } catch {
+        return sendError(reply, 'FORBIDDEN', `API key cannot access project "${projectId}"`, 403);
+      }
+
       logger.info('OpenClaw inbound request received', {
         component: 'openclaw-adapter',
         projectId,
         agentId,
         hasSessionId: !!sessionId,
+        isMaster: scope.isMaster,
       });
 
-      // 3. Run the agent directly (synchronous response to OpenClaw)
+      // 4. Run the agent directly (synchronous response to OpenClaw)
       const result = await runAgent({
         projectId: projectId as ProjectId,
         sessionId: sessionId ?? randomUUID(),
@@ -125,7 +133,7 @@ export function openclawAdapterRoutes(
         responseLength: result.response.length,
       });
 
-      // 4. Return the agent's response
+      // 5. Return the agent's response
       return sendSuccess(reply, {
         response: result.response,
         sourceChannel: 'openclaw',
@@ -133,21 +141,4 @@ export function openclawAdapterRoutes(
       });
     },
   );
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────
-
-/** Constant-time string comparison to prevent timing attacks. */
-function safeEqual(a: string, b: string): boolean {
-  const aLen = a.length;
-  const bLen = b.length;
-  const maxLen = Math.max(aLen, bLen);
-
-  const aBuf = Buffer.alloc(maxLen);
-  const bBuf = Buffer.alloc(maxLen);
-  aBuf.write(a);
-  bBuf.write(b);
-
-  const equal = timingSafeEqual(aBuf, bBuf);
-  return equal && aLen === bLen;
 }

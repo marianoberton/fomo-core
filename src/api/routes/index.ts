@@ -46,6 +46,9 @@ import { platformBridgeRoutes } from './platform-bridge.js';
 import { agentRunRoutes } from './agent-runs.js';
 import { manychatWebhookRoutes } from './manychat-webhook.js';
 import { reactivationCampaignRoutes } from './reactivation-campaign.js';
+import { openclawTaskRoutes } from './openclaw-tasks.js';
+import { openclawSandboxRoutes } from './openclaw-sandbox.js';
+import { openclawConnectRoutes } from './openclaw-connect.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -113,4 +116,29 @@ export async function registerRoutes(
     (f) => { platformBridgeRoutes(f, deps); },
     { prefix: '/platform' },
   );
+
+  // OpenClaw routes — auth handled by Bearer middleware, fallback to OPENCLAW_INTERNAL_KEY
+  const openclawFallbackKey = process.env['OPENCLAW_INTERNAL_KEY'];
+
+  // Task lifecycle, agent health
+  openclawTaskRoutes(fastify, {
+    openclawInternalKey: openclawFallbackKey,
+    agentRepository: deps.agentRepository,
+    taskRegistry: deps.taskRegistry,
+    logger: deps.logger,
+  });
+
+  // Sandbox — bidirectional agent optimization via WebSocket
+  openclawSandboxRoutes(fastify, {
+    ...deps,
+    openclawInternalKey: openclawFallbackKey,
+  });
+
+  // Connect + whoami — onboarding and identity verification
+  openclawConnectRoutes(fastify, {
+    openclawInternalKey: openclawFallbackKey,
+    projectRepository: deps.projectRepository,
+    agentRepository: deps.agentRepository,
+    logger: deps.logger,
+  });
 }

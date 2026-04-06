@@ -483,6 +483,17 @@ export function createMockDeps(): RouteDependencies & {
       getContainerStatus: vi.fn(),
       listClientContainers: vi.fn(),
     },
+    taskRegistry: {
+      create: vi.fn(),
+      get: vi.fn(),
+      addEvent: vi.fn(),
+      complete: vi.fn(),
+      fail: vi.fn(),
+      cancel: vi.fn(),
+      list: vi.fn().mockReturnValue([]),
+      countActive: vi.fn().mockReturnValue(0),
+      prune: vi.fn().mockReturnValue(0),
+    },
     logger: createMockLogger(),
   };
 }

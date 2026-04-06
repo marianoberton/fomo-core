@@ -9,12 +9,33 @@ import { z } from 'zod';
 
 // ─── Invoke Request ──────────────────────────────────────────────
 
+/** Structured task packet for OpenClaw orchestration. */
+export const TaskPacketSchema = z.object({
+  /** Unique task ID from OpenClaw for correlation. */
+  taskId: z.string().min(1).max(128),
+  /** What the agent should accomplish. */
+  objective: z.string().min(1).max(10_000),
+  /** Boundaries — what is in/out of scope. */
+  scope: z.string().max(10_000).optional(),
+  /** How to determine if the task succeeded. */
+  acceptanceCriteria: z.array(z.string().max(2_000)).optional(),
+  /** Priority hint for the agent. */
+  priority: z.enum(['low', 'normal', 'high', 'critical']).default('normal'),
+  /** Deadline hint (ISO datetime string). */
+  deadline: z.string().datetime().optional(),
+  /** Structured context key-value pairs from OpenClaw. */
+  context: z.record(z.string(), z.unknown()).optional(),
+});
+export type TaskPacket = z.infer<typeof TaskPacketSchema>;
+
 /** Schema for the input the OpenClaw skill sends to fomo-core. */
 export const FomoAgentInvokeInputSchema = z.object({
   /** The fomo-core agent ID to invoke. */
   agentId: z.string().min(1).max(128),
-  /** The message / task for the agent. */
-  message: z.string().min(1).max(100_000),
+  /** Plain text message (optional when task is provided). */
+  message: z.string().min(1).max(100_000).optional(),
+  /** Structured task packet (optional when message is provided). */
+  task: TaskPacketSchema.optional(),
   /** Optional session ID to continue an existing conversation. */
   sessionId: z.string().min(1).optional(),
   /** Source channel identifier (defaults to 'openclaw'). */
@@ -23,7 +44,14 @@ export const FomoAgentInvokeInputSchema = z.object({
   contactRole: z.string().min(1).optional(),
   /** Optional metadata forwarded to the agent. */
   metadata: z.record(z.unknown()).optional(),
-});
+  /** If true, stream SSE events instead of returning JSON. */
+  stream: z.boolean().optional(),
+  /** Callback URL for async webhook delivery. */
+  callbackUrl: z.string().url().optional(),
+}).refine(
+  (data) => data.message ?? data.task,
+  { message: 'Either message or task must be provided' },
+);
 export type FomoAgentInvokeInput = z.infer<typeof FomoAgentInvokeInputSchema>;
 
 // ─── Invoke Response ─────────────────────────────────────────────
@@ -44,6 +72,8 @@ export const FomoAgentInvokeOutputSchema = z.object({
     input: z.record(z.unknown()),
     result: z.unknown(),
   })).optional(),
+  /** Correlated task ID from the original task packet. */
+  taskId: z.string().optional(),
   /** ISO timestamp of the response. */
   timestamp: z.string(),
   /** Token usage and cost. */
@@ -54,6 +84,15 @@ export const FomoAgentInvokeOutputSchema = z.object({
   }).optional(),
 });
 export type FomoAgentInvokeOutput = z.infer<typeof FomoAgentInvokeOutputSchema>;
+
+/** Schema for async invoke acceptance (202 response). */
+export const FomoAgentAsyncAcceptedSchema = z.object({
+  taskId: z.string(),
+  agentId: z.string(),
+  status: z.literal('running'),
+  sessionId: z.string(),
+});
+export type FomoAgentAsyncAccepted = z.infer<typeof FomoAgentAsyncAcceptedSchema>;
 
 // ─── Skill Config ────────────────────────────────────────────────
 

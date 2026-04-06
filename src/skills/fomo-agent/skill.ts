@@ -22,10 +22,12 @@
 import {
   FomoAgentInvokeInputSchema,
   FomoAgentInvokeOutputSchema,
+  FomoAgentAsyncAcceptedSchema,
 } from './types.js';
 import type {
   FomoAgentInvokeInput,
   FomoAgentInvokeOutput,
+  FomoAgentAsyncAccepted,
 } from './types.js';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -49,8 +51,10 @@ export interface FomoAgentSkillDeps {
 
 /** The fomo-agent skill interface. */
 export interface FomoAgentSkill {
-  /** Invoke a fomo-core agent with a message/task. */
+  /** Invoke a fomo-core agent synchronously (returns full response). */
   invoke(input: FomoAgentInvokeInput): Promise<FomoAgentInvokeOutput>;
+  /** Invoke a fomo-core agent asynchronously (returns 202 with taskId immediately). */
+  invokeAsync(input: FomoAgentInvokeInput & { callbackUrl: string }): Promise<FomoAgentAsyncAccepted>;
 }
 
 // ─── Factory ─────────────────────────────────────────────────────
@@ -67,20 +71,26 @@ export function createFomoAgentSkill(deps: FomoAgentSkillDeps): FomoAgentSkill {
   // Strip trailing slash from base URL
   const baseUrl = fomoCorBaseUrl.replace(/\/+$/, '');
 
+  /** Build the invoke request body from parsed input. */
+  function buildInvokeBody(parsed: FomoAgentInvokeInput): string {
+    return JSON.stringify({
+      message: parsed.message,
+      task: parsed.task,
+      sessionId: parsed.sessionId,
+      sourceChannel: parsed.sourceChannel,
+      contactRole: parsed.contactRole,
+      metadata: parsed.metadata,
+      stream: parsed.stream,
+      callbackUrl: parsed.callbackUrl,
+    });
+  }
+
   return {
     async invoke(input: FomoAgentInvokeInput): Promise<FomoAgentInvokeOutput> {
-      // Validate input
       const parsed = FomoAgentInvokeInputSchema.parse(input);
 
       const url = `${baseUrl}/api/v1/agents/${encodeURIComponent(parsed.agentId)}/invoke`;
-
-      const body = JSON.stringify({
-        message: parsed.message,
-        sessionId: parsed.sessionId,
-        sourceChannel: parsed.sourceChannel,
-        contactRole: parsed.contactRole,
-        metadata: parsed.metadata,
-      });
+      const body = buildInvokeBody(parsed);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => { controller.abort(); }, timeoutMs);
@@ -110,8 +120,48 @@ export function createFomoAgentSkill(deps: FomoAgentSkillDeps): FomoAgentSkill {
           throw new Error(`fomo-core invoke error: ${errMsg}`);
         }
 
-        // Validate response shape
         const output = FomoAgentInvokeOutputSchema.parse(json.data);
+        return output;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+
+    async invokeAsync(input: FomoAgentInvokeInput & { callbackUrl: string }): Promise<FomoAgentAsyncAccepted> {
+      const parsed = FomoAgentInvokeInputSchema.parse({ ...input, callbackUrl: input.callbackUrl });
+
+      const url = `${baseUrl}/api/v1/agents/${encodeURIComponent(parsed.agentId)}/invoke`;
+      const body = buildInvokeBody(parsed);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => { controller.abort(); }, timeoutMs);
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${fomoApiKey}`,
+          },
+          body,
+          signal: controller.signal,
+        });
+
+        if (response.status !== 202) {
+          const errorBody = await response.text();
+          throw new Error(
+            `fomo-core async invoke failed (HTTP ${response.status}): ${errorBody}`,
+          );
+        }
+
+        const json = (await response.json()) as ApiResponse<unknown>;
+
+        if (!json.success || !json.data) {
+          const errMsg = json.error?.message ?? 'Unknown error from fomo-core';
+          throw new Error(`fomo-core async invoke error: ${errMsg}`);
+        }
+
+        const output = FomoAgentAsyncAcceptedSchema.parse(json.data);
         return output;
       } finally {
         clearTimeout(timeoutId);

@@ -13,7 +13,11 @@ import {
   extractAssistantResponse,
   extractToolCalls,
 } from './chat-setup.js';
+import type { ChatSetupResult } from './chat-setup.js';
 import { createAgentRunner } from '@/core/agent-runner.js';
+import type { ExecutionTrace } from '@/core/types.js';
+import type { Logger } from '@/observability/logger.js';
+import type { TaskRegistry } from '@/channels/openclaw-task-registry.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -100,13 +104,41 @@ const updateAgentSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+/** Structured task packet from OpenClaw orchestrator. */
+const taskPacketSchema = z.object({
+  /** Unique task ID from OpenClaw for correlation. */
+  taskId: z.string().min(1).max(128),
+  /** What the agent should accomplish. */
+  objective: z.string().min(1).max(10_000),
+  /** Boundaries — what is in/out of scope. */
+  scope: z.string().max(10_000).optional(),
+  /** How to determine if the task succeeded. */
+  acceptanceCriteria: z.array(z.string().max(2_000)).optional(),
+  /** Priority hint for the agent. */
+  priority: z.enum(['low', 'normal', 'high', 'critical']).default('normal'),
+  /** Deadline hint (ISO datetime string). */
+  deadline: z.string().datetime().optional(),
+  /** Structured context key-value pairs from OpenClaw. */
+  context: z.record(z.string(), z.unknown()).optional(),
+});
+
 const invokeAgentSchema = z.object({
-  message: z.string().min(1).max(100_000),
+  /** Plain text message (optional when task is provided). */
+  message: z.string().min(1).max(100_000).optional(),
+  /** Structured task packet from OpenClaw (optional when message is provided). */
+  task: taskPacketSchema.optional(),
   sessionId: z.string().min(1).optional(),
   sourceChannel: z.string().min(1).optional(),
   contactRole: z.string().min(1).optional(),
   metadata: z.record(z.unknown()).optional(),
-});
+  /** If true, stream SSE events instead of returning JSON. */
+  stream: z.boolean().optional(),
+  /** Callback URL for async webhook delivery (returns 202 immediately). */
+  callbackUrl: z.string().url().optional(),
+}).refine(
+  (data) => data.message ?? data.task,
+  { message: 'Either message or task must be provided' },
+);
 
 const sendMessageSchema = z.object({
   fromAgentId: z.string().min(1),
@@ -528,10 +560,20 @@ export function agentRoutes(
       );
     }
 
-    const { message, sessionId, sourceChannel, contactRole, metadata } =
+    const { message, task, sessionId, sourceChannel, contactRole, metadata, stream, callbackUrl } =
       parseResult.data;
 
-    // 2. Run shared chat setup (sanitize, load project/session/prompt, create services)
+    // 2. Compose message — from task packet if provided, otherwise use raw message
+    const composedMessage = task
+      ? composeTaskMessage(task, message)
+      : message ?? '';
+
+    // Merge task into metadata for trace correlation
+    const mergedMetadata = task
+      ? { ...metadata, _task: task }
+      : metadata;
+
+    // 3. Run shared chat setup (sanitize, load project/session/prompt, create services)
     const setupResult = await prepareChatRun(
       {
         projectId: agent.projectId,
@@ -539,8 +581,8 @@ export function agentRoutes(
         sessionId,
         sourceChannel,
         contactRole,
-        message,
-        metadata,
+        message: composedMessage,
+        metadata: mergedMetadata,
       },
       deps,
     );
@@ -556,7 +598,7 @@ export function agentRoutes(
 
     const setup = setupResult.value;
 
-    // 3. Create abort controller tied to client disconnect
+    // 4. Create abort controller tied to client disconnect
     const abortController = new AbortController();
     request.raw.on('close', () => {
       if (!request.raw.complete) {
@@ -564,7 +606,7 @@ export function agentRoutes(
       }
     });
 
-    // 4. Create agent runner and execute
+    // 5. Create agent runner
     const agentRunner = createAgentRunner({
       provider: setup.provider,
       fallbackProvider: setup.fallbackProvider,
@@ -574,6 +616,119 @@ export function agentRoutes(
       logger,
     });
 
+    // ─── SSE Streaming Path ──────────────────────────────────────
+    if (stream) {
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
+
+      const writeSSE = (eventType: string, data: unknown): void => {
+        reply.raw.write(`event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+
+      const result = await agentRunner.run({
+        message: setup.sanitizedMessage,
+        agentConfig: setup.agentConfig,
+        sessionId: setup.sessionId,
+        systemPrompt: setup.systemPrompt,
+        promptSnapshot: setup.promptSnapshot,
+        conversationHistory: setup.conversationHistory,
+        abortSignal: abortController.signal,
+        onEvent: (event) => {
+          writeSSE(event.type, event);
+        },
+      });
+
+      if (result.ok) {
+        const trace = result.value;
+        await persistTraceAndMessages(deps, setup, trace);
+
+        writeSSE('done', {
+          type: 'agent_complete',
+          agentId,
+          sessionId: setup.sessionId,
+          traceId: trace.id,
+          response: extractAssistantResponse(trace.events),
+          taskId: task?.taskId,
+          usage: { totalTokens: trace.totalTokensUsed, costUSD: trace.totalCostUSD },
+          status: trace.status,
+        });
+      } else {
+        writeSSE('error', { type: 'error', code: 'EXECUTION_FAILED', message: result.error.message });
+      }
+
+      reply.raw.end();
+      return;
+    }
+
+    // ─── Async Callback Path ─────────────────────────────────────
+    if (callbackUrl) {
+      const taskId = task?.taskId ?? `task_${Date.now()}`;
+
+      // Register in task registry if available
+      deps.taskRegistry?.create(taskId, agentId, agent.projectId, callbackUrl);
+
+      // Return 202 immediately
+      void reply.status(202).send({
+        success: true,
+        data: { taskId, agentId, status: 'running', sessionId: setup.sessionId },
+      });
+
+      // Execute in background — fire-and-forget with error handling
+      void (async () => {
+        try {
+          const result = await agentRunner.run({
+            message: setup.sanitizedMessage,
+            agentConfig: setup.agentConfig,
+            sessionId: setup.sessionId,
+            systemPrompt: setup.systemPrompt,
+            promptSnapshot: setup.promptSnapshot,
+            conversationHistory: setup.conversationHistory,
+            abortSignal: abortController.signal,
+            onEvent: (event) => {
+              deps.taskRegistry?.addEvent(taskId, event);
+            },
+          });
+
+          if (result.ok) {
+            const trace = result.value;
+            await persistTraceAndMessages(deps, setup, trace);
+
+            const assistantText = extractAssistantResponse(trace.events);
+            const callbackPayload = {
+              taskId,
+              agentId,
+              sessionId: setup.sessionId,
+              traceId: trace.id,
+              status: 'completed',
+              response: assistantText,
+              toolCalls: extractToolCalls(trace.events),
+              timestamp: new Date().toISOString(),
+              usage: { totalTokens: trace.totalTokensUsed, costUSD: trace.totalCostUSD },
+            };
+
+            deps.taskRegistry?.complete(taskId, callbackPayload);
+            await deliverCallback(callbackUrl, callbackPayload, logger);
+          } else {
+            const errorPayload = { taskId, agentId, status: 'failed', error: result.error.message };
+            deps.taskRegistry?.fail(taskId, result.error.message);
+            await deliverCallback(callbackUrl, errorPayload, logger);
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Unknown error';
+          logger.error('Async agent invoke failed', { component: 'agents', agentId, taskId, error: msg });
+          deps.taskRegistry?.fail(taskId, msg);
+          await deliverCallback(callbackUrl, { taskId, agentId, status: 'failed', error: msg }, logger);
+        }
+      })();
+
+      return;
+    }
+
+    // ─── Synchronous Path (default) ──────────────────────────────
     const result = await agentRunner.run({
       message: setup.sanitizedMessage,
       agentConfig: setup.agentConfig,
@@ -589,33 +744,21 @@ export function agentRoutes(
     }
 
     const trace = result.value;
-
-    // 5. Persist execution trace
-    await deps.executionTraceRepository.save(trace);
-
-    // 6. Persist messages
-    await deps.sessionRepository.addMessage(setup.sessionId, {
-      role: 'user',
-      content: setup.sanitizedMessage,
-    }, trace.id);
+    await persistTraceAndMessages(deps, setup, trace);
 
     const assistantText = extractAssistantResponse(trace.events);
     const toolCalls = extractToolCalls(trace.events);
 
-    await deps.sessionRepository.addMessage(setup.sessionId, {
-      role: 'assistant',
-      content: assistantText,
-    }, trace.id);
-
     logger.info('Agent invoked', { component: 'agents', agentId, traceId: trace.id });
 
-    // 7. Return response
+    // Return response
     return sendSuccess(reply, {
       agentId,
       sessionId: setup.sessionId,
       traceId: trace.id,
       response: assistantText,
       toolCalls,
+      taskId: task?.taskId,
       timestamp: new Date().toISOString(),
       usage: {
         inputTokens: trace.totalTokensUsed,
@@ -644,4 +787,113 @@ export function agentRoutes(
       return handleInvokeAgent(request, reply, agentId);
     },
   );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────
+
+/** Compose a structured message from an OpenClaw task packet. */
+function composeTaskMessage(
+  task: z.infer<typeof taskPacketSchema>,
+  additionalMessage?: string,
+): string {
+  const parts: string[] = [];
+
+  parts.push(`## Task: ${task.taskId}`);
+  parts.push(`**Objective**: ${task.objective}`);
+
+  if (task.scope) {
+    parts.push(`**Scope**: ${task.scope}`);
+  }
+
+  if (task.acceptanceCriteria && task.acceptanceCriteria.length > 0) {
+    parts.push('**Acceptance Criteria**:');
+    for (const criterion of task.acceptanceCriteria) {
+      parts.push(`- ${criterion}`);
+    }
+  }
+
+  parts.push(`**Priority**: ${task.priority}`);
+
+  if (task.deadline) {
+    parts.push(`**Deadline**: ${task.deadline}`);
+  }
+
+  if (task.context && Object.keys(task.context).length > 0) {
+    parts.push('**Context**:');
+    for (const [key, value] of Object.entries(task.context)) {
+      parts.push(`- ${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+    }
+  }
+
+  if (additionalMessage) {
+    parts.push('', '---', '', additionalMessage);
+  }
+
+  return parts.join('\n');
+}
+
+/** Persist execution trace and conversation messages. */
+async function persistTraceAndMessages(
+  deps: RouteDependencies,
+  setup: ChatSetupResult,
+  trace: ExecutionTrace,
+): Promise<void> {
+  await deps.executionTraceRepository.save(trace);
+
+  await deps.sessionRepository.addMessage(setup.sessionId, {
+    role: 'user',
+    content: setup.sanitizedMessage,
+  }, trace.id);
+
+  const assistantText = extractAssistantResponse(trace.events);
+
+  await deps.sessionRepository.addMessage(setup.sessionId, {
+    role: 'assistant',
+    content: assistantText,
+  }, trace.id);
+}
+
+/** Deliver a callback POST to the OpenClaw manager with retries. */
+async function deliverCallback(
+  url: string,
+  payload: unknown,
+  log: Logger,
+  maxRetries = 3,
+): Promise<void> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (response.ok) {
+        log.info('Callback delivered', { component: 'agents', url, attempt });
+        return;
+      }
+
+      log.warn('Callback delivery failed', {
+        component: 'agents',
+        url,
+        status: response.status,
+        attempt,
+      });
+    } catch (error) {
+      log.warn('Callback delivery error', {
+        component: 'agents',
+        url,
+        attempt,
+        error: error instanceof Error ? error.message : 'Unknown',
+      });
+    }
+
+    // Exponential backoff: 1s, 2s, 4s
+    if (attempt < maxRetries - 1) {
+      await new Promise((resolve) => { setTimeout(resolve, 1000 * 2 ** attempt); });
+    }
+  }
+
+  log.error('Callback delivery exhausted retries', { component: 'agents', url });
 }

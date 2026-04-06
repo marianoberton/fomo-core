@@ -117,6 +117,7 @@ import { channelWebhookRoutes } from '@/api/routes/channel-webhooks.js';
 import { createWebhookQueue } from '@/channels/webhook-queue.js';
 import type { WebhookQueue } from '@/channels/webhook-queue.js';
 import { openclawAdapterRoutes } from '@/channels/openclaw-adapter.js';
+import { createTaskRegistry } from '@/channels/openclaw-task-registry.js';
 import { onboardingRoutes } from '@/api/routes/onboarding.js';
 import { webchatPublicRoutes } from '@/api/routes/webchat.js';
 import { telegramApprovalWebhookRoutes } from '@/api/routes/telegram-webhook.js';
@@ -736,6 +737,9 @@ async function start(): Promise<void> {
       logger.info('Webhook queue started (Redis connected)', { component: 'main' });
     }
 
+    // OpenClaw task registry — in-memory task lifecycle tracking (always created)
+    const openclawTaskRegistry = createTaskRegistry();
+
     // Assemble route dependencies
     const deps: RouteDependencies = {
       projectRepository,
@@ -772,6 +776,7 @@ async function start(): Promise<void> {
       provisioningService: provisioningService,
       dokployService: dokployService,
       agentRunRepository,
+      taskRegistry: openclawTaskRegistry,
       logger,
     };
 
@@ -844,16 +849,14 @@ async function start(): Promise<void> {
         });
 
         // OpenClaw adapter — receives inbound calls from OpenClaw Manager instances
-        const openclawInternalKey = process.env['OPENCLAW_INTERNAL_KEY'];
-        if (openclawInternalKey) {
-          openclawAdapterRoutes(prefixed, {
-            openclawInternalKey,
-            inboundProcessor,
-            runAgent,
-            logger,
-          });
-          logger.info('OpenClaw adapter registered at POST /api/v1/openclaw/inbound', { component: 'main' });
-        }
+        // Auth: Bearer token (project-scoped or master) + fallback to OPENCLAW_INTERNAL_KEY
+        openclawAdapterRoutes(prefixed, {
+          openclawInternalKey: process.env['OPENCLAW_INTERNAL_KEY'],
+          inboundProcessor,
+          runAgent,
+          logger,
+        });
+        logger.info('OpenClaw adapter registered at POST /api/v1/openclaw/inbound', { component: 'main' });
       },
       { prefix: '/api/v1' },
     );
@@ -862,6 +865,7 @@ async function start(): Promise<void> {
     const shutdown = async (): Promise<void> => {
       logger.info('Shutting down...', { component: 'main' });
       clientMonitor.stop();
+      openclawTaskRegistry.shutdown();
       await mcpManager.disconnectAll();
       if (taskRunner) {
         await taskRunner.stop();
