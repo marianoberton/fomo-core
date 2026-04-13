@@ -13,6 +13,10 @@ export interface DatabaseOptions {
   url?: string;
   /** Log Prisma queries (recommended only in development). */
   logQueries?: boolean;
+  /** Maximum number of connections in the pool (default: 10). */
+  connectionLimit?: number;
+  /** Maximum seconds to wait for a connection from the pool (default: 10). */
+  poolTimeoutSeconds?: number;
 }
 
 /** Wrapper around PrismaClient with lifecycle hooks. */
@@ -36,8 +40,31 @@ export function createDatabase(options?: DatabaseOptions): Database {
     throw new Error('Database already initialized. Call disconnect() first or use getDatabase().');
   }
 
+  // Append connection pool params to the URL if not already present.
+  // Prisma uses ?connection_limit=N&pool_timeout=N query params.
+  let datasourceUrl = options?.url;
+  if (datasourceUrl) {
+    const url = new URL(datasourceUrl);
+    if (!url.searchParams.has('connection_limit') && options?.connectionLimit) {
+      url.searchParams.set('connection_limit', String(options.connectionLimit));
+    }
+    if (!url.searchParams.has('pool_timeout') && options?.poolTimeoutSeconds) {
+      url.searchParams.set('pool_timeout', String(options.poolTimeoutSeconds));
+    }
+    datasourceUrl = url.toString();
+  }
+
+  const connectionLimit = options?.connectionLimit ?? 10;
+  const poolTimeout = options?.poolTimeoutSeconds ?? 10;
+
+  logger.info('Initializing database', {
+    component: 'database',
+    connectionLimit,
+    poolTimeoutSeconds: poolTimeout,
+  });
+
   const client = new PrismaClient({
-    datasourceUrl: options?.url,
+    datasourceUrl,
     log: options?.logQueries
       ? [
           { emit: 'event', level: 'query' },

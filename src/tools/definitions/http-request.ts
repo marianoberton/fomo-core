@@ -5,6 +5,7 @@
  * URL validation, response size limits, and timeout support.
  */
 import { z } from 'zod';
+import { lookup } from 'node:dns/promises';
 import type { ExecutionContext } from '@/core/types.js';
 import type { Result } from '@/core/result.js';
 import { ok, err } from '@/core/result.js';
@@ -94,7 +95,7 @@ function validateUrl(urlStr: string, allowedPatterns?: string[]): URL {
     throw new Error(`Unsupported protocol: ${parsed.protocol}`);
   }
 
-  // SSRF check
+  // SSRF check on hostname string
   if (isBlockedHost(parsed.hostname)) {
     throw new Error(`Blocked host: requests to private/reserved IPs are not allowed`);
   }
@@ -108,6 +109,32 @@ function validateUrl(urlStr: string, allowedPatterns?: string[]): URL {
   }
 
   return parsed;
+}
+
+/**
+ * Resolve DNS and verify the IP is not private/reserved.
+ * Prevents DNS rebinding attacks where a domain resolves to a private IP.
+ */
+async function validateResolvedIp(hostname: string): Promise<void> {
+  // Skip for raw IP addresses — already checked by isBlockedHost
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname) || hostname.startsWith('[')) {
+    return;
+  }
+
+  try {
+    const { address } = await lookup(hostname);
+    if (isBlockedHost(address)) {
+      throw new Error(
+        `DNS rebinding blocked: ${hostname} resolves to private IP ${address}`,
+      );
+    }
+  } catch (error) {
+    // Re-throw our own errors, ignore DNS resolution failures
+    // (those will fail at fetch time with a clearer error)
+    if (error instanceof Error && error.message.startsWith('DNS rebinding blocked')) {
+      throw error;
+    }
+  }
 }
 
 /** Simple URL pattern matching: supports * as wildcard. */
@@ -163,6 +190,10 @@ export function createHttpRequestTool(options?: HttpRequestToolOptions): Executa
       try {
         // Validate URL + SSRF check
         validateUrl(parsed.url, allowedPatterns);
+
+        // DNS rebinding protection — resolve hostname and verify IP
+        const urlObj = new URL(parsed.url);
+        await validateResolvedIp(urlObj.hostname);
 
         // Build fetch options
         const fetchOptions: RequestInit = {

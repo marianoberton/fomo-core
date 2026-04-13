@@ -74,13 +74,37 @@ export function createMCPManager(options?: MCPManagerOptions): MCPManager {
   /** Known server configs — stored so ensureConnectedInternal can reconnect dropped connections. */
   const pendingConfigs = new Map<string, MCPServerConfig>();
 
+  let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
+
   /**
    * Ensures a server is connected. Called at tool execute() time.
    * Returns the existing connection if healthy, or reconnects if dropped.
+   *
+   * Performs a lightweight ping to verify the connection is actually alive
+   * (TCP connections can appear connected but be dead).
    */
   async function ensureConnectedInternal(serverName: string): Promise<MCPConnection> {
     const existing = connections.get(serverName);
-    if (existing?.status === 'connected') return existing;
+
+    if (existing?.status === 'connected') {
+      // Verify the connection is actually alive with a lightweight call
+      try {
+        await Promise.race([
+          existing.listTools(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Health check timeout')), 3000),
+          ),
+        ]);
+        return existing;
+      } catch {
+        logger.warn('MCP connection stale — reconnecting', {
+          component: 'mcp-manager',
+          serverName,
+        });
+        // Fall through to reconnect
+        connections.delete(serverName);
+      }
+    }
 
     const config = pendingConfigs.get(serverName);
     if (!config) {

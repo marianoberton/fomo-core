@@ -113,6 +113,8 @@ export function createMockApprovalGate(): {
     listPending: vi.fn(),
     listAll: vi.fn().mockResolvedValue([]),
     isApproved: vi.fn(),
+    startSweeper: vi.fn(),
+    stopSweeper: vi.fn(),
   };
 }
 

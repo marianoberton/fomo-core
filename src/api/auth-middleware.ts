@@ -29,6 +29,7 @@ import { timingSafeEqual as cryptoTimingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { Logger } from '@/observability/logger.js';
 import type { ApiKeyService } from '@/security/api-key-service.js';
+import { requireProjectAccess, requireScope } from './project-access.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -39,6 +40,11 @@ declare module 'fastify' {
      * - undefined = auth was skipped (env-var path unavailable or auth disabled)
      */
     apiKeyProjectId?: string | null;
+    /**
+     * Scopes granted by the API key (e.g. ["*"], ["chat"], ["read"]).
+     * "*" = full access.  Empty array or undefined = no scope filtering.
+     */
+    apiKeyScopes?: string[];
   }
 }
 
@@ -112,6 +118,7 @@ export function registerAuthMiddleware(
         const result = await apiKeyService.validateApiKey(token);
         if (result.valid) {
           request.apiKeyProjectId = result.projectId; // null = master, string = project-scoped
+          request.apiKeyScopes = result.scopes;
           return; // authenticated via DB key
         }
       }
@@ -119,6 +126,7 @@ export function registerAuthMiddleware(
       // 2. Fall back to static NEXUS_API_KEY (backward compat)
       if (apiKey && timingSafeEqual(token, apiKey)) {
         request.apiKeyProjectId = null; // env-var key = master = full access
+        request.apiKeyScopes = ['*']; // env-var key has full access
         return; // authenticated via env-var key
       }
 
@@ -131,6 +139,16 @@ export function registerAuthMiddleware(
       await reply.code(401).send({ error: 'Invalid API key' });
     },
   );
+
+  // ─── Project isolation guard ──────────────────────────────────
+  // Runs after the auth hook.  If the API key is project-scoped,
+  // this prevents it from accessing resources in other projects.
+  fastify.addHook('onRequest', requireProjectAccess);
+
+  // ─── Scope enforcement ───────────────────────────────────────
+  // Ensures API keys with limited scopes (e.g. ["chat"]) can only
+  // access matching endpoint categories.
+  fastify.addHook('onRequest', requireScope);
 }
 
 /**

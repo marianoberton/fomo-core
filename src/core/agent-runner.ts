@@ -240,6 +240,33 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
           return ok(trace);
         }
 
+        // Retrieve long-term memories ONCE before the loop — the user's
+        // message doesn't change across turns, so re-querying on every
+        // tool-result iteration wastes embedding API calls and latency.
+        let retrievedMemories: Awaited<ReturnType<typeof memoryManager.retrieveMemories>> = [];
+
+        if (message) {
+          retrievedMemories = await memoryManager.retrieveMemories({
+            query: message,
+            topK: agentConfig.memoryConfig.longTerm.retrievalTopK,
+            projectId: agentConfig.projectId,
+            sessionScope: sessionId,
+          });
+        }
+
+        if (retrievedMemories.length > 0) {
+          addTraceEvent(trace, {
+            type: 'memory_retrieval',
+            data: {
+              count: retrievedMemories.length,
+              memories: retrievedMemories.map((m) => ({
+                category: m.category,
+                similarity: m.similarityScore,
+              })),
+            },
+          });
+        }
+
         // Main agent loop
         let turnCount = 0;
         let shouldContinue = true;
@@ -276,31 +303,6 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
               break;
             }
             throw error;
-          }
-
-          // Retrieve relevant long-term memories
-          let retrievedMemories: Awaited<ReturnType<typeof memoryManager.retrieveMemories>> = [];
-
-          if (message) {
-            retrievedMemories = await memoryManager.retrieveMemories({
-              query: message,
-              topK: agentConfig.memoryConfig.longTerm.retrievalTopK,
-              projectId: agentConfig.projectId,
-              sessionScope: sessionId,
-            });
-          }
-
-          if (retrievedMemories.length > 0) {
-            addTraceEvent(trace, {
-              type: 'memory_retrieval',
-              data: {
-                count: retrievedMemories.length,
-                memories: retrievedMemories.map((m) => ({
-                  category: m.category,
-                  similarity: m.similarityScore,
-                })),
-              },
-            });
           }
 
           // Use pre-built system prompt (assembled by chat-setup from prompt layers)
@@ -796,14 +798,45 @@ async function executeLLMCall(params: {
     }
   };
 
-  // Try primary provider
-  const primaryResult = await attemptCall(provider);
+  // Retry the primary provider with exponential backoff before failover.
+  // maxRetries from FailoverConfig controls how many times we retry the
+  // same provider on transient errors (5xx, rate-limit, timeout).
+  const maxRetries = Math.min(agentConfig.failover.maxRetries, 3);
+  let lastResult = await attemptCall(provider);
 
-  // If primary failed and we have failover config, try fallback
+  for (let attempt = 1; attempt <= maxRetries && !lastResult.ok; attempt++) {
+    if (!shouldFailover(lastResult.error, agentConfig.failover)) {
+      break; // Non-retryable error (e.g. 400, auth failure)
+    }
+
+    const delayMs = Math.min(1000 * 2 ** (attempt - 1), 8000); // 1s, 2s, 4s, max 8s
+
+    addTraceEvent(trace, {
+      type: 'retry',
+      data: {
+        provider: provider.id,
+        attempt,
+        maxRetries,
+        delayMs,
+        errorCode: lastResult.error.code,
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+    // Abort check between retries
+    if (context.abortSignal.aborted) {
+      return lastResult;
+    }
+
+    lastResult = await attemptCall(provider);
+  }
+
+  // If primary still failed and we have a fallback, try it
   if (
-    !primaryResult.ok &&
+    !lastResult.ok &&
     fallbackProvider &&
-    shouldFailover(primaryResult.error, agentConfig.failover)
+    shouldFailover(lastResult.error, agentConfig.failover)
   ) {
     params.onFallback?.();
 
@@ -812,14 +845,14 @@ async function executeLLMCall(params: {
       data: {
         from: provider.id,
         to: fallbackProvider.id,
-        reason: primaryResult.error.code,
+        reason: lastResult.error.code,
       },
     });
 
     return attemptCall(fallbackProvider);
   }
 
-  return primaryResult;
+  return lastResult;
 }
 
 /**

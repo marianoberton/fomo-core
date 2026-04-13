@@ -51,6 +51,8 @@ export interface ChannelResolverDeps {
   integrationRepository: ChannelIntegrationRepository;
   secretService: SecretService;
   logger: Logger;
+  /** TTL for cached adapters in milliseconds (default: 10 minutes). */
+  cacheTtlMs?: number;
 }
 
 // ─── Resolver Factory ───────────────────────────────────────────
@@ -60,9 +62,12 @@ export interface ChannelResolverDeps {
  */
 export function createChannelResolver(deps: ChannelResolverDeps): ChannelResolver {
   const { integrationRepository, secretService, logger } = deps;
+  const cacheTtlMs = deps.cacheTtlMs ?? 10 * 60 * 1000; // 10 minutes
 
-  // Cache adapters by "projectId:provider" composite key
-  const adapterCache = new Map<string, ChannelAdapter>();
+  // Cache adapters by "projectId:provider" composite key with TTL.
+  // If credentials are rotated, the old adapter is evicted after the TTL
+  // expires — no need to wait for a manual invalidate() call or a restart.
+  const adapterCache = new Map<string, { adapter: ChannelAdapter; expiresAt: number }>();
 
   function cacheKey(projectId: ProjectId, provider: IntegrationProvider): string {
     return `${projectId}:${provider}`;
@@ -194,10 +199,16 @@ export function createChannelResolver(deps: ChannelResolverDeps): ChannelResolve
       projectId: ProjectId,
       provider: IntegrationProvider,
     ): Promise<ChannelAdapter | null> {
-      // Check cache first
+      // Check cache first (with TTL)
       const key = cacheKey(projectId, provider);
       const cached = adapterCache.get(key);
-      if (cached) return cached;
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.adapter;
+      }
+      // Expired or missing — evict stale entry
+      if (cached) {
+        adapterCache.delete(key);
+      }
 
       const integration = await integrationRepository.findByProjectAndProvider(projectId, provider);
       if (!integration) return null;
@@ -215,7 +226,7 @@ export function createChannelResolver(deps: ChannelResolverDeps): ChannelResolve
 
       const adapter = await createAdapterForIntegration(integration);
       if (adapter) {
-        adapterCache.set(key, adapter);
+        adapterCache.set(key, { adapter, expiresAt: Date.now() + cacheTtlMs });
         logger.info(`Created ${provider} adapter for project`, {
           component: 'channel-resolver',
           projectId,
@@ -259,17 +270,55 @@ export function createChannelResolver(deps: ChannelResolverDeps): ChannelResolve
         };
       }
 
-      try {
-        return await adapter.send(message);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        logger.error(`Error sending message via ${provider}`, {
-          component: 'channel-resolver',
-          projectId,
-          error: errorMessage,
-        });
-        return { success: false, error: errorMessage };
+      // Retry outbound sends to handle transient channel API failures.
+      // Without retry, the agent's response is lost if the channel is
+      // temporarily unavailable (e.g. WhatsApp 503 during maintenance).
+      const MAX_SEND_RETRIES = 2;
+      let lastError = '';
+
+      for (let attempt = 0; attempt <= MAX_SEND_RETRIES; attempt++) {
+        try {
+          const result = await adapter.send(message);
+          if (result.success) return result;
+
+          // Non-exception failure (e.g. API returned error status)
+          lastError = result.error ?? 'Unknown send error';
+
+          if (attempt < MAX_SEND_RETRIES) {
+            const delayMs = 1000 * 2 ** attempt; // 1s, 2s
+            logger.warn(`Outbound send failed — retrying in ${delayMs}ms`, {
+              component: 'channel-resolver',
+              projectId,
+              provider,
+              attempt: attempt + 1,
+              error: lastError,
+            });
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : 'Unknown error';
+
+          if (attempt < MAX_SEND_RETRIES) {
+            const delayMs = 1000 * 2 ** attempt;
+            logger.warn(`Outbound send threw — retrying in ${delayMs}ms`, {
+              component: 'channel-resolver',
+              projectId,
+              provider,
+              attempt: attempt + 1,
+              error: lastError,
+            });
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
+        }
       }
+
+      logger.error(`Outbound send failed after ${MAX_SEND_RETRIES + 1} attempts`, {
+        component: 'channel-resolver',
+        projectId,
+        provider,
+        error: lastError,
+      });
+      return { success: false, error: lastError };
     },
 
     invalidate(projectId: ProjectId): void {

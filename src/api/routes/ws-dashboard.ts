@@ -5,7 +5,7 @@
  * internal /chat/stream endpoint. This adapter translates between the two:
  *
  * Dashboard → Backend:
- *   { type: 'auth', apiKey }         → auth validation (skipped for now)
+ *   { type: 'auth', apiKey }         → validates API key via ApiKeyService
  *   { type: 'session.create', ... }  → create session via sessionRepository
  *   { type: 'message.send', content} → agent run via handleChatStreamMessage
  *   { type: 'approval.decide', ... } → resolve approval via approvalGate
@@ -252,10 +252,30 @@ function setupDashboardSocket(
 
     switch (msg.type) {
       case 'auth': {
-        // TODO: Validate API key against project config
-        // For now, accept any key and mark as authenticated
-        authenticated = true;
-        sendEvent({ type: 'auth.success' });
+        if (!msg.apiKey) {
+          sendError('AUTH_FAILED', 'API key is required');
+          return;
+        }
+
+        deps.apiKeyService
+          .validateApiKey(msg.apiKey)
+          .then((result) => {
+            if (!result.valid) {
+              sendError('AUTH_FAILED', 'Invalid or revoked API key');
+              return;
+            }
+            // If the key is scoped to a project, verify it matches this connection's project
+            if (result.projectId && result.projectId !== projectId) {
+              sendError('AUTH_FAILED', 'API key does not have access to this project');
+              return;
+            }
+            authenticated = true;
+            sendEvent({ type: 'auth.success' });
+          })
+          .catch((err: unknown) => {
+            const errMsg = err instanceof Error ? err.message : 'Authentication failed';
+            sendError('AUTH_FAILED', errMsg);
+          });
         break;
       }
 

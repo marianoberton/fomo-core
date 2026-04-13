@@ -18,6 +18,7 @@ import type { ChannelType, InboundMessage, IntegrationProvider, SendResult } fro
 import type { ContactRepository, ChannelIdentifier } from '@/contacts/types.js';
 import type { SessionRepository, Session } from '@/infrastructure/repositories/session-repository.js';
 import type { AgentChannelRouter } from './agent-channel-router.js';
+import type { MessageDeduplicator } from './message-dedup.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -28,6 +29,8 @@ export interface InboundProcessorDeps {
   logger: Logger;
   /** Optional agent-channel router for mode-aware agent resolution. */
   agentChannelRouter?: AgentChannelRouter;
+  /** Optional deduplicator to prevent duplicate webhook processing. */
+  messageDeduplicator?: MessageDeduplicator;
   /** Optional broadcaster to notify WebSocket clients of new messages. */
   sessionBroadcaster?: import('@/hitl/session-broadcaster.js').SessionBroadcaster;
   /** Function to run the agent and get a response */
@@ -86,6 +89,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
     sessionRepository,
     logger,
     agentChannelRouter,
+    messageDeduplicator,
     sessionBroadcaster,
     runAgent,
   } = deps;
@@ -102,6 +106,22 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
       });
 
       try {
+        // ─── Deduplication check ──────────────────────────────────
+        // Channel providers (WhatsApp, Telegram) retry webhook deliveries.
+        // Without this check the same message would be processed N times,
+        // sending duplicate responses to the customer.
+        if (messageDeduplicator && message.channelMessageId) {
+          const dedupKey = `${message.projectId}:${message.channelMessageId}`;
+          if (await messageDeduplicator.isDuplicate(dedupKey)) {
+            logger.info('Skipping duplicate inbound message', {
+              component: 'inbound-processor',
+              channelMessageId: message.channelMessageId,
+              channel: message.channel,
+            });
+            return { success: true };
+          }
+        }
+
         const projectId = message.projectId;
 
         // ─── OpenClaw Manager routing ──────────────────────────────
@@ -212,18 +232,9 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
         }
 
         // 2. Find or create session for this contact
-        const sessions = await sessionRepository.listByProject(projectId, 'active');
+        // Uses indexed DB query instead of loading all project sessions (O(1) vs O(N))
         let session: Session | null = null;
-
-        // Find existing active session for this contact
-        let existingSession: Session | null = null;
-        for (const s of sessions) {
-          const metadata = s.metadata;
-          if (metadata?.['contactId'] === contact.id) {
-            existingSession = s;
-            break;
-          }
-        }
+        let existingSession = await sessionRepository.findByContactId(projectId, contact.id);
 
         // /start (or resetSession flag) → close existing session and force a new one
         if (message.resetSession && existingSession) {

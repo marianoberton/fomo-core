@@ -84,6 +84,19 @@ export interface ApprovalGate {
    * Also checks for expiration.
    */
   isApproved(approvalId: ApprovalId): Promise<boolean>;
+
+  /**
+   * Start a periodic sweeper that resolves stale pending approvals.
+   *
+   * This is the restart-safe complement to the in-memory timers.
+   * After a process restart the timers are lost, but the sweeper will
+   * pick up any pending approvals whose timeout has elapsed and execute
+   * the configured timeout policy (auto-approve / auto-deny / escalate).
+   */
+  startSweeper(intervalMs?: number): void;
+
+  /** Stop the periodic sweeper. */
+  stopSweeper(): void;
 }
 
 /**
@@ -135,10 +148,11 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
   const DEFAULT_TIMEOUT_MS = 600_000; // 10 minutes
 
   // ─── Timer tracking (in-memory only — not persisted across restarts) ──
-  // NOTE: If the process restarts while approvals are pending, these timers
-  // are lost. The approval will still expire via expiresAt, but no automatic
-  // action (auto-approve/deny/escalate) will occur until a background job is added.
+  // The startSweeper() method acts as a restart-safe complement: it scans
+  // the store periodically and resolves any stale pending approvals whose
+  // timeout has elapsed, covering the gap left by lost in-memory timers.
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
+  let sweeperTimer: ReturnType<typeof setInterval> | null = null;
 
   function cancelTimers(approvalId: ApprovalId): void {
     const timers = pendingTimers.get(approvalId);
@@ -378,6 +392,71 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
       const checked = await getAndCheckExpiration(approvalId);
       if (!checked) return false;
       return checked.status === 'approved';
+    },
+
+    // ─── Periodic Sweeper ─────────────────────────────────────────
+    // Scans the store for pending approvals whose timeout has elapsed
+    // and executes the timeout policy.  This ensures that approvals
+    // are resolved even if the process was restarted (in-memory timers lost).
+
+    startSweeper(intervalMs = 60_000): void {
+      if (sweeperTimer) return; // already running
+
+      const sweep = async (): Promise<void> => {
+        if (!timeoutConfig) return; // nothing to enforce
+
+        try {
+          const all = await store.listAll();
+          const now = new Date();
+          const timeoutMs = timeoutConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+          for (const request of all) {
+            if (request.status !== 'pending') continue;
+
+            const elapsed = now.getTime() - request.requestedAt.getTime();
+            if (elapsed < timeoutMs) continue;
+
+            // Skip if an in-memory timer is still active for this approval
+            if (pendingTimers.has(request.id)) continue;
+
+            logger.info('Sweeper resolving stale approval', {
+              component: 'approval-gate',
+              approvalId: request.id,
+              toolId: request.toolId,
+              elapsedMs: elapsed,
+            });
+
+            await handleTimeout(request.id);
+          }
+        } catch (error) {
+          logger.error('Approval sweeper failed', {
+            component: 'approval-gate',
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      };
+
+      sweeperTimer = setInterval(() => {
+        void sweep();
+      }, intervalMs);
+
+      // Don't prevent Node from exiting
+      if (typeof sweeperTimer === 'object' && 'unref' in sweeperTimer) {
+        sweeperTimer.unref();
+      }
+
+      logger.info('Approval sweeper started', {
+        component: 'approval-gate',
+        intervalMs,
+      });
+    },
+
+    stopSweeper(): void {
+      if (sweeperTimer) {
+        clearInterval(sweeperTimer);
+        sweeperTimer = null;
+        logger.info('Approval sweeper stopped', { component: 'approval-gate' });
+      }
     },
   };
 }

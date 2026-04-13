@@ -96,6 +96,7 @@ import { Queue } from 'bullmq';
 import { createProactiveMessenger, PROACTIVE_MESSAGE_QUEUE } from '@/channels/proactive.js';
 import type { ProactiveMessenger, ProactiveMessageJobData } from '@/channels/proactive.js';
 import { createInboundProcessor } from '@/channels/inbound-processor.js';
+import { createInMemoryDedup } from '@/channels/message-dedup.js';
 import { createWebhookProcessor } from '@/webhooks/webhook-processor.js';
 import { createFileService } from '@/files/file-service.js';
 import { createLocalStorage } from '@/files/storage-local.js';
@@ -155,6 +156,8 @@ async function start(): Promise<void> {
     // Initialize database
     const db = createDatabase({
       logQueries: process.env['NODE_ENV'] === 'development',
+      connectionLimit: Number(process.env['DB_CONNECTION_LIMIT'] ?? 10),
+      poolTimeoutSeconds: Number(process.env['DB_POOL_TIMEOUT'] ?? 10),
     });
     await db.connect();
 
@@ -223,6 +226,9 @@ async function start(): Promise<void> {
       notifier: telegramNotifier,
       expirationMs: 30 * 60 * 1000, // 30 minutes — realistic for human review
     });
+    // Start the sweeper so stale pending approvals are resolved even after
+    // a process restart (in-memory timeout timers are not persisted).
+    approvalGate.startSweeper(60_000);
     const toolRegistry = createToolRegistry({
       approvalGate: async (toolId, input, context) => {
         const request = await approvalGate.requestApproval({
@@ -534,12 +540,15 @@ async function start(): Promise<void> {
     // Agent-channel router — resolves which agent handles a channel message
     const agentChannelRouter = createAgentChannelRouter({ agentRepository, logger });
 
+    const messageDeduplicator = createInMemoryDedup({ logger });
+
     const inboundProcessor = createInboundProcessor({
       channelResolver,
       contactRepository,
       sessionRepository,
       logger,
       agentChannelRouter,
+      messageDeduplicator,
       sessionBroadcaster,
       runAgent,
     });
@@ -861,24 +870,59 @@ async function start(): Promise<void> {
       { prefix: '/api/v1' },
     );
 
-    // Graceful shutdown
+    // Graceful shutdown — drains in-flight work before closing connections
+    let shuttingDown = false;
     const shutdown = async (): Promise<void> => {
-      logger.info('Shutting down...', { component: 'main' });
+      if (shuttingDown) return; // prevent double-shutdown
+      shuttingDown = true;
+
+      logger.info('Shutting down — draining in-flight requests...', { component: 'main' });
+
+      // 1. Stop accepting new requests (closes the listening socket)
+      await server.close();
+
+      // 2. Stop background schedulers and sweepers
+      approvalGate.stopSweeper();
       clientMonitor.stop();
       openclawTaskRegistry.shutdown();
-      await mcpManager.disconnectAll();
+
+      // 3. Drain queues (waits for in-flight jobs to finish)
       if (taskRunner) {
         await taskRunner.stop();
       }
       if (webhookQueue) {
         await webhookQueue.stop();
       }
-      await server.close();
+
+      // 4. Close external connections
+      await mcpManager.disconnectAll();
+
+      // 5. Close database last (in-flight queries must finish first)
       await db.disconnect();
+
+      logger.info('Shutdown complete', { component: 'main' });
     };
 
+    // Handle both termination signals
     process.on('SIGTERM', () => void shutdown());
     process.on('SIGINT', () => void shutdown());
+
+    // Catch unhandled errors to log and shutdown gracefully
+    process.on('uncaughtException', (error) => {
+      logger.fatal('Uncaught exception — shutting down', {
+        component: 'main',
+        error: error.message,
+        stack: error.stack,
+      });
+      void shutdown().finally(() => process.exit(1));
+    });
+
+    process.on('unhandledRejection', (reason) => {
+      logger.error('Unhandled promise rejection', {
+        component: 'main',
+        error: reason instanceof Error ? reason.message : String(reason),
+      });
+    });
 
     await server.listen({ port, host });
     logger.info(`Server listening on ${host}:${port}`, { component: 'main' });

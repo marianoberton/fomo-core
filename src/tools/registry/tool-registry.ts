@@ -6,6 +6,7 @@
 import {
   ToolNotAllowedError,
   ToolHallucinationError,
+  ToolExecutionError,
   ApprovalRequiredError,
 } from '@/core/errors.js';
 import type { Result } from '@/core/result.js';
@@ -29,6 +30,8 @@ export type ApprovalGateCallback = (
 export interface ToolRegistryOptions {
   /** Optional approval gate callback. If not provided, high-risk tools are blocked. */
   approvalGate?: ApprovalGateCallback;
+  /** Default per-tool execution timeout in milliseconds (default: 30 000). */
+  defaultToolTimeoutMs?: number;
 }
 
 export interface ToolRegistry {
@@ -85,6 +88,7 @@ export interface ToolRegistry {
  */
 export function createToolRegistry(options?: ToolRegistryOptions): ToolRegistry {
   const tools = new Map<string, ExecutableTool>();
+  const defaultTimeoutMs = options?.defaultToolTimeoutMs ?? 30_000;
 
   function validateAccess(
     toolId: string,
@@ -234,7 +238,28 @@ export function createToolRegistry(options?: ToolRegistryOptions): ToolRegistry 
         traceId: context.traceId,
       });
 
-      return tool.execute(inputResult.value, context);
+      // Race the tool execution against a timeout to prevent a hung tool
+      // (e.g. http-request, scrape-webpage, MCP) from blocking the agent loop.
+      const timeoutMs = defaultTimeoutMs;
+      const execution = tool.execute(inputResult.value, context);
+
+      const timeout = new Promise<Result<ToolResult, NexusError>>((resolve) => {
+        const timer = setTimeout(() => {
+          logger.error('Tool execution timed out', {
+            component: 'tool-registry',
+            toolId: tool.id,
+            timeoutMs,
+            projectId: context.projectId,
+          });
+          resolve(err(new ToolExecutionError(tool.id, `Execution timed out after ${timeoutMs}ms`)));
+        }, timeoutMs);
+        // Ensure the timer doesn't prevent Node from exiting
+        if (typeof timer === 'object' && 'unref' in timer) {
+          timer.unref();
+        }
+      });
+
+      return Promise.race([execution, timeout]);
     },
 
     async resolveDryRun(

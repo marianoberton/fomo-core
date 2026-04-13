@@ -12,6 +12,7 @@ import type { ChannelResolver } from './channel-resolver.js';
 import type { AgentChannelRouter } from './agent-channel-router.js';
 import type { Logger } from '@/observability/logger.js';
 import type { AgentId } from '@/agents/types.js';
+import type { MessageDeduplicator } from './message-dedup.js';
 
 // ─── Mock Logger ────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ function createDeps(overrides: Partial<InboundProcessorDeps> = {}): InboundProce
   const sessionRepository: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
     create: vi.fn().mockResolvedValue(mockSession),
     findById: vi.fn(),
-    findByContactId: vi.fn(),
+    findByContactId: vi.fn().mockResolvedValue(mockSession),
     findByCallId: vi.fn(),
     updateStatus: vi.fn(),
     updateMetadata: vi.fn().mockResolvedValue(true),
@@ -168,7 +169,7 @@ describe('InboundProcessor', () => {
     it('creates a new session when no existing session for contact', async () => {
       const deps = createDeps();
       const sessionRepo = deps.sessionRepository as unknown as { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> };
-      sessionRepo.listByProject.mockResolvedValue([]);
+      sessionRepo.findByContactId.mockResolvedValue(null);
       const processor = createInboundProcessor(deps);
 
       await processor.process(createMessage());
@@ -223,7 +224,7 @@ describe('InboundProcessor', () => {
       const sessionRepo: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
         create: vi.fn(),
         findById: vi.fn(),
-        findByContactId: vi.fn(),
+        findByContactId: vi.fn().mockResolvedValue(pausedSession),
         findByCallId: vi.fn(),
         updateStatus: vi.fn(),
         updateMetadata: vi.fn().mockResolvedValue(true),
@@ -255,7 +256,7 @@ describe('InboundProcessor', () => {
       const sessionRepo: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
         create: vi.fn(),
         findById: vi.fn(),
-        findByContactId: vi.fn(),
+        findByContactId: vi.fn().mockResolvedValue(pausedSession),
         findByCallId: vi.fn(),
         updateStatus: vi.fn(),
         updateMetadata: vi.fn().mockResolvedValue(true),
@@ -282,6 +283,35 @@ describe('InboundProcessor', () => {
           content: 'Hello',
         }),
       );
+    });
+  });
+
+  describe('deduplication', () => {
+    it('skips duplicate messages when deduplicator is provided', async () => {
+      const mockDedup = { isDuplicate: vi.fn() };
+      mockDedup.isDuplicate.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+      const deps = createDeps({ messageDeduplicator: mockDedup });
+      const processor = createInboundProcessor(deps);
+
+      const msg = createMessage();
+      await processor.process(msg);
+      const result = await processor.process(msg);
+
+      expect(result.success).toBe(true);
+      // Agent should only run once (first call)
+      expect(deps.runAgent).toHaveBeenCalledTimes(1);
+    });
+
+    it('processes normally without deduplicator', async () => {
+      const deps = createDeps(); // no deduplicator
+      const processor = createInboundProcessor(deps);
+
+      await processor.process(createMessage());
+      await processor.process(createMessage());
+
+      // Both calls processed
+      expect(deps.runAgent).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -348,11 +378,11 @@ describe('InboundProcessor', () => {
       const sessionRepo: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
         create: vi.fn().mockResolvedValue(mockSession),
         findById: vi.fn(),
-        findByContactId: vi.fn(),
+        findByContactId: vi.fn().mockResolvedValue(null), // No existing session
         findByCallId: vi.fn(),
         updateStatus: vi.fn(),
         updateMetadata: vi.fn().mockResolvedValue(true),
-        listByProject: vi.fn().mockResolvedValue([]), // No existing session
+        listByProject: vi.fn().mockResolvedValue([]),
         addMessage: vi.fn(),
         getMessages: vi.fn().mockResolvedValue([]),
       };

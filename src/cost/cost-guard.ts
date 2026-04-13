@@ -58,6 +58,13 @@ export interface CostGuard {
   preCheck(projectId: ProjectId): Promise<void>;
 
   /**
+   * Check per-agent daily budget.
+   * Throws BudgetExceededError if the agent has exceeded its daily budget.
+   * Pass 0 or undefined to skip the check.
+   */
+  preCheckAgent(projectId: ProjectId, agentId: string, agentDailyBudgetUsd: number): Promise<void>;
+
+  /**
    * Record usage after an LLM call completes.
    * Emits alerts if thresholds are crossed.
    */
@@ -163,6 +170,31 @@ export function createCostGuard(options: CostGuardOptions): CostGuard {
 
       // Record request for rate limiting
       await usageStore.recordRequest(projectId);
+    },
+
+    async preCheckAgent(
+      projectId: ProjectId,
+      agentId: string,
+      agentDailyBudgetUsd: number,
+    ): Promise<void> {
+      if (!agentDailyBudgetUsd || agentDailyBudgetUsd <= 0) return;
+
+      const agentSpend = await usageStore.getAgentSpend(agentId, 'today', projectId);
+      if (agentSpend.totalCostUSD >= agentDailyBudgetUsd) {
+        logger.warn('Agent daily budget exceeded', {
+          component: 'cost-guard',
+          agentId,
+          projectId,
+          spent: agentSpend.totalCostUSD,
+          budget: agentDailyBudgetUsd,
+        });
+        throw new BudgetExceededError(
+          projectId,
+          'daily',
+          agentSpend.totalCostUSD,
+          agentDailyBudgetUsd,
+        );
+      }
     },
 
     async recordUsage(

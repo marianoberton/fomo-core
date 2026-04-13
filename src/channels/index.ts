@@ -38,6 +38,10 @@ export type {
   ProactiveMessageJobData,
 } from './proactive.js';
 
+// Message Deduplication
+export { createInMemoryDedup } from './message-dedup.js';
+export type { MessageDeduplicator, InMemoryDedupOptions } from './message-dedup.js';
+
 // Webhook Queue
 export { createWebhookQueue } from './webhook-queue.js';
 export type { WebhookQueue, WebhookQueueOptions } from './webhook-queue.js';
