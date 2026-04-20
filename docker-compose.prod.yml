@@ -43,6 +43,7 @@ services:
     networks:
       - default
       - fomo-network
+      - dokploy-network
     ports:
       - "3002:3002"
     env_file:
@@ -88,7 +89,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./templates:/app/templates:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:3002/health | grep -q '\"status\"' || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/health | grep -q '\"status\"' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -110,6 +111,8 @@ networks:
   fomo-network:
     name: fomo-network
     driver: bridge
+  dokploy-network:
+    external: true
 
 volumes:
   pgdata:
