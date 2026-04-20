@@ -11,10 +11,9 @@
 
 import type { CreateAgentInput } from '../types.js';
 import { getAgentLLMConfig } from './model-config.js';
+import { FOMO_PROJECT_ID } from './constants.js';
 
-// ─── Project ID ───────────────────────────────────────────────────────────────
-// Setear en env o reemplazar al crear via API
-export const FOMO_PROJECT_ID = process.env['FOMO_INTERNAL_PROJECT_ID'] ?? 'fomo-internal';
+export { FOMO_PROJECT_ID };
 
 // ─── 1. FAMA-SALES ────────────────────────────────────────────────────────────
 /**

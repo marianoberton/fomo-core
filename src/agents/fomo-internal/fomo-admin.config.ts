@@ -9,7 +9,7 @@
 
 import type { CreateAgentInput } from '../types.js';
 import { getAgentLLMConfig } from './model-config.js';
-import { FOMO_PROJECT_ID } from './agents.config.js';
+import { FOMO_PROJECT_ID } from './constants.js';
 
 /** All admin tool IDs that fomo-admin is allowed to use. */
 export const FOMO_ADMIN_TOOL_ALLOWLIST = [
