@@ -84,6 +84,38 @@ import {
   createControlAgentTool,
   createScrapeWebpageTool,
   createTriggerCampaignTool,
+  createAdminListProjectsTool,
+  createAdminListAgentsTool,
+  createAdminGetAgentTool,
+  createAdminListPromptLayersTool,
+  createAdminGetPromptLayerTool,
+  createAdminDiffPromptLayersTool,
+  createAdminQueryTracesTool,
+  createAdminGetTraceTool,
+  createAdminGetCostReportTool,
+  createAdminGetAgentHealthTool,
+  createAdminListToolsTool,
+  createAdminListModelsTool,
+  createAdminCreateAgentTool,
+  createAdminUpdateAgentTool,
+  createAdminSetAgentStatusTool,
+  createAdminCreateProjectTool,
+  createAdminUpdateProjectTool,
+  createAdminGrantToolTool,
+  createAdminRevokeToolTool,
+  createAdminSetAgentModelTool,
+  createAdminCreatePromptLayerTool,
+  createAdminActivatePromptLayerTool,
+  createAdminSandboxRunTool,
+  createAdminSandboxCompareTool,
+  createAdminSandboxPromoteTool,
+  createAdminDeleteAgentTool,
+  createAdminDeleteProjectTool,
+  createAdminIssueApiKeyTool,
+  createAdminRevokeApiKeyTool,
+  createAdminGetProvisionStatusTool,
+  createAdminProvisionClientTool,
+  createAdminDeprovisionClientTool,
 } from '@/tools/definitions/index.js';
 import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
 import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
@@ -640,6 +672,44 @@ async function start(): Promise<void> {
     toolRegistry.register(createExportConversationsTool({ prisma }));
     toolRegistry.register(createAlertRuleTool({ prisma }));
     toolRegistry.register(createControlAgentTool({ prisma, agentRegistry }));
+
+    // Admin tools (fomo-admin agent)
+    toolRegistry.register(createAdminListProjectsTool({ projectRepository, agentRepository }));
+    toolRegistry.register(createAdminListAgentsTool({ projectRepository, agentRepository }));
+    toolRegistry.register(createAdminGetAgentTool({ projectRepository, agentRepository }));
+    toolRegistry.register(createAdminListPromptLayersTool({ prisma }));
+    toolRegistry.register(createAdminGetPromptLayerTool({ prisma }));
+    toolRegistry.register(createAdminDiffPromptLayersTool({ prisma }));
+    toolRegistry.register(createAdminQueryTracesTool({ prisma }));
+    toolRegistry.register(createAdminGetTraceTool({ prisma }));
+    toolRegistry.register(createAdminGetCostReportTool({ prisma }));
+    toolRegistry.register(createAdminGetAgentHealthTool({ prisma, agentRepository }));
+    toolRegistry.register(createAdminListToolsTool({ toolRegistry }));
+    toolRegistry.register(createAdminListModelsTool());
+    // Admin write tools
+    toolRegistry.register(createAdminCreateAgentTool({ agentRepository, projectRepository }));
+    toolRegistry.register(createAdminUpdateAgentTool({ agentRepository, projectRepository }));
+    toolRegistry.register(createAdminSetAgentStatusTool({ agentRepository, projectRepository }));
+    toolRegistry.register(createAdminCreateProjectTool({ agentRepository, projectRepository }));
+    toolRegistry.register(createAdminUpdateProjectTool({ agentRepository, projectRepository }));
+    toolRegistry.register(createAdminGrantToolTool({ agentRepository, projectRepository }));
+    toolRegistry.register(createAdminRevokeToolTool({ agentRepository, projectRepository }));
+    toolRegistry.register(createAdminSetAgentModelTool({ agentRepository, projectRepository }));
+    toolRegistry.register(createAdminCreatePromptLayerTool({ prisma }));
+    toolRegistry.register(createAdminActivatePromptLayerTool({ prisma }));
+    // Admin sandbox tools
+    toolRegistry.register(createAdminSandboxRunTool({ prisma }));
+    toolRegistry.register(createAdminSandboxCompareTool({ prisma }));
+    toolRegistry.register(createAdminSandboxPromoteTool({ prisma, agentRepository }));
+    // Admin destructive tools
+    toolRegistry.register(createAdminDeleteAgentTool({ agentRepository, projectRepository, apiKeyService }));
+    toolRegistry.register(createAdminDeleteProjectTool({ agentRepository, projectRepository, apiKeyService }));
+    toolRegistry.register(createAdminIssueApiKeyTool({ agentRepository, projectRepository, apiKeyService }));
+    toolRegistry.register(createAdminRevokeApiKeyTool({ agentRepository, projectRepository, apiKeyService }));
+    // Admin provisioning tools
+    toolRegistry.register(createAdminGetProvisionStatusTool({ provisioningService }));
+    toolRegistry.register(createAdminProvisionClientTool({ provisioningService }));
+    toolRegistry.register(createAdminDeprovisionClientTool({ provisioningService }));
 
     // Handoff manager (Chatwoot human escalation)
     const handoffManager = createHandoffManager({

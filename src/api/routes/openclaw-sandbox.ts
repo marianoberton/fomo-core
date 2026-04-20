@@ -15,22 +15,20 @@ import type { RouteDependencies } from '../types.js';
 import { resolveOpenClawScope, assertProjectAccess } from '../openclaw-auth.js';
 import type { OpenClawScope } from '../openclaw-auth.js';
 import type { AgentId } from '@/agents/types.js';
-import type { ProjectId, SessionId, PromptLayerId } from '@/core/types.js';
+import type { ProjectId } from '@/core/types.js';
 import type { AgentStreamEvent } from '@/core/stream-events.js';
 import { createAgentRunner } from '@/core/agent-runner.js';
-import { resolveActiveLayers } from '@/prompts/index.js';
 import { sandboxClientMessage } from '../sandbox/sandbox-schemas.js';
 import type { SandboxStreamEvent } from '../sandbox/sandbox-events.js';
 import {
   createSandboxState,
   prepareSandboxRun,
-  getEffectiveLayers,
-  getEffectiveConfig,
   createDryRunToolRegistry,
   extractRunMetrics,
   computeMetricsDiff,
 } from '../sandbox/sandbox-session.js';
 import type { SandboxState } from '../sandbox/sandbox-session.js';
+import { buildSandboxBaseline, SandboxBaselineError } from '../sandbox/sandbox-runner.js';
 import { extractAssistantResponse, extractToolCalls } from './chat-setup.js';
 import { createLogger } from '@/observability/logger.js';
 
@@ -206,90 +204,25 @@ async function handleStart(
   send: (event: SandboxStreamEvent) => void,
   sendError: (code: string, message: string) => void,
 ): Promise<SandboxState | null> {
-  // Load agent
-  const agent = await deps.agentRegistry.get(msg.agentId as AgentId);
-  if (!agent) {
-    sendError('NOT_FOUND', `Agent "${msg.agentId}" not found`);
-    return null;
-  }
-
-  // Load project
-  const project = await deps.projectRepository.findById(msg.projectId as ProjectId);
-  if (!project) {
-    sendError('NOT_FOUND', `Project "${msg.projectId}" not found`);
-    return null;
-  }
-
-  // Resolve prompt layers
-  let layers: import('@/prompts/types.js').ResolvedPromptLayers;
-  if (agent.promptConfig.identity && agent.promptConfig.instructions && agent.promptConfig.safety) {
-    const syntheticBase = {
-      projectId: project.id,
-      version: 1,
-      isActive: true as const,
-      createdAt: new Date(),
-      createdBy: 'agent',
-      changeReason: 'agent-prompt',
-    };
-    layers = {
-      identity: { ...syntheticBase, id: `${msg.agentId}:identity` as PromptLayerId, layerType: 'identity' as const, content: agent.promptConfig.identity },
-      instructions: { ...syntheticBase, id: `${msg.agentId}:instructions` as PromptLayerId, layerType: 'instructions' as const, content: agent.promptConfig.instructions },
-      safety: { ...syntheticBase, id: `${msg.agentId}:safety` as PromptLayerId, layerType: 'safety' as const, content: agent.promptConfig.safety },
-    };
-  } else {
-    const layersResult = await resolveActiveLayers(project.id, deps.promptLayerRepository);
-    if (!layersResult.ok) {
-      sendError('NO_ACTIVE_PROMPT', layersResult.error.message);
+  let baseline;
+  try {
+    baseline = await buildSandboxBaseline(deps, {
+      agentId: msg.agentId as AgentId,
+      projectId: msg.projectId as ProjectId,
+    });
+  } catch (error) {
+    if (error instanceof SandboxBaselineError) {
+      const code = error.code === 'AGENT_NOT_FOUND' || error.code === 'PROJECT_NOT_FOUND'
+        ? 'NOT_FOUND'
+        : error.code;
+      sendError(code, error.message);
       return null;
     }
-    layers = layersResult.value;
+    sendError('INTERNAL_ERROR', error instanceof Error ? error.message : 'Unknown error');
+    return null;
   }
 
-  // Build baseline core config (simplified from chat-setup)
-  const DEFAULT_CONFIG = {
-    allowedTools: [] as string[],
-    mcpServers: [] as CoreAgentConfig['mcpServers'],
-    maxTurnsPerSession: 10,
-    maxConcurrentSessions: 5,
-    failover: { maxRetries: 2, onTimeout: true, onRateLimit: true, onServerError: true, timeoutMs: 30_000 },
-    memoryConfig: {
-      longTerm: { enabled: false, maxEntries: 100, retrievalTopK: 5, embeddingProvider: 'openai', decayEnabled: false, decayHalfLifeDays: 30 },
-      contextWindow: { reserveTokens: 2000, pruningStrategy: 'turn-based' as const, maxTurnsInContext: 20, compaction: { enabled: false, memoryFlushBeforeCompaction: false } },
-    },
-    costConfig: {
-      dailyBudgetUSD: 10, monthlyBudgetUSD: 100, maxTokensPerTurn: 4096,
-      maxTurnsPerSession: 50, maxToolCallsPerTurn: 10, alertThresholdPercent: 80,
-      hardLimitPercent: 100, maxRequestsPerMinute: 60, maxRequestsPerHour: 1000,
-    },
-  };
-
-  const coreConfig = { ...DEFAULT_CONFIG, ...project.config, projectId: project.id } as CoreAgentConfig;
-
-  // Apply agent LLM overrides
-  if (agent.llmConfig) {
-    if (agent.llmConfig.provider) {
-      coreConfig.provider = { ...coreConfig.provider, provider: agent.llmConfig.provider };
-    }
-    if (agent.llmConfig.model) {
-      coreConfig.provider = { ...coreConfig.provider, model: agent.llmConfig.model };
-    }
-    if (agent.llmConfig.temperature !== undefined) {
-      coreConfig.provider = { ...coreConfig.provider, temperature: agent.llmConfig.temperature };
-    }
-    if (agent.llmConfig.maxOutputTokens !== undefined) {
-      coreConfig.provider = { ...coreConfig.provider, maxOutputTokens: agent.llmConfig.maxOutputTokens };
-    }
-  }
-
-  if (agent.toolAllowlist.length > 0) {
-    coreConfig.allowedTools = [...new Set([...coreConfig.allowedTools, ...agent.toolAllowlist])];
-  }
-
-  // Create session for sandbox
-  const session = await deps.sessionRepository.create({
-    projectId: project.id,
-    metadata: { _sandbox: true },
-  });
+  const { agent, layers, coreConfig, sessionId } = baseline;
 
   const state = createSandboxState({
     agentId: msg.agentId,
@@ -298,7 +231,7 @@ async function handleStart(
     agent,
     layers,
     coreConfig,
-    sessionId: session.id,
+    sessionId,
   });
 
   log.info('Sandbox session started', {
@@ -576,6 +509,3 @@ async function handleReset(
 
   return newState;
 }
-
-/** Import CoreAgentConfig type. */
-type CoreAgentConfig = import('@/core/types.js').AgentConfig;

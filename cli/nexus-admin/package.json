@@ -1,0 +1,20 @@
+{
+  "name": "nexus-admin",
+  "version": "1.0.0",
+  "description": "CLI for FOMO-Admin autonomous agent",
+  "type": "module",
+  "bin": {
+    "nexus-admin": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

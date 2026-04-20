@@ -93,3 +93,51 @@ export { createLicitacionesSearchTool } from './licitaciones-search.js';
 export { createLicitacionesDetailTool } from './licitaciones-detail.js';
 export { createLicitacionesDocumentTool } from './licitaciones-document.js';
 export { createExcelAnalyzeTool } from './excel-analyze.js';
+
+// Admin tools — read-only
+export {
+  createAdminListProjectsTool,
+  createAdminListAgentsTool,
+  createAdminGetAgentTool,
+  createAdminListPromptLayersTool,
+  createAdminGetPromptLayerTool,
+  createAdminDiffPromptLayersTool,
+  createAdminQueryTracesTool,
+  createAdminGetTraceTool,
+  createAdminGetCostReportTool,
+  createAdminGetAgentHealthTool,
+  createAdminListToolsTool,
+  createAdminListModelsTool,
+} from './admin/index.js';
+// Admin tools — write
+export {
+  createAdminCreateAgentTool,
+  createAdminUpdateAgentTool,
+  createAdminSetAgentStatusTool,
+  createAdminCreateProjectTool,
+  createAdminUpdateProjectTool,
+  createAdminGrantToolTool,
+  createAdminRevokeToolTool,
+  createAdminSetAgentModelTool,
+  createAdminCreatePromptLayerTool,
+  createAdminActivatePromptLayerTool,
+} from './admin/index.js';
+// Admin tools — sandbox
+export {
+  createAdminSandboxRunTool,
+  createAdminSandboxCompareTool,
+  createAdminSandboxPromoteTool,
+} from './admin/index.js';
+// Admin tools — destructive
+export {
+  createAdminDeleteAgentTool,
+  createAdminDeleteProjectTool,
+  createAdminIssueApiKeyTool,
+  createAdminRevokeApiKeyTool,
+} from './admin/index.js';
+// Admin tools — provisioning
+export {
+  createAdminGetProvisionStatusTool,
+  createAdminProvisionClientTool,
+  createAdminDeprovisionClientTool,
+} from './admin/index.js';

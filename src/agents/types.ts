@@ -24,7 +24,8 @@ export type AgentOperatingMode =
   | 'customer-facing' // Talks directly to end customers via channels
   | 'internal'        // Background worker (scheduled tasks, data processing)
   | 'copilot'         // Assists the Fomo team via dashboard chat
-  | 'manager';        // Orchestrates other agents; can use delegate-to-agent tool
+  | 'manager'         // Orchestrates other agents; can use delegate-to-agent tool
+  | 'admin';          // Platform operator: create/update/optimize agents, manage projects/clients/provisioning (master-key only)
 
 // ─── Agent Limits ────────────────────────────────────────────────
 

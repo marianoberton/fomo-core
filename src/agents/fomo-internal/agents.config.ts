@@ -345,6 +345,10 @@ Chequeos automáticos en D+3, D+7, D+14.`,
   },
 };
 
+// ─── 5. FOMO-ADMIN ───────────────────────────────────────────────────────────
+// Imported from dedicated config file (complex agent with many tools)
+export { fomoAdminAgent } from './fomo-admin.config.js';
+
 // ─── Export all ───────────────────────────────────────────────────────────────
 export const FOMO_INTERNAL_AGENTS = [
   famaSalesAgent,

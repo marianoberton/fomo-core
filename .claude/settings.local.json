@@ -27,7 +27,8 @@
       "WebFetch(domain:github.com)",
       "Bash(npx tsx:*)",
       "Bash(pnpm add:*)",
-      "Bash(cmd //c:*)"
+      "Bash(cmd //c:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

@@ -384,7 +384,7 @@ model Agent {
   skillIds        String[] @map("skill_ids")    // References to SkillInstance IDs
 
   // Operating Mode
-  operatingMode String @default("customer-facing") @map("operating_mode") // customer-facing, internal, copilot, manager
+  operatingMode String @default("customer-facing") @map("operating_mode") // customer-facing, internal, copilot, manager, admin
 
   // Status
   status      String   @default("active")  // active, paused, disabled
@@ -726,6 +726,25 @@ model AgentRun {
   @@index([externalProject, status])
   @@index([status, startedAt])
   @@map("agent_runs")
+}
+
+// ─── Admin Audit Log ────────────────────────────────────────────
+
+model AdminAuditLog {
+  id            String   @id @default(cuid())
+  actor         String   // 'mariano' | 'guille' | 'scheduled' | 'cli'
+  sessionId     String?  @map("session_id")
+  agentId       String?  @map("agent_id")
+  toolId        String   @map("tool_id")
+  inputRedacted Json     @map("input_redacted")
+  approvedBy    String?  @map("approved_by")
+  outcome       String   // 'success' | 'error' | 'denied'
+  traceId       String?  @map("trace_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([actor, createdAt])
+  @@index([toolId, createdAt])
+  @@map("admin_audit_logs")
 }
 
 model AgentRunStep {

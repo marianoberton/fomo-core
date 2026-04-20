@@ -12,7 +12,7 @@
  */
 
 import { createLogger } from '@/observability/logger.js';
-import { FOMO_INTERNAL_AGENTS, FOMO_PROJECT_ID } from './agents.config.js';
+import { FOMO_INTERNAL_AGENTS, FOMO_PROJECT_ID, fomoAdminAgent } from './agents.config.js';
 
 const logger = createLogger({ name: 'fomo-internal-seed' });
 
@@ -49,9 +49,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // 2. Crear agentes
+  // 2. Crear agentes (4 FAMA + 1 FOMO-Admin)
+  const allAgents = [...FOMO_INTERNAL_AGENTS, fomoAdminAgent];
   logger.info('Creating agents', { component: 'fomo-internal-seed' });
-  for (const agent of FOMO_INTERNAL_AGENTS) {
+  for (const agent of allAgents) {
     logger.info('Creating agent', { component: 'fomo-internal-seed', agentName: agent.name });
     const res = await fetch(`${API_BASE}/api/v1/projects/${FOMO_PROJECT_ID}/agents`, {
       method: 'POST',
@@ -70,7 +71,58 @@ async function main(): Promise<void> {
     }
   }
 
-  logger.info('Seed complete. FOMO agents ready.', { component: 'fomo-internal-seed' });
+  // 3. Crear scheduled tasks para FOMO-Admin
+  const scheduledTasks = [
+    {
+      name: 'weekly-fleet-health-review',
+      description: 'Review all active agents, summarize health, notify anomalies',
+      cronExpression: '0 8 * * 1', // Mon 08:00
+      prompt: 'Revisá todos los agentes activos en la plataforma. Para cada uno: listá métricas de salud (error rate, costo, latencia) de los últimos 7 días. Si hay anomalías, reportalas con trace IDs.',
+    },
+    {
+      name: 'daily-cost-anomaly-check',
+      description: 'Check for cost anomalies across all projects',
+      cronExpression: '0 7 * * *', // Daily 07:00
+      prompt: 'Generá un reporte de costos de las últimas 24hs. Comparalo con el promedio de los últimos 7 días. Si algún proyecto superó 2x el baseline, notificá con detalle del desvío.',
+    },
+    {
+      name: 'nightly-orphan-trace-sweep',
+      description: 'Identify stuck/orphan traces and report',
+      cronExpression: '0 3 * * *', // Daily 03:00
+      prompt: 'Buscá traces con status "running" que tengan más de 1 hora de antigüedad. Reportá los IDs y el agente/proyecto asociado. Estos son traces huérfanos que probablemente necesitan cleanup.',
+    },
+  ];
+
+  logger.info('Creating scheduled tasks for FOMO-Admin', { component: 'fomo-internal-seed' });
+  for (const task of scheduledTasks) {
+    const res = await fetch(`${API_BASE}/api/v1/projects/${FOMO_PROJECT_ID}/scheduled-tasks`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: task.name,
+        description: task.description,
+        cronExpression: task.cronExpression,
+        taskPayload: {
+          type: 'agent-prompt',
+          agentName: 'FOMO-Admin',
+          prompt: task.prompt,
+        },
+        origin: 'system',
+        status: 'active',
+      }),
+    });
+
+    if (res.ok) {
+      logger.info('Scheduled task created', { component: 'fomo-internal-seed', taskName: task.name });
+    } else if (res.status === 409) {
+      logger.warn('Scheduled task already exists', { component: 'fomo-internal-seed', taskName: task.name });
+    } else {
+      const errText = await res.text();
+      logger.error('Failed to create scheduled task', { component: 'fomo-internal-seed', taskName: task.name, error: errText });
+    }
+  }
+
+  logger.info('Seed complete. FOMO agents + scheduled tasks ready.', { component: 'fomo-internal-seed' });
 }
 
 main().catch((e: unknown) => {

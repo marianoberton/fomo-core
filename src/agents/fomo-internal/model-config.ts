@@ -56,6 +56,13 @@ const MODEL_CONFIG_RAW = {
     model: 'claude-sonnet-4-6',
     temperature: 0.2,
   },
+  /** Admin — most capable model for platform operations and optimization. */
+  'FOMO-Admin': {
+    provider: 'anthropic' as const,
+    model: 'claude-opus-4-6',
+    temperature: 0.2,
+    maxOutputTokens: 8000,
+  },
 } satisfies Record<string, AgentModelEntry>;
 
 /** Validated and exported model config. */

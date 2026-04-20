@@ -49,6 +49,8 @@ import { reactivationCampaignRoutes } from './reactivation-campaign.js';
 import { openclawTaskRoutes } from './openclaw-tasks.js';
 import { openclawSandboxRoutes } from './openclaw-sandbox.js';
 import { openclawConnectRoutes } from './openclaw-connect.js';
+import { adminAuditRoutes } from './admin-audit.js';
+import { adminInvokeRoutes } from './admin-invoke.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -116,6 +118,10 @@ export async function registerRoutes(
     (f) => { platformBridgeRoutes(f, deps); },
     { prefix: '/platform' },
   );
+
+  // Admin routes — master-key only
+  adminAuditRoutes(fastify, deps);
+  adminInvokeRoutes(fastify, deps);
 
   // OpenClaw routes — auth handled by Bearer middleware, fallback to OPENCLAW_INTERNAL_KEY
   const openclawFallbackKey = process.env['OPENCLAW_INTERNAL_KEY'];
