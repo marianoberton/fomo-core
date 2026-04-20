@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node dist/main.js",
     "dev": "tsx watch src/main.ts",
-    "build": "tsc && tsc-alias",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:unit": "vitest run src --exclude src/**/*.integration.test.ts --exclude src/tools/**/*.test.ts",

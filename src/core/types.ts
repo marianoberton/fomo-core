@@ -160,7 +160,8 @@ export type TraceEventType =
   | 'error'
   | 'cost_check'
   | 'cost_alert'
-  | 'failover';
+  | 'failover'
+  | 'retry';
 
 export interface TraceEvent {
   id: string;
