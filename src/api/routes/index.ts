@@ -119,9 +119,10 @@ export async function registerRoutes(
     { prefix: '/platform' },
   );
 
-  // Admin routes — master-key only
-  adminAuditRoutes(fastify, deps);
-  adminInvokeRoutes(fastify, deps);
+  // Admin routes — master-key only (wrapped in register() so the preHandler hook
+  // scopes only to admin routes and does not bleed into the global /api/v1 scope)
+  await fastify.register(async (f: FastifyInstance) => { adminAuditRoutes(f, deps); });
+  await fastify.register(async (f: FastifyInstance) => { adminInvokeRoutes(f, deps); });
 
   // OpenClaw routes — auth handled by Bearer middleware, fallback to OPENCLAW_INTERNAL_KEY
   const openclawFallbackKey = process.env['OPENCLAW_INTERNAL_KEY'];
