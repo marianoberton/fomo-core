@@ -89,7 +89,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./templates:/app/templates:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/health | grep -q '\"status\"' || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3002/health | grep -q '\"status\"' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
