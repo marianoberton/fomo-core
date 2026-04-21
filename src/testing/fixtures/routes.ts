@@ -478,12 +478,14 @@ export function createMockDeps(): RouteDependencies & {
       provisionClient: vi.fn(),
       deprovisionClient: vi.fn(),
       getClientStatus: vi.fn(),
+      redeployClient: vi.fn(),
     },
     dokployService: {
       createClientContainer: vi.fn(),
       destroyClientContainer: vi.fn(),
       getContainerStatus: vi.fn(),
       listClientContainers: vi.fn(),
+      redeployClient: vi.fn(),
     },
     taskRegistry: {
       create: vi.fn(),

@@ -8,6 +8,8 @@
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError } from '../error-handler.js';
 import { createAdminAuthHook } from '../admin-auth.js';
@@ -16,6 +18,14 @@ import { createAgentRunner } from '@/core/agent-runner.js';
 import type { SessionId } from '@/core/types.js';
 import { FOMO_PROJECT_ID } from '@/agents/fomo-internal/agents.config.js';
 import { createLogger } from '@/observability/logger.js';
+
+const SENSITIVE_KEY = /key|token|secret|password|credential/i;
+
+function redactSensitiveFields(obj: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, SENSITIVE_KEY.test(k) ? '[REDACTED]' : v]),
+  );
+}
 
 const logger = createLogger({ name: 'admin-invoke-route' });
 
@@ -129,6 +139,41 @@ export function adminInvokeRoutes(
       await deps.sessionRepository.addMessage(setup.sessionId, { role: 'user', content: setup.sanitizedMessage }, trace.id);
       const assistantText = extractAssistantResponse(trace.events);
       await deps.sessionRepository.addMessage(setup.sessionId, { role: 'assistant', content: assistantText }, trace.id);
+
+      // 6. Write audit log entries for every admin tool call in the trace
+      const toolCallEvents = trace.events.filter(
+        (e) => e.type === 'tool_call' &&
+          typeof e.data['toolId'] === 'string' &&
+          (e.data['toolId'] as string).startsWith('admin-'),
+      );
+      await Promise.all(
+        toolCallEvents.map(async (callEvent) => {
+          const toolCallId = callEvent.data['toolCallId'] as string;
+          const toolId = callEvent.data['toolId'] as string;
+          const rawInput = (callEvent.data['input'] ?? {}) as Record<string, unknown>;
+
+          const resultEvent = trace.events.find(
+            (e) => e.type === 'tool_result' && e.data['toolCallId'] === toolCallId,
+          );
+          if (!resultEvent) return; // approval still pending — skip for now
+
+          const outcome = (resultEvent.data['success'] as boolean) ? 'success' : 'error';
+          const inputRedacted = redactSensitiveFields(rawInput);
+
+          await deps.prisma.adminAuditLog.create({
+            data: {
+              id: randomUUID(),
+              actor,
+              sessionId: setup.sessionId,
+              agentId: adminAgent.id,
+              toolId,
+              inputRedacted: inputRedacted as Prisma.InputJsonValue,
+              outcome,
+              traceId: trace.id,
+            },
+          });
+        }),
+      );
 
       logger.info('Admin invoke complete', {
         component: 'admin-invoke',

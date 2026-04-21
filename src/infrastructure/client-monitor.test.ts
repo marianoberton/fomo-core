@@ -25,6 +25,7 @@ function createMockDokployService(): DokployService {
     destroyClientContainer: vi.fn(),
     getContainerStatus: vi.fn(),
     listClientContainers: vi.fn().mockResolvedValue([]),
+    redeployClient: vi.fn(),
   };
 }
 

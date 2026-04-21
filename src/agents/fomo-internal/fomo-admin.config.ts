@@ -50,6 +50,7 @@ export const FOMO_ADMIN_TOOL_ALLOWLIST = [
   'admin-get-provision-status',
   'admin-provision-client',
   'admin-deprovision-client',
+  'admin-redeploy-client',
   // Shared utility tools
   'store-memory',
   'search-project-memory',

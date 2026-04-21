@@ -41,6 +41,7 @@ function createMockProvisioningService(): {
     provisionClient: vi.fn(),
     deprovisionClient: vi.fn(),
     getClientStatus: vi.fn(),
+    redeployClient: vi.fn(),
   };
 }
 
@@ -52,6 +53,7 @@ function createMockDokployService(): {
     destroyClientContainer: vi.fn(),
     getContainerStatus: vi.fn(),
     listClientContainers: vi.fn(),
+    redeployClient: vi.fn(),
   };
 }
 

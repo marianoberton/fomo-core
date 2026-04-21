@@ -79,5 +79,6 @@ export {
   createAdminGetProvisionStatusTool,
   createAdminProvisionClientTool,
   createAdminDeprovisionClientTool,
+  createAdminRedeployClientTool,
 } from './provisioning.js';
 export type { AdminProvisioningToolOptions } from './provisioning.js';

@@ -27,6 +27,8 @@ export interface DokployService {
   getContainerStatus(clientId: string): Promise<ClientContainerStatus>;
   /** List all managed client applications. */
   listClientContainers(): Promise<ClientContainerStatus[]>;
+  /** Trigger a redeployment of a client's application (pull latest + rebuild). */
+  redeployClient(clientId: string): Promise<void>;
 }
 
 // ─── Service Dependencies ───────────────────────────────────────
@@ -313,6 +315,25 @@ export function createDokployService(deps: DokployServiceDeps): DokployService {
         });
         return [];
       }
+    },
+
+    async redeployClient(clientId: string): Promise<void> {
+      const name = appName(clientId);
+
+      logger.info('Redeploying client application via Dokploy', { component: COMPONENT, appName: name });
+
+      const app = await findApplicationByName(name);
+      if (!app) {
+        throw new Error(`Application for client "${clientId}" not found`);
+      }
+
+      await dokployRequest(
+        'POST',
+        '/api/trpc/application.deploy?batch=1',
+        { 0: { json: { applicationId: app.applicationId } } },
+      );
+
+      logger.info('Client application redeployment triggered via Dokploy', { component: COMPONENT, appName: name });
     },
   };
 }

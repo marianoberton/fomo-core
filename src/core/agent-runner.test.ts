@@ -201,6 +201,9 @@ function createMockCostGuard(
       }
       return Promise.resolve();
     },
+    preCheckAgent(_projectId, _agentId, _budgetUsd) {
+      return Promise.resolve();
+    },
     recordUsage() {
       return Promise.resolve();
     },

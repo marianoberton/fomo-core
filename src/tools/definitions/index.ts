@@ -140,4 +140,5 @@ export {
   createAdminGetProvisionStatusTool,
   createAdminProvisionClientTool,
   createAdminDeprovisionClientTool,
+  createAdminRedeployClientTool,
 } from './admin/index.js';

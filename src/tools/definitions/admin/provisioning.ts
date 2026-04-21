@@ -255,3 +255,74 @@ export function createAdminDeprovisionClientTool(
   };
 }
 
+// ─── admin-redeploy-client ─────────────────────────────────────────
+
+const redeployInput = z.object({
+  clientId: z.string(),
+});
+
+/**
+ * Create the admin-redeploy-client tool.
+ */
+export function createAdminRedeployClientTool(
+  options: AdminProvisioningToolOptions,
+): ExecutableTool {
+  const { provisioningService } = options;
+
+  return {
+    id: 'admin-redeploy-client',
+    name: 'Admin Redeploy Client',
+    description:
+      'Trigger a redeployment of a client container (pull latest code + rebuild). ' +
+      'Use after config changes or to recover from a failed state.',
+    category: 'admin',
+    inputSchema: redeployInput,
+    outputSchema: z.object({ clientId: z.string(), redeployed: z.boolean() }),
+    riskLevel: 'medium',
+    requiresApproval: false,
+    sideEffects: true,
+    supportsDryRun: true,
+
+    async execute(
+      input: unknown,
+      _context: ExecutionContext,
+    ): Promise<Result<ToolResult, NexusError>> {
+      const startTime = Date.now();
+      const parsed = redeployInput.parse(input);
+
+      logger.info('Redeploying client', {
+        component: 'admin-redeploy-client',
+        clientId: parsed.clientId,
+      });
+
+      try {
+        await provisioningService.redeployClient(parsed.clientId);
+
+        return ok({
+          success: true,
+          output: { clientId: parsed.clientId, redeployed: true },
+          durationMs: Date.now() - startTime,
+        });
+      } catch (e) {
+        return err(
+          new ToolExecutionError(
+            'admin-redeploy-client',
+            e instanceof Error ? e.message : String(e),
+          ),
+        );
+      }
+    },
+
+    async dryRun(
+      input: unknown,
+      _context: ExecutionContext,
+    ): Promise<Result<ToolResult, NexusError>> {
+      const parsed = redeployInput.parse(input);
+      return ok({
+        success: true,
+        output: { clientId: parsed.clientId, wouldRedeploy: true },
+        durationMs: 0,
+      });
+    },
+  };
+}

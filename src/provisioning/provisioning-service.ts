@@ -51,6 +51,8 @@ export interface ProvisioningService {
   deprovisionClient(clientId: string): Promise<void>;
   /** Get the runtime status of a client's container. */
   getClientStatus(clientId: string): Promise<ClientContainerStatus>;
+  /** Trigger a redeployment (pull latest + rebuild). */
+  redeployClient(clientId: string): Promise<void>;
 }
 
 // ─── Dependencies ───────────────────────────────────────────────
@@ -133,6 +135,21 @@ export function createProvisioningService(deps: ProvisioningServiceDeps): Provis
 
       try {
         return await dokployService.getContainerStatus(clientId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('not found')) {
+          throw new ClientNotFoundError(clientId);
+        }
+        throw new ProvisioningError(message, clientId, err instanceof Error ? err : undefined);
+      }
+    },
+
+    async redeployClient(clientId: string): Promise<void> {
+      logger.info('Triggering redeploy for client', { component: COMPONENT, clientId });
+
+      try {
+        await dokployService.redeployClient(clientId);
+        logger.info('Client redeployment triggered successfully', { component: COMPONENT, clientId });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes('not found')) {

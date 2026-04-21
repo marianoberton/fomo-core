@@ -30,6 +30,7 @@ function createMockDokployService(): {
     destroyClientContainer: vi.fn(),
     getContainerStatus: vi.fn(),
     listClientContainers: vi.fn(),
+    redeployClient: vi.fn(),
   };
 }
 

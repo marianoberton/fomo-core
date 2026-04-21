@@ -116,6 +116,7 @@ import {
   createAdminGetProvisionStatusTool,
   createAdminProvisionClientTool,
   createAdminDeprovisionClientTool,
+  createAdminRedeployClientTool,
 } from '@/tools/definitions/index.js';
 import { resolveEmbeddingProvider } from '@/providers/embeddings.js';
 import { createPrismaMemoryStore } from '@/memory/prisma-memory-store.js';
@@ -710,6 +711,7 @@ async function start(): Promise<void> {
     toolRegistry.register(createAdminGetProvisionStatusTool({ provisioningService }));
     toolRegistry.register(createAdminProvisionClientTool({ provisioningService }));
     toolRegistry.register(createAdminDeprovisionClientTool({ provisioningService }));
+    toolRegistry.register(createAdminRedeployClientTool({ provisioningService }));
 
     // Handoff manager (Chatwoot human escalation)
     const handoffManager = createHandoffManager({
