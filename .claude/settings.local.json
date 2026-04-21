@@ -28,7 +28,10 @@
       "Bash(npx tsx:*)",
       "Bash(pnpm add:*)",
       "Bash(cmd //c:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:localhost)",
+      "Bash(ssh hostinger-fomo *)",
+      "Bash(timeout 10 node dist/main.js)"
     ]
   }
 }

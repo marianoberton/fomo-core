@@ -161,3 +161,84 @@ git submodule update --remote dashboard && git add dashboard && git commit -m "c
 ```
 
 See `dashboard/CLAUDE.md` for dashboard-specific standards and UX rules.
+
+## Production Operations
+
+### Infrastructure
+- **VPS**: SSH alias `hostinger-fomo` (equivalent to `ssh root@147.79.81.222`)
+- **Backend container**: `compose-generate-multi-byte-system-fqoeno-app-1`
+- **Auto-deploy**: push to `main` → Dokploy picks it up in ~2-3 min
+- **API key**: stored in `.env` as `NEXUS_API_KEY` — never hardcode in code or docs
+
+### Pre-push Checklist (mandatory — skipping broke deploy 4× in April 2026)
+
+```bash
+pnpm build                                    # Must exit 0 with no errors
+timeout 10 node dist/main.js 2>&1 | head -50  # Must print "Server listening on 0.0.0.0:3002"
+                                              # Must NOT print ReferenceError / TypeError
+```
+
+If build fails, fix before pushing. If startup crashes, diagnose before pushing.
+
+### Deploy & Verify
+
+```bash
+git push origin main
+
+# Wait ~2-3 min, then:
+ssh hostinger-fomo "docker ps --format '{{.Names}}\t{{.Status}}' | grep fqoeno"
+# ✅ "Up X seconds/minutes" (< 3 min = fresh deploy)
+# ❌ "Up X hours" = deploy didn't apply — check Dokploy UI for the app "compose-generate-multi-byte-system-fqoeno"
+```
+
+### Testing Against the Production Container
+
+Base image is `node:22-alpine` — **no `curl`**. Use `wget`. Always use `127.0.0.1`, not `localhost` (IPv6 resolves first inside the container).
+
+```bash
+# HTTP endpoint (GET)
+ssh hostinger-fomo 'docker exec compose-generate-multi-byte-system-fqoeno-app-1 \
+  wget -qO- --header="Authorization: Bearer $NEXUS_API_KEY" \
+  http://127.0.0.1:3002/api/v1/<path> 2>&1'
+
+# HTTP endpoint with headers only (check status code)
+ssh hostinger-fomo 'docker exec compose-generate-multi-byte-system-fqoeno-app-1 \
+  wget -S --header="Authorization: Bearer $NEXUS_API_KEY" \
+  http://127.0.0.1:3002/api/v1/<path> 2>&1 | head -5'
+
+# WebSocket handshake (expect 101)
+ssh hostinger-fomo 'docker exec compose-generate-multi-byte-system-fqoeno-app-1 sh -c \
+  "wget -S --header=\"Upgrade: websocket\" --header=\"Connection: Upgrade\" \
+   --header=\"Sec-WebSocket-Version: 13\" --header=\"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\" \
+   \"http://127.0.0.1:3002/api/v1/ws?projectId=test\" 2>&1 | head -5"'
+```
+
+### Reading Production Logs
+
+```bash
+# Last N lines
+ssh hostinger-fomo "docker logs --tail 30 compose-generate-multi-byte-system-fqoeno-app-1 2>&1"
+
+# Since N minutes ago
+ssh hostinger-fomo "docker logs --since 5m compose-generate-multi-byte-system-fqoeno-app-1 2>&1"
+
+# Filter by component (logs are JSON; grep on component name)
+ssh hostinger-fomo "docker logs --since 5m compose-generate-multi-byte-system-fqoeno-app-1 2>&1 | grep 'auth-middleware'"
+
+# Filter by keyword
+ssh hostinger-fomo "docker logs --since 10m compose-generate-multi-byte-system-fqoeno-app-1 2>&1 | grep 'ERROR\|WARN'"
+```
+
+### Common Prod Diagnostics
+
+| Symptom | What to check |
+|---------|--------------|
+| 401 with no log | A `preHandler` hook (e.g. `adminAuth`) applied globally — check if route fn uses `fastify.addHook()` outside `register()` |
+| 401 with "Rejected" log | `auth-middleware.ts` exemption not matching the actual URL |
+| 403 | `requireProjectAccess` or `requireScope` blocking |
+| Deploy not applied | Container "Up X hours" → check Dokploy app UI |
+| Container restart loop | `docker logs` for startup crash — usually DB unreachable or bad env var |
+
+### Fastify Hook Scope Rule
+
+When a route file calls `fastify.addHook('preHandler', hook)` **without** wrapping in `fastify.register()`, the hook applies to the entire parent scope. If a route function is called directly (`adminRoutes(fastify, deps)`) the hook bleeds into all siblings. Fix: wrap in `fastify.register(async (f) => { adminRoutes(f, deps); })` to encapsulate.
