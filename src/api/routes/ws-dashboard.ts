@@ -257,6 +257,14 @@ function setupDashboardSocket(
           return;
         }
 
+        // Fallback to static NEXUS_API_KEY env var (matches HTTP auth-middleware behavior)
+        const envApiKey = process.env['NEXUS_API_KEY'];
+        if (envApiKey && msg.apiKey === envApiKey) {
+          authenticated = true;
+          sendEvent({ type: 'auth.success' });
+          break;
+        }
+
         deps.apiKeyService
           .validateApiKey(msg.apiKey)
           .then((result) => {
