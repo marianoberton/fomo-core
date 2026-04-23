@@ -51,6 +51,8 @@ declare module 'fastify' {
 /** Path prefixes/exact paths that skip API key validation. */
 const WEBHOOK_PREFIX = '/api/v1/webhooks/';
 const WS_PATH = '/api/v1/ws';
+/** Project live-events WS — auth handled inside the handler via query/header. */
+const WS_PROJECT_PREFIX = '/api/v1/ws/project/';
 
 /**
  * Register the Bearer-token auth hook on the given Fastify scope.
@@ -90,7 +92,12 @@ export function registerAuthMiddleware(
 
       // Webhooks carry their own HMAC / provider-specific auth — skip Bearer check.
       // WebSocket upgrade requests also skip: browsers cannot send Authorization on WS handshake.
-      if (pathname.startsWith(WEBHOOK_PREFIX) || pathname === WS_PATH || pathname.startsWith(`${WS_PATH}?`)) {
+      if (
+        pathname.startsWith(WEBHOOK_PREFIX) ||
+        pathname === WS_PATH ||
+        pathname.startsWith(`${WS_PATH}?`) ||
+        pathname.startsWith(WS_PROJECT_PREFIX)
+      ) {
         return;
       }
 

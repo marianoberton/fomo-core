@@ -20,6 +20,7 @@ import { agentRoutes } from './agents.js';
 import { dashboardRoutes } from './dashboard.js';
 import { usageRoutes } from './usage.js';
 import { wsDashboardRoutes } from './ws-dashboard.js';
+import { wsProjectRoutes } from './ws-project.js';
 import { catalogRoutes } from './catalog.js';
 import { templateRoutes } from './templates.js';
 import { secretRoutes } from './secrets.js';
@@ -31,6 +32,8 @@ import { proactiveRoutes } from './proactive.js';
 import { operationsSummaryRoutes } from './operations-summary.js';
 import { skillRoutes } from './skills.js';
 import { campaignRoutes } from './campaigns.js';
+import { campaignTemplateRoutes } from './campaign-templates.js';
+import { performanceRoutes } from './performance.js';
 import { verticalRoutes } from './verticals.js';
 import { workforceMetricsRoutes } from './workforce-metrics.js';
 import { costRoutes } from './cost.js';
@@ -51,6 +54,7 @@ import { openclawSandboxRoutes } from './openclaw-sandbox.js';
 import { openclawConnectRoutes } from './openclaw-connect.js';
 import { adminAuditRoutes } from './admin-audit.js';
 import { adminInvokeRoutes } from './admin-invoke.js';
+import { adminChatwootRoutes } from './admin-chatwoot.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -74,6 +78,7 @@ export async function registerRoutes(
   await fastify.register(dashboardRoutes, deps);
   await fastify.register(usageRoutes, deps);
   await fastify.register(wsDashboardRoutes, deps);
+  await fastify.register(wsProjectRoutes, deps);
   await fastify.register(catalogRoutes, deps);
   await fastify.register(templateRoutes, deps);
   await fastify.register(secretRoutes, deps);
@@ -83,6 +88,8 @@ export async function registerRoutes(
   await fastify.register(proactiveRoutes, deps);
   await fastify.register(skillRoutes, deps);
   campaignRoutes(fastify, deps);
+  campaignTemplateRoutes(fastify, deps);
+  performanceRoutes(fastify, deps);
   workforceMetricsRoutes(fastify, deps);
   operationsSummaryRoutes(fastify, deps);
   verticalRoutes(fastify, deps);
@@ -123,6 +130,7 @@ export async function registerRoutes(
   // scopes only to admin routes and does not bleed into the global /api/v1 scope)
   await fastify.register(async (f: FastifyInstance) => { adminAuditRoutes(f, deps); });
   await fastify.register(async (f: FastifyInstance) => { adminInvokeRoutes(f, deps); });
+  await fastify.register(async (f: FastifyInstance) => { adminChatwootRoutes(f, deps); });
 
   // OpenClaw routes — auth handled by Bearer middleware, fallback to OPENCLAW_INTERNAL_KEY
   const openclawFallbackKey = process.env['OPENCLAW_INTERNAL_KEY'];

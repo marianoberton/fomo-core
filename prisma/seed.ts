@@ -91,7 +91,21 @@ async function createPromptLayers(
 
 // ─── Main ───────────────────────────────────────────────────────
 
+/**
+ * Guard against running the seed in production unless ALLOW_PROD_SEED=1.
+ * A previous run of the FAMA-Sales seed against the prod DB destroyed data,
+ * so we require an explicit opt-in to run this script when NODE_ENV=production.
+ */
+function assertSafeToSeed(): void {
+  if (process.env['NODE_ENV'] === 'production' && process.env['ALLOW_PROD_SEED'] !== '1') {
+    throw new Error(
+      'Production seed blocked. Set ALLOW_PROD_SEED=1 explicitly if you really mean it.',
+    );
+  }
+}
+
 async function main(): Promise<void> {
+  assertSafeToSeed();
   console.log('Seeding database...');
 
   // ═══════════════════════════════════════════════════════════════

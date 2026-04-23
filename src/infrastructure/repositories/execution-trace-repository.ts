@@ -1,7 +1,8 @@
 /**
  * ExecutionTrace repository — trace lifecycle and event persistence.
  */
-import type { PrismaClient, Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import type {
   ExecutionStatus,
@@ -12,6 +13,7 @@ import type {
   TraceEvent,
   TraceId,
 } from '@/core/types.js';
+import type { ProjectEventBus } from '@/api/events/event-bus.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -76,8 +78,26 @@ function toAppModel(record: {
 
 /**
  * Create an ExecutionTraceRepository backed by Prisma.
+ *
+ * @param prisma   Prisma client.
+ * @param eventBus Optional event bus — emits `trace.created` once per trace
+ *                 (on the first save/create). Consumer dedupes by traceId.
  */
-export function createExecutionTraceRepository(prisma: PrismaClient): ExecutionTraceRepository {
+export function createExecutionTraceRepository(
+  prisma: PrismaClient,
+  eventBus?: ProjectEventBus,
+): ExecutionTraceRepository {
+  function emitCreated(trace: { id: TraceId; projectId: ProjectId; sessionId: SessionId }): void {
+    if (!eventBus) return;
+    eventBus.emit({
+      kind: 'trace.created',
+      projectId: trace.projectId,
+      traceId: trace.id,
+      sessionId: trace.sessionId,
+      ts: Date.now(),
+    });
+  }
+
   return {
     async create(input: TraceCreateInput): Promise<ExecutionTrace> {
       const record = await prisma.executionTrace.create({
@@ -94,36 +114,54 @@ export function createExecutionTraceRepository(prisma: PrismaClient): ExecutionT
           status: 'running',
         },
       });
-      return toAppModel(record);
+      const trace = toAppModel(record);
+      emitCreated(trace);
+      return trace;
     },
 
     async save(trace: ExecutionTrace): Promise<void> {
-      await prisma.executionTrace.upsert({
-        where: { id: trace.id },
-        create: {
-          id: trace.id,
-          projectId: trace.projectId,
-          sessionId: trace.sessionId,
-          promptSnapshot: trace.promptSnapshot as unknown as Prisma.InputJsonValue,
-          events: trace.events as unknown as Prisma.InputJsonValue,
-          totalDurationMs: trace.totalDurationMs,
-          totalTokensUsed: trace.totalTokensUsed,
-          totalCostUsd: trace.totalCostUSD,
-          turnCount: trace.turnCount,
-          status: trace.status,
-          createdAt: trace.createdAt,
-          completedAt: trace.completedAt ?? null,
-        },
-        update: {
-          events: trace.events as unknown as Prisma.InputJsonValue,
-          totalDurationMs: trace.totalDurationMs,
-          totalTokensUsed: trace.totalTokensUsed,
-          totalCostUsd: trace.totalCostUSD,
-          turnCount: trace.turnCount,
-          status: trace.status,
-          completedAt: trace.completedAt ?? null,
-        },
-      });
+      // Try to create first so we can emit `trace.created` only on insert.
+      // On unique-constraint violation (P2002), fall back to update.
+      try {
+        await prisma.executionTrace.create({
+          data: {
+            id: trace.id,
+            projectId: trace.projectId,
+            sessionId: trace.sessionId,
+            promptSnapshot: trace.promptSnapshot as unknown as Prisma.InputJsonValue,
+            events: trace.events as unknown as Prisma.InputJsonValue,
+            totalDurationMs: trace.totalDurationMs,
+            totalTokensUsed: trace.totalTokensUsed,
+            totalCostUsd: trace.totalCostUSD,
+            turnCount: trace.turnCount,
+            status: trace.status,
+            createdAt: trace.createdAt,
+            completedAt: trace.completedAt ?? null,
+          },
+        });
+        emitCreated(trace);
+        return;
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          await prisma.executionTrace.update({
+            where: { id: trace.id },
+            data: {
+              events: trace.events as unknown as Prisma.InputJsonValue,
+              totalDurationMs: trace.totalDurationMs,
+              totalTokensUsed: trace.totalTokensUsed,
+              totalCostUsd: trace.totalCostUSD,
+              turnCount: trace.turnCount,
+              status: trace.status,
+              completedAt: trace.completedAt ?? null,
+            },
+          });
+          return;
+        }
+        throw err;
+      }
     },
 
     async findById(id: TraceId): Promise<ExecutionTrace | null> {

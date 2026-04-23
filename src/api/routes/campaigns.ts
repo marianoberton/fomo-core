@@ -15,7 +15,9 @@ import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { paginationSchema } from '../pagination.js';
 import { getVariantMetrics, calculateWinner } from '../../campaigns/ab-test-engine.js';
 import { getCampaignMetrics } from '@/campaigns/campaign-tracker.js';
-import type { CampaignId, ABTestResult } from '../../campaigns/types.js';
+import { interpolateTemplate } from '@/campaigns/campaign-runner.js';
+import type { CampaignId, ABTestResult, AudienceFilter } from '../../campaigns/types.js';
+import { calculateCost } from '@/providers/models.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -266,6 +268,97 @@ export function campaignRoutes(
 
       const metrics = await getCampaignMetrics(prisma, campaign.id as CampaignId);
       await sendSuccess(reply, metrics);
+    },
+  );
+
+  // DELETE /projects/:projectId/campaigns/:id
+  fastify.delete(
+    '/projects/:projectId/campaigns/:id',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const existing = await prisma.campaign.findUnique({
+        where: { id: request.params.id },
+      });
+      if (existing?.projectId !== request.params.projectId) {
+        await sendNotFound(reply, 'Campaign', request.params.id);
+        return;
+      }
+      await prisma.campaign.delete({ where: { id: request.params.id } });
+      await reply.status(204).send();
+    },
+  );
+
+  // POST /projects/:projectId/campaigns/:id/dry-run
+  fastify.post(
+    '/projects/:projectId/campaigns/:id/dry-run',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!campaign || campaign.projectId !== request.params.projectId) {
+        await sendNotFound(reply, 'Campaign', request.params.id);
+        return;
+      }
+
+      if (typeof campaign.template !== 'string' || campaign.template.length === 0) {
+        await sendError(reply, 'VALIDATION_ERROR', 'Campaign has no template', 400);
+        return;
+      }
+
+      const filter = campaign.audienceFilter as unknown as AudienceFilter;
+      const where: Prisma.ContactWhereInput = { projectId: campaign.projectId };
+      if (filter.tags && filter.tags.length > 0) {
+        where.tags = { hasEvery: filter.tags };
+      }
+      if (filter.role) where.role = filter.role;
+
+      const [totalAudience, withPhone, withEmail, sample] = await Promise.all([
+        prisma.contact.count({ where }),
+        prisma.contact.count({ where: { ...where, phone: { not: null } } }),
+        prisma.contact.count({ where: { ...where, email: { not: null } } }),
+        prisma.contact.findMany({ where, take: 10, orderBy: { createdAt: 'desc' } }),
+      ]);
+
+      // Rough token estimate: 1 token ≈ 4 chars. Add 20 tokens for system overhead.
+      const avgTokensPerMessage = Math.max(
+        10,
+        Math.ceil(campaign.template.length / 4) + 20,
+      );
+      // Cost estimate uses a conservative default model (haiku pricing).
+      const estimatedTotalCostUsd = calculateCost(
+        'claude-haiku-4-5',
+        avgTokensPerMessage * totalAudience,
+        0,
+      );
+
+      const previews = sample.map((contact) => ({
+        contactId: contact.id,
+        name: contact.name,
+        rendered: interpolateTemplate(campaign.template, {
+          name: contact.name,
+          displayName: contact.displayName ?? undefined,
+          phone: contact.phone ?? undefined,
+          email: contact.email ?? undefined,
+        }),
+        channel: campaign.channel,
+        estimatedTokens: avgTokensPerMessage,
+      }));
+
+      await sendSuccess(reply, {
+        campaignId: campaign.id,
+        totalAudience,
+        estimatedTotalCostUsd,
+        coverage: {
+          withPhone,
+          withEmail,
+        },
+        previews,
+      });
     },
   );
 

@@ -5,6 +5,12 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
+import {
+  requireAgentAccess,
+  requireSessionAccess,
+  ProjectAccessDeniedError,
+  ResourceNotFoundError,
+} from '../middleware/require-project-access.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -38,7 +44,11 @@ export function platformBridgeRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { prisma, logger } = deps;
+  const { prisma, logger, eventBus } = deps;
+
+  function isGuardError(e: unknown): boolean {
+    return e instanceof ProjectAccessDeniedError || e instanceof ResourceNotFoundError;
+  }
 
   // ────────────────────────────────────────────────────────────────
   // 1. GET /agents — list agents with today's metrics
@@ -95,6 +105,13 @@ export function platformBridgeRoutes(
     '/agents/:agentId/detail',
     async (request, reply) => {
       const { agentId } = request.params;
+
+      try {
+        await requireAgentAccess(request, reply, agentId, prisma);
+      } catch (e) {
+        if (isGuardError(e)) return;
+        throw e;
+      }
 
       const agent = await prisma.agent.findUnique({ where: { id: agentId } });
       if (!agent) {
@@ -198,6 +215,13 @@ export function platformBridgeRoutes(
     async (request, reply) => {
       const { sessionId } = request.params;
 
+      try {
+        await requireSessionAccess(request, reply, sessionId, prisma);
+      } catch (e) {
+        if (isGuardError(e)) return;
+        throw e;
+      }
+
       const session = await prisma.session.findUnique({
         where: { id: sessionId },
         select: { id: true, status: true, agentId: true },
@@ -235,6 +259,14 @@ export function platformBridgeRoutes(
     '/conversations/:sessionId/escalate',
     async (request, reply) => {
       const { sessionId } = request.params;
+
+      try {
+        await requireSessionAccess(request, reply, sessionId, prisma);
+      } catch (e) {
+        if (isGuardError(e)) return;
+        throw e;
+      }
+
       const body = escalateBodySchema.parse(request.body);
 
       const session = await prisma.session.findUnique({
@@ -414,6 +446,69 @@ export function platformBridgeRoutes(
       );
 
       return sendSuccess(reply, { agents: agentsStatus });
+    },
+  );
+
+  // ────────────────────────────────────────────────────────────────
+  // 9. GET /events — SSE fallback for live project events
+  // ────────────────────────────────────────────────────────────────
+  // WebSocket is the primary transport (/api/v1/ws/project/:projectId).
+  // This SSE endpoint is a fallback for browsers / middleboxes that
+  // strip WS upgrades or when the client prefers a one-way stream.
+  //
+  // Auth: standard Bearer — the middleware has already validated
+  //       request.apiKeyProjectId, and requireProjectAccess is enforced
+  //       against the `projectId` query below.
+  fastify.get<{ Querystring: { projectId: string } }>(
+    '/events',
+    async (request, reply) => {
+      const { projectId } = projectIdQuerySchema.parse(request.query);
+
+      // Enforce project-scoped access for scoped keys
+      const keyProjectId = request.apiKeyProjectId;
+      if (keyProjectId !== null && keyProjectId !== undefined && keyProjectId !== projectId) {
+        await sendError(reply, 'PROJECT_ACCESS_DENIED', 'API key does not have access to this project', 403);
+        return;
+      }
+
+      const raw = reply.raw;
+      raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        // Disable buffering on some proxies (nginx, CF)
+        'X-Accel-Buffering': 'no',
+      });
+      raw.write(': connected\n\n');
+
+      const unsubscribe = eventBus.subscribe(projectId as import('@/core/types.js').ProjectId, (event) => {
+        try {
+          raw.write(`data: ${JSON.stringify(event)}\n\n`);
+        } catch (err) {
+          logger.warn('SSE write failed', {
+            component: 'platform-bridge',
+            projectId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
+
+      const heartbeat = setInterval(() => {
+        if (!raw.writableEnded) raw.write(': ping\n\n');
+      }, 30_000);
+
+      const cleanup = (): void => {
+        unsubscribe();
+        clearInterval(heartbeat);
+      };
+      request.raw.on('close', cleanup);
+      raw.on('error', cleanup);
+
+      // Keep the handler alive — Fastify will treat this as streaming.
+      // Await a promise that resolves when the client disconnects.
+      await new Promise<void>((resolve) => {
+        request.raw.on('close', () => { resolve(); });
+      });
     },
   );
 }

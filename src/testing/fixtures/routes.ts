@@ -471,7 +471,18 @@ export function createMockDeps(): RouteDependencies & {
     mcpServerRepository: createMockMCPServerRepository(),
     skillService: createMockSkillService(),
     agentRunRepository: createMockAgentRunRepository(),
-    prisma: {} as RouteDependencies['prisma'],
+    // Minimal Prisma mock — just enough for require-project-access guards.
+    // By default every findUnique returns a row with projectId='proj-1' so
+    // guards pass. Tests that want a 403/404 from the guard can override
+    // the specific findUnique mock.
+    prisma: {
+      session: { findUnique: vi.fn().mockResolvedValue({ projectId: 'proj-1' }) },
+      approvalRequest: { findUnique: vi.fn().mockResolvedValue({ projectId: 'proj-1' }) },
+      executionTrace: { findUnique: vi.fn().mockResolvedValue({ projectId: 'proj-1' }) },
+      contact: { findUnique: vi.fn().mockResolvedValue({ projectId: 'proj-1' }) },
+      client: { findUnique: vi.fn().mockResolvedValue({ projectId: 'proj-1' }) },
+      agent: { findUnique: vi.fn().mockResolvedValue({ projectId: 'proj-1' }) },
+    } as unknown as RouteDependencies['prisma'],
     sessionBroadcaster: { subscribe: vi.fn().mockReturnValue(() => { /* noop */ }), broadcast: vi.fn() },
     resumeAfterApproval: () => Promise.resolve(),
     provisioningService: {
@@ -497,6 +508,12 @@ export function createMockDeps(): RouteDependencies & {
       list: vi.fn().mockReturnValue([]),
       countActive: vi.fn().mockReturnValue(0),
       prune: vi.fn().mockReturnValue(0),
+    },
+    eventBus: {
+      emit: vi.fn(),
+      subscribe: vi.fn().mockReturnValue(() => { /* noop */ }),
+      subscribeAll: vi.fn().mockReturnValue(() => { /* noop */ }),
+      listenerCount: vi.fn().mockReturnValue(0),
     },
     logger: createMockLogger(),
   };

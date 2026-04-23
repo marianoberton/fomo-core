@@ -39,6 +39,7 @@ model Project {
   mcpServerInstances   MCPServerInstance[]
   skillInstances       SkillInstance[]
   campaigns            Campaign[]
+  campaignTemplates    CampaignTemplate[]
   clients              Client[]
   agentRuns            AgentRun[]
 
@@ -682,6 +683,24 @@ model CampaignReply {
 
   @@index([contactId])
   @@map("campaign_replies")
+}
+
+model CampaignTemplate {
+  id          String   @id @default(cuid())
+  projectId   String   @map("project_id")
+  name        String
+  description String?
+  body        String
+  variables   String[]
+  channel     String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("campaign_templates")
 }
 
 // ─── Clients (for cost tracking) ────────────────────────────────

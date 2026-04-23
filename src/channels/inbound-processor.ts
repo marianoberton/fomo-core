@@ -19,6 +19,7 @@ import type { ContactRepository, ChannelIdentifier } from '@/contacts/types.js';
 import type { SessionRepository, Session } from '@/infrastructure/repositories/session-repository.js';
 import type { AgentChannelRouter } from './agent-channel-router.js';
 import type { MessageDeduplicator } from './message-dedup.js';
+import type { ProjectEventBus } from '@/api/events/event-bus.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -33,6 +34,8 @@ export interface InboundProcessorDeps {
   messageDeduplicator?: MessageDeduplicator;
   /** Optional broadcaster to notify WebSocket clients of new messages. */
   sessionBroadcaster?: import('@/hitl/session-broadcaster.js').SessionBroadcaster;
+  /** Optional project event bus for live event fan-out (WS/SSE). */
+  eventBus?: ProjectEventBus;
   /** Function to run the agent and get a response */
   runAgent: (params: {
     projectId: ProjectId;
@@ -91,6 +94,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
     agentChannelRouter,
     messageDeduplicator,
     sessionBroadcaster,
+    eventBus,
     runAgent,
   } = deps;
 
@@ -277,6 +281,22 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
           session = { ...session, metadata: updatedMetadata };
         }
 
+        // Emit live event: message.inbound — fan out to dashboard/SSE subscribers.
+        // Fire-and-forget; the bus itself is synchronous but any listener doing I/O
+        // should handle its own errors.
+        if (eventBus) {
+          eventBus.emit({
+            kind: 'message.inbound',
+            projectId,
+            sessionId: session.id,
+            contactId: contact.id,
+            ...(resolvedAgentId && { agentId: resolvedAgentId }),
+            text: message.content,
+            channel: message.channel,
+            ts: Date.now(),
+          });
+        }
+
         // 3. If session is paused (operator takeover), persist message but skip agent
         if (session.status === 'paused') {
           const stored = await sessionRepository.addMessage(
@@ -321,6 +341,19 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
           content: agentResult.response,
           replyToChannelMessageId: message.channelMessageId,
         });
+
+        // Emit live event: message.outbound — only when the channel send succeeded.
+        if (eventBus && sendResult.success) {
+          eventBus.emit({
+            kind: 'message.outbound',
+            projectId,
+            sessionId: session.id,
+            ...(resolvedAgentId && { agentId: resolvedAgentId }),
+            text: agentResult.response,
+            channel: message.channel,
+            ts: Date.now(),
+          });
+        }
 
         const durationMs = Date.now() - startTime;
 

@@ -22,6 +22,7 @@ import type {
 } from './types.js';
 import { selectVariant } from './ab-test-engine.js';
 import { markCampaignReply } from './campaign-tracker.js';
+import type { ProjectEventBus } from '@/api/events/event-bus.js';
 
 // ─── Error ──────────────────────────────────────────────────────
 
@@ -44,6 +45,8 @@ export interface CampaignRunnerDeps {
   prisma: PrismaClient;
   proactiveMessenger: ProactiveMessenger;
   logger: Logger;
+  /** Optional event bus for emitting `campaign.progress` events during execution. */
+  eventBus?: ProjectEventBus;
 }
 
 // ─── Interface ──────────────────────────────────────────────────
@@ -113,7 +116,11 @@ function resolveRecipient(
 
 /** Create a CampaignRunner for executing outbound campaigns. */
 export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
-  const { prisma, proactiveMessenger, logger } = deps;
+  const { prisma, proactiveMessenger, logger, eventBus } = deps;
+
+  // Emit `campaign.progress` every PROGRESS_BATCH sends so the dashboard can
+  // show a live counter without flooding the bus on large audiences.
+  const PROGRESS_BATCH = 10;
 
   return {
     async executeCampaign(
@@ -264,6 +271,32 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
             error: errorMessage,
           });
         }
+
+        // Emit progress every PROGRESS_BATCH sends (live dashboard counter)
+        if (eventBus && (sent + failed) % PROGRESS_BATCH === 0) {
+          eventBus.emit({
+            kind: 'campaign.progress',
+            projectId: campaign.projectId as ProjectId,
+            campaignId,
+            sent,
+            failed,
+            replied: 0,
+            ts: Date.now(),
+          });
+        }
+      }
+
+      // Final progress emit after the run completes
+      if (eventBus) {
+        eventBus.emit({
+          kind: 'campaign.progress',
+          projectId: campaign.projectId as ProjectId,
+          campaignId,
+          sent,
+          failed,
+          replied: 0,
+          ts: Date.now(),
+        });
       }
 
       // 5. Update campaign status

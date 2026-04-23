@@ -7,6 +7,12 @@ import type { RouteDependencies } from '../types.js';
 import { sendSuccess } from '../error-handler.js';
 import { createPrismaUsageStore } from '@/cost/prisma-usage-store.js';
 import type { ProjectId } from '@/core/types.js';
+import {
+  requireClientAccess,
+  requireAgentAccess,
+  ProjectAccessDeniedError,
+  ResourceNotFoundError,
+} from '../middleware/require-project-access.js';
 
 const periodSchema = z.enum(['today', 'week', 'month']).default('month');
 
@@ -19,6 +25,10 @@ export function costRoutes(
 ): void {
   const { prisma } = deps;
   const store = createPrismaUsageStore(prisma);
+
+  function isGuardError(e: unknown): boolean {
+    return e instanceof ProjectAccessDeniedError || e instanceof ResourceNotFoundError;
+  }
 
   // GET /api/v1/cost/summary?period=month
   fastify.get('/summary', async (request, reply) => {
@@ -73,6 +83,13 @@ export function costRoutes(
       })
       .parse(request.params);
 
+    try {
+      await requireClientAccess(request, reply, clientId, prisma);
+    } catch (e) {
+      if (isGuardError(e)) return;
+      throw e;
+    }
+
     const query = z
       .object({
         period: periodSchema.optional(),
@@ -93,6 +110,13 @@ export function costRoutes(
         agentId: z.string(),
       })
       .parse(request.params);
+
+    try {
+      await requireAgentAccess(request, reply, agentId, prisma);
+    } catch (e) {
+      if (isGuardError(e)) return;
+      throw e;
+    }
 
     const query = z
       .object({
@@ -132,6 +156,13 @@ export function costRoutes(
         clientId: z.string(),
       })
       .parse(request.params);
+
+    try {
+      await requireClientAccess(request, reply, clientId, prisma);
+    } catch (e) {
+      if (isGuardError(e)) return;
+      throw e;
+    }
 
     const body = z
       .object({

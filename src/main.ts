@@ -167,6 +167,8 @@ import type { ProjectId } from '@/core/types.js';
 import { createCampaignRunner } from '@/campaigns/campaign-runner.js';
 import { createNotifySlackTool } from '@/tools/definitions/notify-slack.js';
 import type { CampaignRunner } from '@/campaigns/campaign-runner.js';
+import { createProjectEventBus } from '@/api/events/event-bus.js';
+import { createReplyTracker } from '@/campaigns/reply-tracker.js';
 
 const logger = createLogger();
 
@@ -196,11 +198,15 @@ async function start(): Promise<void> {
 
     const prisma = db.client;
 
+    // Project event bus — in-process live event fan-out for WS + SSE.
+    // Created before repositories so the trace repo can emit `trace.created`.
+    const eventBus = createProjectEventBus();
+
     // Create repositories
     const projectRepository = createProjectRepository(prisma);
     const sessionRepository = createSessionRepository(prisma);
     const promptLayerRepository = createPromptLayerRepository(prisma);
-    const executionTraceRepository = createExecutionTraceRepository(prisma);
+    const executionTraceRepository = createExecutionTraceRepository(prisma, eventBus);
     const scheduledTaskRepository = createScheduledTaskRepository(prisma);
     const contactRepository = createContactRepository(prisma);
     const webhookRepository = createWebhookRepository(prisma);
@@ -258,6 +264,7 @@ async function start(): Promise<void> {
       store: createPrismaApprovalStore(prisma),
       notifier: telegramNotifier,
       expirationMs: 30 * 60 * 1000, // 30 minutes — realistic for human review
+      eventBus,
     });
     // Start the sweeper so stale pending approvals are resolved even after
     // a process restart (in-memory timeout timers are not persisted).
@@ -583,6 +590,7 @@ async function start(): Promise<void> {
       agentChannelRouter,
       messageDeduplicator,
       sessionBroadcaster,
+      eventBus,
       runAgent,
     });
 
@@ -717,6 +725,7 @@ async function start(): Promise<void> {
     const handoffManager = createHandoffManager({
       config: DEFAULT_HANDOFF_CONFIG,
       logger,
+      eventBus,
     });
     logger.info('Channel system initialized (dynamic per-project integrations)', { component: 'main' });
 
@@ -796,7 +805,7 @@ async function start(): Promise<void> {
       logger.info('Proactive messenger enabled (Redis connected)', { component: 'main' });
 
       // Campaign runner (outbound campaigns via ProactiveMessenger)
-      campaignRunner = createCampaignRunner({ prisma, proactiveMessenger, logger });
+      campaignRunner = createCampaignRunner({ prisma, proactiveMessenger, logger, eventBus });
       toolRegistry.register(createTriggerCampaignTool({ campaignRunner, prisma }));
       logger.info('Campaign runner enabled', { component: 'main' });
 
@@ -820,6 +829,11 @@ async function start(): Promise<void> {
 
     // OpenClaw task registry — in-memory task lifecycle tracking (always created)
     const openclawTaskRegistry = createTaskRegistry();
+
+    // Campaign reply tracker — listens to message.inbound on the bus and
+    // marks CampaignSend.replied when a contact responds within the window.
+    const replyTracker = createReplyTracker({ prisma, eventBus, logger });
+    replyTracker.start();
 
     // Assemble route dependencies
     const deps: RouteDependencies = {
@@ -858,6 +872,7 @@ async function start(): Promise<void> {
       dokployService: dokployService,
       agentRunRepository,
       taskRegistry: openclawTaskRegistry,
+      eventBus,
       logger,
     };
 

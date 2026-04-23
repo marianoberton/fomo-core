@@ -107,8 +107,22 @@ export interface ChatwootIntegrationConfig {
   accountId: number;
   inboxId: number;
   agentBotId: number;
-  /** Env var name for the Chatwoot API token (NOT the token itself). */
-  apiTokenEnvVar: string;
+  /**
+   * Preferred: key in the secrets table for the Chatwoot API token.
+   * When present, the adapter resolves the token from SecretService.
+   */
+  apiTokenSecretKey?: string;
+  /**
+   * Preferred: key in the secrets table for the Chatwoot webhook HMAC secret.
+   * When present, the webhook route validates signatures using this secret.
+   */
+  webhookSecretKey?: string;
+  /**
+   * Legacy: env var name holding the Chatwoot API token.
+   * Kept for backward compatibility with instances seeded before SecretService
+   * support. A deprecation warning is logged whenever this fallback is used.
+   */
+  apiTokenEnvVar?: string;
 }
 
 /** Telegram integration config — references secret keys in the secrets table. */
@@ -185,13 +199,20 @@ export interface IntegrationConfigMap {
 
 // ─── Zod Schemas for Integration Configs ────────────────────────
 
-export const ChatwootIntegrationConfigSchema = z.object({
-  baseUrl: z.string().url(),
-  accountId: z.number().int().positive(),
-  inboxId: z.number().int().positive(),
-  agentBotId: z.number().int().positive(),
-  apiTokenEnvVar: z.string().min(1),
-});
+export const ChatwootIntegrationConfigSchema = z
+  .object({
+    baseUrl: z.string().url(),
+    accountId: z.number().int().positive(),
+    inboxId: z.number().int().positive(),
+    agentBotId: z.number().int().positive(),
+    apiTokenSecretKey: z.string().min(1).max(128).optional(),
+    webhookSecretKey: z.string().min(1).max(128).optional(),
+    apiTokenEnvVar: z.string().min(1).optional(),
+  })
+  .refine(
+    (c) => c.apiTokenSecretKey !== undefined || c.apiTokenEnvVar !== undefined,
+    { message: 'Either apiTokenSecretKey (preferred) or apiTokenEnvVar must be set' },
+  );
 
 export const TelegramIntegrationConfigSchema = z.object({
   botTokenSecretKey: z.string().min(1).max(128),

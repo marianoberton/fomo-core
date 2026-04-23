@@ -21,6 +21,10 @@ import type { HandoffManager } from '@/channels/handoff.js';
 import type { ChatwootWebhookEvent, ChatwootAdapter } from '@/channels/adapters/chatwoot.js';
 import type { ProjectId } from '@/core/types.js';
 import type { WebhookQueue } from '@/channels/webhook-queue.js';
+import type { ChatwootIntegrationConfig } from '@/channels/types.js';
+import type { Logger } from '@/observability/logger.js';
+import type { SecretService } from '@/secrets/types.js';
+import type { ChannelIntegrationRepository } from '@/channels/types.js';
 
 // ─── Extended Dependencies ──────────────────────────────────────
 
@@ -36,13 +40,67 @@ export interface ChatwootWebhookDeps extends RouteDependencies {
   }) => Promise<{ response: string }>;
 }
 
+// ─── Secret Resolution ──────────────────────────────────────────
+
+/**
+ * Resolve the webhook HMAC secret for a Chatwoot account.
+ *
+ * Preferred path: read from SecretService using `webhookSecretKey` configured
+ * on the project's ChannelIntegration. Falls back to the legacy
+ * `CHATWOOT_WEBHOOK_SECRET` env var (shared across all projects) with a
+ * deprecation warning.
+ *
+ * Returns null when no secret can be resolved — in that case the request
+ * must be rejected (we never accept unsigned webhooks).
+ */
+async function resolveChatwootWebhookSecret(deps: {
+  accountId: number | undefined;
+  channelResolver: ChannelResolver;
+  channelIntegrationRepository: ChannelIntegrationRepository;
+  secretService: SecretService;
+  logger: Logger;
+}): Promise<string | null> {
+  const { accountId, channelResolver, channelIntegrationRepository, secretService, logger } = deps;
+
+  if (accountId !== undefined) {
+    const projectId = await channelResolver.resolveProjectByAccount(accountId);
+    if (projectId) {
+      const integration = await channelIntegrationRepository.findByProjectAndProvider(projectId, 'chatwoot');
+      const cwConfig = integration?.config as ChatwootIntegrationConfig | undefined;
+      if (cwConfig?.webhookSecretKey) {
+        try {
+          return await secretService.get(projectId, cwConfig.webhookSecretKey);
+        } catch {
+          logger.error('Failed to resolve Chatwoot webhook secret from SecretService', {
+            component: 'chatwoot-webhook',
+            projectId,
+            webhookSecretKey: cwConfig.webhookSecretKey,
+          });
+          // fall through to env-var fallback
+        }
+      }
+    }
+  }
+
+  const envSecret = process.env['CHATWOOT_WEBHOOK_SECRET'];
+  if (envSecret) {
+    logger.warn('Chatwoot webhook using legacy env var secret — migrate to SecretService', {
+      component: 'chatwoot-webhook',
+      accountId,
+    });
+    return envSecret;
+  }
+
+  return null;
+}
+
 // ─── Route Registration ─────────────────────────────────────────
 
 export function chatwootWebhookRoutes(
   fastify: FastifyInstance,
   deps: ChatwootWebhookDeps,
 ): void {
-  const { channelResolver, handoffManager, webhookQueue, logger } = deps;
+  const { channelResolver, handoffManager, webhookQueue, logger, channelIntegrationRepository, secretService } = deps;
 
   /**
    * POST /webhooks/chatwoot — receives Agent Bot webhook events from Chatwoot.
@@ -59,10 +117,21 @@ export function chatwootWebhookRoutes(
       return reply.status(401).send({ error: 'Missing signature' });
     }
 
-    const secret = process.env['CHATWOOT_WEBHOOK_SECRET'];
+    // Peek at the payload to find the account, so we can resolve the
+    // per-project webhook secret before validating the HMAC.
+    const earlyEvent = request.body as ChatwootWebhookEvent;
+    const secret = await resolveChatwootWebhookSecret({
+      accountId: earlyEvent.account?.id,
+      channelResolver,
+      channelIntegrationRepository,
+      secretService,
+      logger,
+    });
+
     if (!secret) {
-      logger.error('CHATWOOT_WEBHOOK_SECRET not configured', {
+      logger.error('No Chatwoot webhook secret configured (project or env)', {
         component: 'chatwoot-webhook',
+        accountId: earlyEvent.account?.id,
       });
       return reply.status(500).send({ error: 'Server misconfigured' });
     }
@@ -158,7 +227,12 @@ export function chatwootWebhookRoutes(
     // Check if customer is requesting human escalation
     if (handoffManager.shouldEscalateFromMessage(event.content)) {
       void handoffManager
-        .escalate(conversationId, adapter, 'Cliente solicito agente humano')
+        .escalate(
+          conversationId,
+          adapter,
+          'Cliente solicito agente humano',
+          { projectId, sessionId: `cw-${String(conversationId)}` as import('@/core/types.js').SessionId },
+        )
         .catch((error: unknown) => {
           logger.error('Failed to escalate to human', {
             component: 'chatwoot-webhook',
@@ -202,6 +276,7 @@ export function chatwootWebhookRoutes(
               conversationId,
               adapter,
               'El agente AI determino que se requiere asistencia humana',
+              { projectId, sessionId: `cw-${String(conversationId)}` as import('@/core/types.js').SessionId },
             );
             return;
           }
@@ -242,10 +317,19 @@ export function chatwootWebhookRoutes(
       return reply.status(401).send({ error: 'Missing signature' });
     }
 
-    const secret = process.env['CHATWOOT_WEBHOOK_SECRET'];
+    const earlyEvent = request.body as ChatwootWebhookEvent;
+    const secret = await resolveChatwootWebhookSecret({
+      accountId: earlyEvent.account?.id,
+      channelResolver,
+      channelIntegrationRepository,
+      secretService,
+      logger,
+    });
+
     if (!secret) {
-      logger.error('CHATWOOT_WEBHOOK_SECRET not configured', {
+      logger.error('No Chatwoot webhook secret configured (status endpoint)', {
         component: 'chatwoot-webhook',
+        accountId: earlyEvent.account?.id,
       });
       return reply.status(500).send({ error: 'Server misconfigured' });
     }
@@ -281,13 +365,19 @@ export function chatwootWebhookRoutes(
       if (projectId) {
         const adapter = await channelResolver.resolveAdapter(projectId, 'chatwoot') as ChatwootAdapter | null;
         if (adapter) {
-          void handoffManager.resume(conversationId, adapter).catch((error: unknown) => {
-            logger.error('Failed to resume bot after resolve', {
-              component: 'chatwoot-webhook',
+          void handoffManager
+            .resume(
               conversationId,
-              error: error instanceof Error ? error.message : 'Unknown error',
+              adapter,
+              { projectId, sessionId: `cw-${String(conversationId)}` as import('@/core/types.js').SessionId },
+            )
+            .catch((error: unknown) => {
+              logger.error('Failed to resume bot after resolve', {
+                component: 'chatwoot-webhook',
+                conversationId,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              });
             });
-          });
         }
       }
     }

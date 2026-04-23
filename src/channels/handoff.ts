@@ -8,6 +8,8 @@
  */
 import type { Logger } from '@/observability/logger.js';
 import type { ChatwootAdapter } from './adapters/chatwoot.js';
+import type { ProjectEventBus } from '@/api/events/event-bus.js';
+import type { ProjectId, SessionId } from '@/core/types.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -20,15 +22,36 @@ export interface HandoffConfig {
   maxTurnsBeforeEscalation: number;
 }
 
+/** Optional session context used to emit live events. */
+export interface HandoffSessionContext {
+  projectId: ProjectId;
+  sessionId: SessionId;
+}
+
 export interface HandoffManager {
   /** Check if an AI response signals handoff. */
   shouldEscalateFromResponse(response: string): boolean;
   /** Check if a customer message requests human escalation. */
   shouldEscalateFromMessage(message: string): boolean;
-  /** Execute handoff: transfer conversation to human agent in Chatwoot. */
-  escalate(conversationId: number, adapter: ChatwootAdapter, reason: string): Promise<void>;
-  /** Resume bot handling after human resolves. */
-  resume(conversationId: number, adapter: ChatwootAdapter): Promise<void>;
+  /**
+   * Execute handoff: transfer conversation to human agent in Chatwoot.
+   * When `session` is provided, a `handoff.requested` event is emitted on the bus.
+   */
+  escalate(
+    conversationId: number,
+    adapter: ChatwootAdapter,
+    reason: string,
+    session?: HandoffSessionContext,
+  ): Promise<void>;
+  /**
+   * Resume bot handling after human resolves.
+   * When `session` is provided, a `handoff.resumed` event is emitted on the bus.
+   */
+  resume(
+    conversationId: number,
+    adapter: ChatwootAdapter,
+    session?: HandoffSessionContext,
+  ): Promise<void>;
   /** Strip the handoff marker from the response (so customer doesn't see it). */
   stripHandoffMarker(response: string): string;
 }
@@ -36,6 +59,8 @@ export interface HandoffManager {
 export interface HandoffManagerDeps {
   config: HandoffConfig;
   logger: Logger;
+  /** Optional event bus for live fan-out of handoff events. */
+  eventBus?: ProjectEventBus;
 }
 
 // ─── Default Config ─────────────────────────────────────────────
@@ -61,7 +86,7 @@ export const DEFAULT_HANDOFF_CONFIG: HandoffConfig = {
  * conversations to human agents via Chatwoot.
  */
 export function createHandoffManager(deps: HandoffManagerDeps): HandoffManager {
-  const { config, logger } = deps;
+  const { config, logger, eventBus } = deps;
 
   const keywordsLower = config.escalationKeywords.map(k => k.toLowerCase());
 
@@ -79,6 +104,7 @@ export function createHandoffManager(deps: HandoffManagerDeps): HandoffManager {
       conversationId: number,
       adapter: ChatwootAdapter,
       reason: string,
+      session?: HandoffSessionContext,
     ): Promise<void> {
       logger.info('Escalating conversation to human agent', {
         component: 'handoff',
@@ -90,19 +116,42 @@ export function createHandoffManager(deps: HandoffManagerDeps): HandoffManager {
 
       await adapter.handoffToHuman(conversationId, note);
 
+      if (eventBus && session) {
+        eventBus.emit({
+          kind: 'handoff.requested',
+          projectId: session.projectId,
+          sessionId: session.sessionId,
+          reason,
+          ts: Date.now(),
+        });
+      }
+
       logger.info('Conversation escalated to human', {
         component: 'handoff',
         conversationId,
       });
     },
 
-    async resume(conversationId: number, adapter: ChatwootAdapter): Promise<void> {
+    async resume(
+      conversationId: number,
+      adapter: ChatwootAdapter,
+      session?: HandoffSessionContext,
+    ): Promise<void> {
       logger.info('Resuming bot for conversation', {
         component: 'handoff',
         conversationId,
       });
 
       await adapter.resumeBot(conversationId);
+
+      if (eventBus && session) {
+        eventBus.emit({
+          kind: 'handoff.resumed',
+          projectId: session.projectId,
+          sessionId: session.sessionId,
+          ts: Date.now(),
+        });
+      }
 
       logger.info('Bot resumed for conversation', {
         component: 'handoff',

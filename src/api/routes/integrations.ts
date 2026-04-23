@@ -177,8 +177,12 @@ function getReferencedSecretKeys(provider: IntegrationProvider, config: Record<s
     }
     case 'whatsapp-waha':
       return []; // WAHA uses direct URL, no secrets
-    case 'chatwoot':
-      return []; // Chatwoot uses env vars, not secrets table
+    case 'chatwoot': {
+      const keys: string[] = [];
+      if (config['apiTokenSecretKey']) keys.push(config['apiTokenSecretKey'] as string);
+      if (config['webhookSecretKey']) keys.push(config['webhookSecretKey'] as string);
+      return keys;
+    }
     case 'vapi': {
       const keys = [config['vapiApiKeySecretKey'] as string];
       if (config['vapiWebhookSecretKey']) keys.push(config['vapiWebhookSecretKey'] as string);
