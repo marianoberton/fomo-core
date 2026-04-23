@@ -25,7 +25,7 @@ const outputSchema = z.object({
     list: z.array(z.object({
       name: z.string(),
       status: z.string(),
-      operatingMode: z.string(),
+      type: z.enum(['conversational', 'process', 'backoffice']),
       activeSessions: z.number(),
     })),
   }),
@@ -115,7 +115,7 @@ export function createGetOperationsSummaryTool(
         // 1. Agents
         const agents = await prisma.agent.findMany({
           where: { projectId },
-          select: { id: true, name: true, status: true, operatingMode: true },
+          select: { id: true, name: true, status: true, type: true },
         });
 
         // 2. Active sessions grouped by agent
@@ -131,7 +131,7 @@ export function createGetOperationsSummaryTool(
         const agentList = agents.map((a) => ({
           name: a.name,
           status: a.status,
-          operatingMode: a.operatingMode,
+          type: a.type,
           activeSessions: sessionCountMap.get(a.id) ?? 0,
         }));
 

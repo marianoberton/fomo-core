@@ -86,9 +86,9 @@ describe('get-operations-summary', () => {
   describe('execute', () => {
     it('returns correct summary for a populated project', async () => {
       mockPrisma.agent.findMany.mockResolvedValue([
-        { id: 'a1', name: 'Sales', status: 'active', operatingMode: 'customer-facing' },
-        { id: 'a2', name: 'Support', status: 'paused', operatingMode: 'customer-facing' },
-        { id: 'a3', name: 'Manager', status: 'active', operatingMode: 'manager' },
+        { id: 'a1', name: 'Sales', status: 'active', type: 'conversational' },
+        { id: 'a2', name: 'Support', status: 'paused', type: 'conversational' },
+        { id: 'a3', name: 'Manager', status: 'active', type: 'backoffice' },
       ]);
       mockPrisma.session.groupBy.mockResolvedValue([
         { agentId: 'a1', _count: 5 },
@@ -131,7 +131,7 @@ describe('get-operations-summary', () => {
       expect(output.agents.list[0]).toEqual({
         name: 'Sales',
         status: 'active',
-        operatingMode: 'customer-facing',
+        type: 'conversational',
         activeSessions: 5,
       });
 

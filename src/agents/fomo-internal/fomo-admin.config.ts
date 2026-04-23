@@ -71,7 +71,8 @@ export const fomoAdminAgent: CreateAgentInput = {
   description:
     'Platform operator agent. Creates, tests, optimizes, and operates client agents ' +
     'and infrastructure. Master-key only.',
-  operatingMode: 'admin',
+  type: 'backoffice',
+  metadata: { archetype: 'admin' },
   llmConfig: getAgentLLMConfig('FOMO-Admin'),
   promptConfig: {
     identity: `Sos FOMO-Admin, el operador interno de la plataforma fomo-core.

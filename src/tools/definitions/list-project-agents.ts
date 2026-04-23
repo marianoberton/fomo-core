@@ -22,7 +22,7 @@ const outputSchema = z.object({
     z.object({
       name: z.string(),
       description: z.string().optional(),
-      operatingMode: z.string(),
+      type: z.enum(['conversational', 'process', 'backoffice']),
       status: z.string(),
       toolCount: z.number(),
     }),
@@ -37,9 +37,9 @@ export interface ListProjectAgentsToolOptions {
 /**
  * Create the list-project-agents tool.
  *
- * Returns the name, description, operating mode, and status of every agent
- * in the current project. Intended for manager agents that need to know
- * which subagents to delegate work to.
+ * Returns the name, description, type, and status of every agent in the
+ * current project. Intended for manager agents that need to know which
+ * subagents to delegate work to.
  */
 export function createListProjectAgentsTool(
   options: ListProjectAgentsToolOptions,
@@ -78,7 +78,7 @@ export function createListProjectAgentsTool(
           agents: agents.map((a) => ({
             name: a.name,
             description: a.description,
-            operatingMode: a.operatingMode,
+            type: a.type,
             status: a.status,
             toolCount: a.toolAllowlist.length,
           })),

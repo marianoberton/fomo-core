@@ -27,6 +27,7 @@ const audienceFilterSchema = z.object({
 });
 
 const createCampaignSchema = z.object({
+  agentId: z.string().min(1),
   name: z.string().min(1).max(200),
   template: z.string().min(1).max(10_000),
   channel: z.enum(['whatsapp', 'telegram', 'slack']),
@@ -73,6 +74,7 @@ export function campaignRoutes(
       const campaign = await prisma.campaign.create({
         data: {
           projectId,
+          agentId: body.agentId,
           name: body.name,
           template: body.template,
           channel: body.channel,

@@ -304,8 +304,9 @@ model ScheduledTask {
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
 
-  project Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  runs    ScheduledTaskRun[]
+  project  Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs     ScheduledTaskRun[]
+  campaign Campaign?
 
   @@index([projectId, status])
   @@index([status, nextRunAt])
@@ -361,6 +362,12 @@ model Webhook {
 
 // ─── Agents ─────────────────────────────────────────────────────
 
+enum AgentType {
+  conversational    // Customer-facing: replies to inbound messages on channels (WhatsApp/Telegram/Slack)
+  process           // Scheduled/batch: triggered by cron or batch API call
+  backoffice        // Internal/copilot/manager/admin: triggered by Fomo team or owner via UI/Slack/WhatsApp-owner
+}
+
 model Agent {
   id          String   @id @default(cuid())
   projectId   String   @map("project_id")
@@ -384,8 +391,8 @@ model Agent {
   // Skills
   skillIds        String[] @map("skill_ids")    // References to SkillInstance IDs
 
-  // Operating Mode
-  operatingMode String @default("customer-facing") @map("operating_mode") // customer-facing, internal, copilot, manager, admin
+  // Type — determines who triggers the agent (channel inbound / cron / human via UI)
+  type        AgentType @default(conversational)
 
   // Status
   status      String   @default("active")  // active, paused, disabled
@@ -398,6 +405,8 @@ model Agent {
 
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sessions    Session[]
+  campaigns      Campaign[]
+  campaignSends  CampaignSend[]
 
   // Sub-Agent Relations
   managerAgentId String? @map("manager_agent_id")
@@ -406,6 +415,7 @@ model Agent {
 
   @@unique([projectId, name])
   @@index([projectId, status])
+  @@index([projectId, type])
   @@map("agents")
 }
 
@@ -630,29 +640,37 @@ enum CampaignSendStatus {
 }
 
 model Campaign {
-  id             String         @id @default(cuid())
-  projectId      String         @map("project_id")
-  name           String
-  status         CampaignStatus @default(draft)
-  template       String         // Mustache-style: "Hola {{name}}, ..."
-  channel        String         // whatsapp | telegram | slack
-  audienceFilter Json           @map("audience_filter") // { tags: ["prospect"], role?: "customer" }
-  scheduledFor   DateTime?      @map("scheduled_for")
-  completedAt    DateTime?      @map("completed_at")
-  metadata       Json?
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  id               String         @id @default(cuid())
+  projectId        String         @map("project_id")
+  agentId          String         @map("agent_id")
+  scheduledTaskId  String?        @unique @map("scheduled_task_id")
+  name             String
+  status           CampaignStatus @default(draft)
+  template         String         // Mustache-style: "Hola {{name}}, ..."
+  channel          String         // whatsapp | telegram | slack
+  audienceFilter   Json           @map("audience_filter") // { tags: ["prospect"], role?: "customer" }
+  audienceSource   Json?          @map("audience_source") // { kind: "static"|"hubspot-deals"|..., params: {...}, ttlHours: 24 }
+  audienceCache    Json?          @map("audience_cache")  // { contacts: [...], cachedAt: ISO, expiresAt: ISO }
+  scheduledFor     DateTime?      @map("scheduled_for")
+  completedAt      DateTime?      @map("completed_at")
+  metadata         Json?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
-  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  sends   CampaignSend[]
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agent         Agent          @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  scheduledTask ScheduledTask? @relation(fields: [scheduledTaskId], references: [id], onDelete: SetNull)
+  sends         CampaignSend[]
 
   @@index([projectId, status])
+  @@index([agentId])
   @@map("campaigns")
 }
 
 model CampaignSend {
   id         String             @id @default(cuid())
   campaignId String             @map("campaign_id")
+  agentId    String             @map("agent_id")
   contactId  String             @map("contact_id")
   status     CampaignSendStatus @default(queued)
   variantId  String?            @map("variant_id") // null if not an A/B test
@@ -661,11 +679,13 @@ model CampaignSend {
   createdAt  DateTime           @default(now()) @map("created_at")
 
   campaign Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  agent    Agent          @relation(fields: [agentId], references: [id], onDelete: Restrict)
   reply    CampaignReply?
 
   @@index([campaignId, status])
   @@index([campaignId, variantId])
   @@index([contactId])
+  @@index([agentId])
   @@map("campaign_sends")
 }
 

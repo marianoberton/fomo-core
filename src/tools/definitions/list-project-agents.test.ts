@@ -52,7 +52,7 @@ const makeAgent = (overrides: Partial<AgentConfig> = {}): AgentConfig => ({
   skillIds: [],
   channelConfig: { allowedChannels: ['whatsapp'] },
   modes: [],
-  operatingMode: 'customer-facing',
+  type: 'conversational',
   limits: { maxTurns: 10, maxTokensPerTurn: 4000, budgetPerDayUsd: 10 },
   status: 'active',
   createdAt: new Date(),
@@ -106,24 +106,24 @@ describe('list-project-agents', () => {
 
     it('returns correct shape for each agent', async () => {
       mockList.mockResolvedValue([
-        makeAgent({ name: 'ventas', operatingMode: 'customer-facing', status: 'active' }),
-        makeAgent({ name: 'gerente', operatingMode: 'manager', status: 'active', toolAllowlist: ['delegate-to-agent', 'list-project-agents'] }),
+        makeAgent({ name: 'ventas', type: 'conversational', status: 'active' }),
+        makeAgent({ name: 'gerente', type: 'backoffice', status: 'active', toolAllowlist: ['delegate-to-agent', 'list-project-agents'] }),
       ]);
 
       const result = await tool.execute({}, mockContext);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        const output = result.value.output as { agents: { name: string; operatingMode: string; status: string; toolCount: number }[] };
+        const output = result.value.output as { agents: { name: string; type: string; status: string; toolCount: number }[] };
         expect(output.agents).toHaveLength(2);
 
         const ventas = output.agents.find((a) => a.name === 'ventas');
         expect(ventas).toBeDefined();
-        expect(ventas?.operatingMode).toBe('customer-facing');
+        expect(ventas?.type).toBe('conversational');
         expect(ventas?.toolCount).toBe(3);
 
         const gerente = output.agents.find((a) => a.name === 'gerente');
-        expect(gerente?.operatingMode).toBe('manager');
+        expect(gerente?.type).toBe('backoffice');
         expect(gerente?.toolCount).toBe(2);
       }
     });
