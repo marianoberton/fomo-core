@@ -149,15 +149,43 @@ export function createChannelResolver(deps: ChannelResolverDeps): ChannelResolve
 
       case 'chatwoot': {
         const cwConfig = config as ChatwootIntegrationConfig;
-        // Chatwoot still uses env var for backward compat
-        const apiToken = process.env[cwConfig.apiTokenEnvVar];
-        if (!apiToken) {
-          logger.error(`Missing env var for Chatwoot API token: ${cwConfig.apiTokenEnvVar}`, {
+        let apiToken: string | undefined;
+
+        // Preferred path: SecretService (per-project encrypted storage).
+        if (cwConfig.apiTokenSecretKey) {
+          try {
+            apiToken = await secretService.get(projectId, cwConfig.apiTokenSecretKey);
+          } catch {
+            logger.error(`Failed to resolve Chatwoot secret: ${cwConfig.apiTokenSecretKey}`, {
+              component: 'channel-resolver',
+              projectId,
+            });
+            return null;
+          }
+        } else if (cwConfig.apiTokenEnvVar) {
+          // Legacy fallback: process env var. Logged at warn level so we can
+          // migrate remaining integrations off the global-env-var path.
+          apiToken = process.env[cwConfig.apiTokenEnvVar];
+          if (!apiToken) {
+            logger.error(`Missing env var for Chatwoot API token: ${cwConfig.apiTokenEnvVar}`, {
+              component: 'channel-resolver',
+              projectId,
+            });
+            return null;
+          }
+          logger.warn('Chatwoot using legacy env var fallback — migrate to SecretService', {
+            component: 'channel-resolver',
+            projectId,
+            apiTokenEnvVar: cwConfig.apiTokenEnvVar,
+          });
+        } else {
+          logger.error('Chatwoot integration has no apiTokenSecretKey or apiTokenEnvVar', {
             component: 'channel-resolver',
             projectId,
           });
           return null;
         }
+
         return createChatwootAdapter({
           baseUrl: cwConfig.baseUrl,
           apiToken,

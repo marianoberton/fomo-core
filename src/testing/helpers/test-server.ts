@@ -50,6 +50,7 @@ import { createSkillService } from '@/skills/skill-service.js';
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerAuthMiddleware } from '@/api/auth-middleware.js';
 import { registerRoutes } from '@/api/routes/index.js';
+import { createProjectEventBus } from '@/api/events/event-bus.js';
 import type { RouteDependencies } from '@/api/types.js';
 
 /** Options for creating test server. */
@@ -197,6 +198,7 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     dokployService: createDokployService({ logger, dokployUrl: 'http://localhost:3000', dokployApiKey: 'test', dokployProjectId: 'test' }),
     agentRunRepository: createAgentRunRepository(prisma),
     taskRegistry: createTaskRegistry(),
+    eventBus: createProjectEventBus(),
     logger,
   };
 

@@ -136,6 +136,10 @@ export function createWebhookQueue(options: WebhookQueueOptions): WebhookQueue {
                   conversationId,
                   adapter,
                   'Cliente solicito agente humano',
+                  {
+                    projectId,
+                    sessionId: `cw-${String(conversationId)}` as import('@/core/types.js').SessionId,
+                  },
                 );
               }
 
@@ -196,6 +200,10 @@ export function createWebhookQueue(options: WebhookQueueOptions): WebhookQueue {
                   conversationId,
                   adapter,
                   'El agente AI determino que se requiere asistencia humana',
+                  {
+                    projectId,
+                    sessionId: `cw-${String(conversationId)}` as import('@/core/types.js').SessionId,
+                  },
                 );
               }
 

@@ -7,6 +7,7 @@ import type { ProjectId, SessionId } from '@/core/types.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
+import { requireSessionAccess, ProjectAccessDeniedError, ResourceNotFoundError } from '../middleware/require-project-access.js';
 
 // ─── Zod Schemas ────────────────────────────────────────────────
 
@@ -31,7 +32,12 @@ export function sessionRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { sessionRepository, projectRepository } = deps;
+  const { sessionRepository, projectRepository, prisma } = deps;
+
+  /** Swallow the thrown error from require*Access guards — the reply is already sent. */
+  function isGuardError(e: unknown): boolean {
+    return e instanceof ProjectAccessDeniedError || e instanceof ResourceNotFoundError;
+  }
 
   // GET /projects/:projectId/sessions
   fastify.get<{ Params: { projectId: string } }>(
@@ -50,6 +56,12 @@ export function sessionRoutes(
 
   // GET /sessions/:id
   fastify.get<{ Params: { id: string } }>('/sessions/:id', async (request, reply) => {
+    try {
+      await requireSessionAccess(request, reply, request.params.id, prisma);
+    } catch (e) {
+      if (isGuardError(e)) return;
+      throw e;
+    }
     const session = await sessionRepository.findById(request.params.id as SessionId);
     if (!session) return sendNotFound(reply, 'Session', request.params.id);
     return sendSuccess(reply, session);
@@ -79,6 +91,12 @@ export function sessionRoutes(
   fastify.patch<{ Params: { id: string } }>(
     '/sessions/:id/status',
     async (request, reply) => {
+      try {
+        await requireSessionAccess(request, reply, request.params.id, prisma);
+      } catch (e) {
+        if (isGuardError(e)) return;
+        throw e;
+      }
       const { status } = updateStatusSchema.parse(request.body);
       const updated = await sessionRepository.updateStatus(
         request.params.id as SessionId,
@@ -93,6 +111,12 @@ export function sessionRoutes(
   fastify.get<{ Params: { id: string } }>(
     '/sessions/:id/messages',
     async (request, reply) => {
+      try {
+        await requireSessionAccess(request, reply, request.params.id, prisma);
+      } catch (e) {
+        if (isGuardError(e)) return;
+        throw e;
+      }
       const session = await sessionRepository.findById(request.params.id as SessionId);
       if (!session) return sendNotFound(reply, 'Session', request.params.id);
 

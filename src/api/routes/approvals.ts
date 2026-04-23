@@ -8,6 +8,11 @@ import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
 import { createLogger } from '@/observability/logger.js';
+import {
+  requireApprovalAccess,
+  ProjectAccessDeniedError,
+  ResourceNotFoundError,
+} from '../middleware/require-project-access.js';
 
 const logger = createLogger({ name: 'approval-routes' });
 
@@ -36,7 +41,11 @@ export function approvalRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { approvalGate, resumeAfterApproval } = deps;
+  const { approvalGate, resumeAfterApproval, prisma } = deps;
+
+  function isGuardError(e: unknown): boolean {
+    return e instanceof ProjectAccessDeniedError || e instanceof ResourceNotFoundError;
+  }
 
   // GET /approvals — global list with filters and pagination
   fastify.get('/approvals', async (request, reply) => {
@@ -74,6 +83,12 @@ export function approvalRoutes(
   fastify.get<{ Params: { id: string } }>(
     '/approvals/:id',
     async (request, reply) => {
+      try {
+        await requireApprovalAccess(request, reply, request.params.id, prisma);
+      } catch (e) {
+        if (isGuardError(e)) return;
+        throw e;
+      }
       const approval = await approvalGate.get(request.params.id as ApprovalId);
       if (!approval) return sendNotFound(reply, 'ApprovalRequest', request.params.id);
       return sendSuccess(reply, approval);
@@ -84,6 +99,12 @@ export function approvalRoutes(
   fastify.post<{ Params: { id: string } }>(
     '/approvals/:id/resolve',
     async (request, reply) => {
+      try {
+        await requireApprovalAccess(request, reply, request.params.id, prisma);
+      } catch (e) {
+        if (isGuardError(e)) return;
+        throw e;
+      }
       const { decision, resolvedBy, note } = resolveApprovalSchema.parse(request.body);
 
       const resolved = await approvalGate.resolve(
@@ -122,6 +143,12 @@ export function approvalRoutes(
   fastify.post<{ Params: { id: string } }>(
     '/approvals/:id/decide',
     async (request, reply) => {
+      try {
+        await requireApprovalAccess(request, reply, request.params.id, prisma);
+      } catch (e) {
+        if (isGuardError(e)) return;
+        throw e;
+      }
       const { approved, note } = decideApprovalSchema.parse(request.body);
 
       const decision = approved ? 'approved' : 'denied';

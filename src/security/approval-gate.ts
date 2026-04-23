@@ -6,6 +6,7 @@ import type { ApprovalId, ProjectId, SessionId, ToolCallId } from '@/core/types.
 import { createLogger } from '@/observability/logger.js';
 import { nanoid } from 'nanoid';
 import type { ApprovalConfig, ApprovalRequest, ApprovalStatus, ApprovalStore } from './types.js';
+import type { ProjectEventBus } from '@/api/events/event-bus.js';
 
 const logger = createLogger({ name: 'approval-gate' });
 
@@ -38,6 +39,11 @@ export interface ApprovalGateOptions {
    * Receives the full ApprovalRequest for external routing.
    */
   onEscalate?: (request: ApprovalRequest) => Promise<void>;
+  /**
+   * Optional event bus for emitting approval.created / approval.resolved events
+   * to WS/SSE subscribers.
+   */
+  eventBus?: ProjectEventBus;
 }
 
 export interface ApprovalGate {
@@ -145,6 +151,7 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
   const expirationMs = options?.expirationMs ?? 5 * 60 * 1000;
   const store = options?.store ?? createInMemoryApprovalStore();
   const timeoutConfig = options?.timeoutConfig;
+  const eventBus = options?.eventBus;
   const DEFAULT_TIMEOUT_MS = 600_000; // 10 minutes
 
   // ─── Timer tracking (in-memory only — not persisted across restarts) ──
@@ -326,6 +333,18 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
         await options.notifier(request);
       }
 
+      // Emit live event for WS/SSE subscribers (after persistence + notifier)
+      if (eventBus) {
+        eventBus.emit({
+          kind: 'approval.created',
+          projectId: request.projectId,
+          approvalId: request.id,
+          tool: request.toolId,
+          sessionId: request.sessionId,
+          ts: Date.now(),
+        });
+      }
+
       // Start timeout/reminder timers after notifier fires
       scheduleTimers(request);
 
@@ -370,6 +389,17 @@ export function createApprovalGate(options?: ApprovalGateOptions): ApprovalGate 
         resolvedBy,
         toolId: resolved.toolId,
       });
+
+      // Emit live event for WS/SSE subscribers
+      if (eventBus && result) {
+        eventBus.emit({
+          kind: 'approval.resolved',
+          projectId: result.projectId,
+          approvalId: result.id,
+          decision,
+          ts: Date.now(),
+        });
+      }
 
       return result;
     },

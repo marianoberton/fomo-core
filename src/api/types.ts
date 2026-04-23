@@ -31,6 +31,7 @@ import type { ProvisioningService } from '@/provisioning/provisioning-service.js
 import type { DokployService } from '@/provisioning/dokploy-service.js';
 import type { AgentRunRepository } from '@/infrastructure/repositories/agent-run-repository.js';
 import type { TaskRegistry } from '@/channels/openclaw-task-registry.js';
+import type { ProjectEventBus } from '@/api/events/event-bus.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -147,5 +148,7 @@ export interface RouteDependencies {
   agentRunRepository: AgentRunRepository;
   /** OpenClaw task lifecycle registry. */
   taskRegistry: TaskRegistry;
+  /** In-process project event bus for live push (WS + SSE). */
+  eventBus: ProjectEventBus;
   logger: Logger;
 }
