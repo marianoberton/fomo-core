@@ -17,7 +17,7 @@ import type {
   AgentMode,
   AgentLimits,
   AgentStatus,
-  AgentOperatingMode,
+  AgentType,
 } from '@/agents/types.js';
 
 // ─── Default Values ─────────────────────────────────────────────
@@ -51,7 +51,7 @@ function toAgentConfig(record: AgentRecord): AgentConfig {
     mcpServers: (rec.mcpServers as MCPServerConfig[] | null) ?? [],
     channelConfig: (rec.channelConfig as ChannelConfig | null) ?? DEFAULT_CHANNEL_CONFIG,
     modes: (rec.modes as AgentMode[] | null) ?? [],
-    operatingMode: (rec as AgentRecord & { operatingMode: string }).operatingMode as AgentOperatingMode,
+    type: rec.type as AgentType,
     skillIds: (rec as AgentRecord & { skillIds: string[] }).skillIds,
     limits: {
       maxTurns: rec.maxTurns,
@@ -93,7 +93,7 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
         modes: input.modes && input.modes.length > 0
           ? (input.modes as unknown as Prisma.InputJsonValue)
           : Prisma.JsonNull,
-        operatingMode: input.operatingMode ?? 'customer-facing',
+        type: input.type ?? 'conversational',
         skillIds: input.skillIds ?? [],
         maxTurns: limits.maxTurns,
         maxTokensPerTurn: limits.maxTokensPerTurn,
@@ -155,9 +155,8 @@ export function createAgentRepository(prisma: PrismaClient): AgentRepository {
           updateData.managerAgent = { connect: { id: input.managerAgentId } };
         }
       }
-      if (input.operatingMode !== undefined) {
-        const extended = updateData as Prisma.AgentUpdateInput & { operatingMode: unknown };
-        extended.operatingMode = input.operatingMode;
+      if (input.type !== undefined) {
+        updateData.type = input.type;
       }
       if (input.skillIds !== undefined) {
         const extended = updateData as Prisma.AgentUpdateInput & { skillIds: unknown };

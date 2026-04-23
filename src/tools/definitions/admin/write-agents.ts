@@ -60,7 +60,7 @@ const createAgentInput = z.object({
   projectId: z.string(),
   name: z.string().min(1).max(100),
   description: z.string().optional(),
-  operatingMode: z.enum(['customer-facing', 'internal', 'copilot', 'manager']).optional(),
+  type: z.enum(['conversational', 'process', 'backoffice']).optional(),
   model: z.string().optional(),
   provider: z.enum(['anthropic', 'openai', 'google', 'ollama', 'openrouter']).optional(),
   temperature: z.number().min(0).max(2).optional(),
@@ -88,7 +88,7 @@ export function createAdminCreateAgentTool(
     name: 'Admin Create Agent',
     description:
       'Create a new agent in a project. Provide name, prompt layers (identity/instructions/safety), ' +
-      'model, and tool allowlist. Operating mode defaults to customer-facing.',
+      'model, and tool allowlist. Agent type defaults to conversational.',
     category: 'admin',
     inputSchema: createAgentInput,
     outputSchema: z.object({ agentId: z.string(), name: z.string() }),
@@ -115,7 +115,7 @@ export function createAdminCreateAgentTool(
           projectId: parsed.projectId,
           name: parsed.name,
           description: parsed.description,
-          operatingMode: parsed.operatingMode ?? 'customer-facing',
+          type: parsed.type ?? 'conversational',
           llmConfig: {
             provider: parsed.provider,
             model: parsed.model,
@@ -173,7 +173,7 @@ const updateAgentInput = z.object({
   agentId: z.string(),
   name: z.string().min(1).max(100).optional(),
   description: z.string().optional(),
-  operatingMode: z.enum(['customer-facing', 'internal', 'copilot', 'manager']).optional(),
+  type: z.enum(['conversational', 'process', 'backoffice']).optional(),
   identity: z.string().optional(),
   instructions: z.string().optional(),
   safety: z.string().optional(),
@@ -220,7 +220,7 @@ export function createAdminUpdateAgentTool(
         const updateData: Record<string, unknown> = {};
         if (parsed.name) updateData['name'] = parsed.name;
         if (parsed.description !== undefined) updateData['description'] = parsed.description;
-        if (parsed.operatingMode) updateData['operatingMode'] = parsed.operatingMode;
+        if (parsed.type) updateData['type'] = parsed.type;
         if (parsed.toolAllowlist) updateData['toolAllowlist'] = parsed.toolAllowlist;
 
         if (parsed.identity || parsed.instructions || parsed.safety) {

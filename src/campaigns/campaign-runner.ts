@@ -211,10 +211,11 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
           chosenVariantId = variant.id;
         }
 
-        // Create send record
+        // Create send record (agentId inherited from parent campaign)
         const sendRecord = await prisma.campaignSend.create({
           data: {
             campaignId,
+            agentId: campaign.agentId,
             contactId: contact.id,
             status: 'queued',
             ...(chosenVariantId !== null && { variantId: chosenVariantId }),

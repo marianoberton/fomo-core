@@ -11,6 +11,7 @@ import {
   ProjectAccessDeniedError,
   ResourceNotFoundError,
 } from '../middleware/require-project-access.js';
+import { legacyRoleOf } from '@/core/agent-role-shim.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ export function platformBridgeRoutes(
           return {
             id: agent.id,
             name: agent.name,
-            role: agent.operatingMode,
+            role: legacyRoleOf(agent.type, agent.metadata),
             status: agent.status,
             model: (agent.llmConfig as Record<string, unknown> | null)?.['model'] ?? null,
             createdAt: agent.createdAt.toISOString(),
@@ -141,7 +142,7 @@ export function platformBridgeRoutes(
           id: agent.id,
           name: agent.name,
           description: agent.description,
-          role: agent.operatingMode,
+          role: legacyRoleOf(agent.type, agent.metadata),
           status: agent.status,
           model: (agent.llmConfig as Record<string, unknown> | null)?.['model'] ?? null,
           toolAllowlist: agent.toolAllowlist,
@@ -437,7 +438,7 @@ export function platformBridgeRoutes(
           return {
             id: agent.id,
             name: agent.name,
-            role: agent.operatingMode,
+            role: legacyRoleOf(agent.type, agent.metadata),
             status: agent.status,
             sessionsToday,
             lastActiveAt: agent.updatedAt.toISOString(),

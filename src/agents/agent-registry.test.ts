@@ -27,7 +27,7 @@ const mockAgent: AgentConfig = {
     defaultChannel: 'whatsapp',
   },
   modes: [],
-  operatingMode: 'customer-facing',
+  type: 'conversational',
   limits: {
     maxTurns: 10,
     maxTokensPerTurn: 4000,

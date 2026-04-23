@@ -83,7 +83,7 @@ export function openclawTaskRoutes(
           agentId: agent.id,
           name: agent.name,
           status: agent.status,
-          operatingMode: agent.operatingMode ?? 'customer-facing',
+          type: agent.type,
           projectId: agent.projectId,
           activeTasks,
           health,

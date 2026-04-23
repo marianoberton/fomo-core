@@ -64,7 +64,7 @@ function createMockAgent(overrides?: Partial<AgentConfig>): AgentConfig {
     mcpServers: [],
     channelConfig: { allowedChannels: [] },
     modes: [],
-    operatingMode: 'customer-facing',
+    type: 'conversational',
     skillIds: [],
     limits: { maxTurns: 10, maxTokensPerTurn: 4096, budgetPerDayUsd: 10 },
     status: 'active',

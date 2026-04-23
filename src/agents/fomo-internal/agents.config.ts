@@ -26,7 +26,7 @@ export const famaSalesAgent: CreateAgentInput = {
   projectId: FOMO_PROJECT_ID,
   name: 'FAMA-Sales',
   description: 'Agente de ventas inbound. Califica leads y agenda demos.',
-  operatingMode: 'customer-facing',
+  type: 'conversational',
   llmConfig: getAgentLLMConfig('FAMA-Sales'),
   promptConfig: {
     identity: `Sos FAMA, el agente comercial de FOMO.
@@ -118,7 +118,8 @@ export const famaManagerAgent: CreateAgentInput = {
   projectId: FOMO_PROJECT_ID,
   name: 'FAMA-Manager',
   description: 'Chief of Staff interno. Orquesta el equipo y gestiona el negocio.',
-  operatingMode: 'manager',
+  type: 'backoffice',
+  metadata: { archetype: 'manager' },
   llmConfig: getAgentLLMConfig('FAMA-Manager'),
   promptConfig: {
     identity: `Sos FAMA, la Chief of Staff de FOMO.
@@ -203,7 +204,8 @@ export const famaOpsAgent: CreateAgentInput = {
   projectId: FOMO_PROJECT_ID,
   name: 'FAMA-Ops',
   description: 'Operaciones internas en background. Follow-ups, reportes y alertas.',
-  operatingMode: 'internal',
+  type: 'backoffice',
+  metadata: { archetype: 'ops' },
   llmConfig: getAgentLLMConfig('FAMA-Ops'),
   promptConfig: {
     identity: `Sos FAMA-Ops, el agente de operaciones internas de FOMO.
@@ -272,7 +274,7 @@ export const famaCSAgent: CreateAgentInput = {
   projectId: FOMO_PROJECT_ID,
   name: 'FAMA-CS',
   description: 'Customer Success. Soporte y onboarding de clientes activos de FOMO.',
-  operatingMode: 'customer-facing',
+  type: 'conversational',
   llmConfig: getAgentLLMConfig('FAMA-CS'),
   promptConfig: {
     identity: `Sos FAMA, el agente de Customer Success de FOMO.

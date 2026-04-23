@@ -23,7 +23,7 @@ function createAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
     skillIds: [],
     channelConfig: { allowedChannels: [], defaultChannel: undefined },
     modes: [],
-    operatingMode: 'customer-facing',
+    type: 'conversational',
     limits: { maxTurns: 10, maxTokensPerTurn: 4000, budgetPerDayUsd: 10 },
     status: 'active',
     createdAt: new Date(),

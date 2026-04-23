@@ -17,15 +17,19 @@ export type AgentMessageId = Brand<string, 'AgentMessageId'>;
 
 export type AgentStatus = 'active' | 'paused' | 'disabled';
 
-// ─── Agent Operating Mode ────────────────────────────────────────
+// ─── Agent Type ──────────────────────────────────────────────────
 
-/** The operating mode determines the agent's role in the system. */
-export type AgentOperatingMode =
-  | 'customer-facing' // Talks directly to end customers via channels
-  | 'internal'        // Background worker (scheduled tasks, data processing)
-  | 'copilot'         // Assists the Fomo team via dashboard chat
-  | 'manager'         // Orchestrates other agents; can use delegate-to-agent tool
-  | 'admin';          // Platform operator: create/update/optimize agents, manage projects/clients/provisioning (master-key only)
+/**
+ * What triggers the agent. Replaces the legacy `operatingMode` field.
+ *
+ * - `conversational`: inbound message on a channel (WhatsApp/Telegram/Slack/Web).
+ * - `process`: cron or batch API call. Pure outbound, no inbound channel.
+ * - `backoffice`: human from UI (dashboard copilot, internal Slack, owner WhatsApp).
+ *
+ * Narrative role (chief-of-staff, customer-support) lives in `metadata.archetype`.
+ * Capability/elevation (manager delegation, admin RBAC) is enforced via tool allowlist + RBAC.
+ */
+export type AgentType = 'conversational' | 'process' | 'backoffice';
 
 // ─── Agent Limits ────────────────────────────────────────────────
 
@@ -119,8 +123,8 @@ export interface AgentConfig {
   channelConfig: ChannelConfig;
   /** Operating modes. Empty array means single-mode (legacy) agent using base config. */
   modes: AgentMode[];
-  /** The agent's role in the system. Defaults to 'customer-facing'. */
-  operatingMode: AgentOperatingMode;
+  /** What triggers the agent. Defaults to 'conversational'. */
+  type: AgentType;
   /** Assigned SkillInstance IDs. Skills compose instructions + tools at chat time. */
   skillIds: string[];
   limits: AgentLimits;
@@ -143,7 +147,7 @@ export interface CreateAgentInput {
   mcpServers?: MCPServerConfig[];
   channelConfig?: ChannelConfig;
   modes?: AgentMode[];
-  operatingMode?: AgentOperatingMode;
+  type?: AgentType;
   skillIds?: string[];
   limits?: Partial<AgentLimits>;
   managerAgentId?: string | null;
@@ -162,7 +166,7 @@ export interface UpdateAgentInput {
   mcpServers?: MCPServerConfig[];
   channelConfig?: ChannelConfig;
   modes?: AgentMode[];
-  operatingMode?: AgentOperatingMode;
+  type?: AgentType;
   skillIds?: string[];
   limits?: Partial<AgentLimits>;
   managerAgentId?: string | null;

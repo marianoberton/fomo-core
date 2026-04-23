@@ -148,7 +148,7 @@ export function openclawConnectRoutes(
           id: a.id,
           name: a.name,
           status: a.status,
-          operatingMode: a.operatingMode,
+          type: a.type,
         })),
         endpoints: ENDPOINTS,
         capabilities: CAPABILITIES,

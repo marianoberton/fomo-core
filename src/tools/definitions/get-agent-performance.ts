@@ -29,7 +29,7 @@ const inputSchema = z.object({
 const outputSchema = z.object({
   agentName: z.string(),
   agentId: z.string(),
-  operatingMode: z.string(),
+  type: z.enum(['conversational', 'process', 'backoffice']),
   status: z.string(),
   timeRange: z.object({
     label: z.string(),
@@ -258,7 +258,7 @@ export function createGetAgentPerformanceTool(
         const output = {
           agentName: agent.name,
           agentId: agentId,
-          operatingMode: agent.operatingMode,
+          type: agent.type,
           status: agent.status,
           timeRange: {
             label: range.label,
