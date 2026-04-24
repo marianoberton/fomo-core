@@ -754,12 +754,21 @@ async function start(): Promise<void> {
     // Prometheus metrics endpoint
     registerMetricsRoute(server, { logger });
 
-    // Client container monitor — checks provisioned containers every 30s
-    const clientMonitor = createClientMonitor({
-      dokployService,
-      logger,
-    });
-    clientMonitor.start();
+    // Client container monitor — checks provisioned containers every 30s.
+    // Only starts when DOKPLOY_API_KEY is present; without it every poll fails
+    // with an auth error and spams the logs.
+    const clientMonitor =
+      process.env['DOKPLOY_API_KEY']
+        ? createClientMonitor({ dokployService, logger })
+        : null;
+    if (clientMonitor) {
+      clientMonitor.start();
+      logger.info('Client monitor started', { component: 'main' });
+    } else {
+      logger.info('Client monitor disabled — DOKPLOY_API_KEY not configured', {
+        component: 'main',
+      });
+    }
 
     // Conditionally start Redis-dependent services (task runner + proactive messaging + webhook queue)
     let taskRunner: ReturnType<typeof createTaskRunner> | null = null;
@@ -976,7 +985,7 @@ async function start(): Promise<void> {
 
       // 2. Stop background schedulers and sweepers
       approvalGate.stopSweeper();
-      clientMonitor.stop();
+      clientMonitor?.stop();
       openclawTaskRegistry.shutdown();
 
       // 3. Drain queues (waits for in-flight jobs to finish)
