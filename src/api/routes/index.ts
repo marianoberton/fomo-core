@@ -33,6 +33,7 @@ import { operationsSummaryRoutes } from './operations-summary.js';
 import { skillRoutes } from './skills.js';
 import { campaignRoutes } from './campaigns.js';
 import { campaignTemplateRoutes } from './campaign-templates.js';
+import { agentTemplateRoutes } from './agent-templates.js';
 import { performanceRoutes } from './performance.js';
 import { verticalRoutes } from './verticals.js';
 import { workforceMetricsRoutes } from './workforce-metrics.js';
@@ -89,6 +90,7 @@ export async function registerRoutes(
   await fastify.register(skillRoutes, deps);
   campaignRoutes(fastify, deps);
   campaignTemplateRoutes(fastify, deps);
+  agentTemplateRoutes(fastify, deps);
   performanceRoutes(fastify, deps);
   workforceMetricsRoutes(fastify, deps);
   operationsSummaryRoutes(fastify, deps);

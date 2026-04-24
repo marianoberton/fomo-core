@@ -25,6 +25,51 @@ export interface AudienceFilter {
   role?: string;
 }
 
+// ─── Audience Source ────────────────────────────────────────────
+
+/**
+ * Discriminated source of a campaign's audience.
+ *
+ * - `contacts` — legacy path, filters the local `Contact` table.
+ * - `mcp` — external source via an MCP tool call (e.g. HubSpot `search-deals`).
+ *   Resolved with TTL cache into `Campaign.audienceCache`.
+ */
+export type AudienceSource =
+  | {
+      kind: 'contacts';
+      filter: AudienceFilter;
+    }
+  | {
+      kind: 'mcp';
+      /** Instance name of the MCP server (e.g. "hubspot"). */
+      serverName: string;
+      /** Tool to call on that server (e.g. "search-deals"). */
+      toolName: string;
+      /** Arguments passed to the MCP tool. */
+      args: Record<string, unknown>;
+      /** Field-path mapping from MCP result rows into Contact shape. */
+      mapping: {
+        contactIdField: string;
+        phoneField?: string;
+        emailField?: string;
+        nameField?: string;
+      };
+      /** Cache TTL in hours (default 24). */
+      ttlHours: number;
+    };
+
+/** Resolved audience cached on the Campaign. Invalidates when `sourceHash` changes. */
+export interface AudienceCache {
+  contactIds: string[];
+  /** ISO-8601 timestamp. */
+  resolvedAt: string;
+  /** ISO-8601 timestamp (= resolvedAt + ttlHours). */
+  expiresAt: string;
+  /** sha1 of JSON.stringify(AudienceSource) at resolution time. */
+  sourceHash: string;
+  count: number;
+}
+
 // ─── A/B Testing ────────────────────────────────────────────────
 
 export interface CampaignVariant {

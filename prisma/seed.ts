@@ -104,9 +104,274 @@ function assertSafeToSeed(): void {
   }
 }
 
+// ─── Agent Templates (global catalog) ───────────────────────────
+//
+// 5 official archetypes materialized by POST /projects/:id/agents/from-template.
+// Idempotent via `slug` UNIQUE + `skipDuplicates: true`.
+
+async function seedAgentTemplates(): Promise<void> {
+  // b1 — customer-support (conversational)
+  const customerSupportPrompt = {
+    identity:
+      'Sos un asistente de atención al cliente. Sos empático, claro y conciso. Hablás en el idioma del cliente.',
+    instructions: `1. Saludá cordialmente en la primera interacción.
+2. Entendé el problema del cliente antes de responder.
+3. Si la pregunta es sobre productos/servicios, usá knowledge-search.
+4. Si no tenés la respuesta con confianza, escalá con escalate-to-human.
+5. Cerrá la conversación confirmando que el problema fue resuelto.`,
+    safety: `- Nunca inventes datos (precios, stock, políticas).
+- Nunca reveles información de otros clientes.
+- Nunca prometas plazos o descuentos sin confirmación humana.
+- Si detectás frustración alta, escalá inmediatamente.`,
+  };
+
+  // b2 — outbound-campaign (process)
+  const outboundCampaignPrompt = {
+    identity:
+      'Sos un agente de campañas outbound. Tu objetivo es calentar leads fríos y derivarlos a un humano cuando muestran interés.',
+    instructions: `1. Personalizá el mensaje inicial con los datos del contacto.
+2. Si el lead responde, hacé UNA pregunta corta para calificarlo.
+3. Si muestra interés (respuesta positiva, pregunta de precio, pedido de demo), ejecutá escalate-to-human.
+4. Si no responde en 48h, dejalo estar. No insistas.`,
+    safety: `- Respetá las opt-outs: si el contacto pide no ser contactado, actualizá tags con "opted_out" y detené el envío.
+- No inventes urgencia artificial.
+- No repitas el mensaje si ya fue enviado (usá read-session-history).`,
+  };
+
+  // b3 — copilot-owner (backoffice)
+  const copilotOwnerPrompt = {
+    identity:
+      'Sos el Chief of Staff del dueño del negocio. Trabajás directamente para él, no para los clientes.',
+    instructions: `1. Reportá estado operativo cuando te lo pidan (get-operations-summary).
+2. Alertá proactivamente ante anomalías (costos, errores, escalaciones).
+3. Ejecutá comandos del dueño sobre los demás agentes (control-agent).
+4. Nunca inventes métricas — siempre usá herramientas.
+5. Compará con días anteriores usando memoria.`,
+    safety: `- Nunca reveles credenciales ni configuración interna.
+- Nunca compartas datos de clientes con terceros.
+- No bypasses approvals.
+- Si detectás costos fuera de control, alertá inmediatamente.`,
+  };
+  const copilotOwnerTools = [
+    'get-operations-summary',
+    'get-agent-performance',
+    'review-agent-activity',
+    'query-sessions',
+    'list-project-agents',
+    'send-notification',
+    'propose-scheduled-task',
+    'store-memory',
+    'knowledge-search',
+    'date-time',
+  ];
+
+  // b4 — manager-delegator (backoffice)
+  const managerDelegatorPrompt = {
+    identity:
+      'Sos el manager de un equipo de agentes especializados. Tu función es enrutar cada pedido al agente correcto.',
+    instructions: `1. Listá los agentes disponibles del proyecto (list-project-agents).
+2. Clasificá el pedido y decidí qué agente debe responder.
+3. Delegá con delegate-to-agent pasando contexto claro.
+4. Si la respuesta requiere varios agentes, coordiná secuencialmente.
+5. Consolidá y devolvé una respuesta unificada al usuario.`,
+    safety: `- Nunca intentes responder vos mismo tareas que son de otro agente.
+- No delegues tareas con credenciales o PII sensible a agentes sin permiso para manejarlos.
+- Si ningún agente es adecuado, escalá.`,
+  };
+
+  // b5 — knowledge-bot (conversational)
+  const knowledgeBotPrompt = {
+    identity:
+      'Sos un asistente que responde preguntas basándose exclusivamente en la base de conocimiento provista.',
+    instructions: `1. Para TODA pregunta, primero ejecutá knowledge-search.
+2. Si hay resultados relevantes (score > 0.7), respondé citando las fuentes.
+3. Si NO hay resultados relevantes, decí "No tengo esa información en mi base de conocimiento" y ofrecé escalar.
+4. Nunca completes con conocimiento general del LLM — solo con lo que hay en la KB.
+5. Citá los archivos fuente entre paréntesis al final de cada afirmación.`,
+    safety: `- Nunca inventes datos que no estén en la KB.
+- Si la pregunta es sobre precios/stock/personal/contrato, usá la KB o escalá — nunca respondas de memoria.
+- Marcá tu nivel de confianza en la respuesta.`,
+  };
+
+  const result = await prisma.agentTemplate.createMany({
+    data: [
+      {
+        slug: 'customer-support',
+        name: 'Atención al Cliente',
+        description:
+          'Responde consultas de clientes vía WhatsApp/Telegram/Slack. Escala a humano cuando no sabe.',
+        type: 'conversational',
+        icon: 'MessageSquare',
+        tags: ['support', 'conversational', 'whatsapp', 'telegram'],
+        isOfficial: true,
+        promptConfig: customerSupportPrompt as Prisma.InputJsonValue,
+        suggestedTools: [
+          'knowledge-search',
+          'store-memory',
+          'send-notification',
+          'escalate-to-human',
+          'date-time',
+          'query-sessions',
+          'read-session-history',
+        ],
+        suggestedLlm: {
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          temperature: 0.4,
+        } as Prisma.InputJsonValue,
+        suggestedModes: [] as Prisma.InputJsonValue,
+        suggestedChannels: ['whatsapp', 'telegram'],
+        suggestedSkillSlugs: [],
+        metadata: { archetype: 'customer-support' } as Prisma.InputJsonValue,
+        maxTurns: 15,
+        maxTokensPerTurn: 4000,
+        budgetPerDayUsd: 10.0,
+        version: 1,
+      },
+      {
+        slug: 'outbound-campaign',
+        name: 'Campañas Outbound',
+        description:
+          'Envía mensajes de reactivación / prospección a una audiencia filtrada. Maneja replies y escala convertidos.',
+        type: 'process',
+        icon: 'Send',
+        tags: ['outbound', 'campaign', 'whatsapp', 'reactivation'],
+        isOfficial: true,
+        promptConfig: outboundCampaignPrompt as Prisma.InputJsonValue,
+        suggestedTools: [
+          'contact-score',
+          'store-memory',
+          'send-notification',
+          'escalate-to-human',
+          'read-session-history',
+          'date-time',
+        ],
+        suggestedLlm: {
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          temperature: 0.5,
+        } as Prisma.InputJsonValue,
+        suggestedModes: [] as Prisma.InputJsonValue,
+        suggestedChannels: ['whatsapp'],
+        suggestedSkillSlugs: [],
+        metadata: {
+          archetype: 'outbound-campaign',
+          supportedChannels: ['whatsapp'],
+        } as Prisma.InputJsonValue,
+        maxTurns: 8,
+        maxTokensPerTurn: 3000,
+        budgetPerDayUsd: 15.0,
+        version: 1,
+      },
+      {
+        slug: 'copilot-owner',
+        name: 'Copilot del Dueño',
+        description:
+          'Chief of Staff del dueño. Reporta estado del negocio, ejecuta comandos, configura alertas. Acceso vía dashboard y WhatsApp.',
+        type: 'backoffice',
+        icon: 'Briefcase',
+        tags: ['copilot', 'owner', 'backoffice', 'internal'],
+        isOfficial: true,
+        promptConfig: copilotOwnerPrompt as Prisma.InputJsonValue,
+        suggestedTools: copilotOwnerTools,
+        suggestedLlm: {
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: 0.2,
+        } as Prisma.InputJsonValue,
+        suggestedModes: [
+          {
+            name: 'copilot',
+            label: 'Copilot',
+            channelMapping: ['dashboard', 'whatsapp'],
+            promptOverrides: copilotOwnerPrompt,
+            toolAllowlist: copilotOwnerTools,
+          },
+        ] as Prisma.InputJsonValue,
+        suggestedChannels: ['dashboard', 'whatsapp'],
+        suggestedSkillSlugs: ['fomo-manager'],
+        metadata: { archetype: 'copilot-owner' } as Prisma.InputJsonValue,
+        maxTurns: 25,
+        maxTokensPerTurn: 8000,
+        budgetPerDayUsd: 20.0,
+        version: 1,
+      },
+      {
+        slug: 'manager-delegator',
+        name: 'Manager Delegador',
+        description:
+          'Coordina sub-agentes. Recibe requests complejos y delega al agente especialista correcto.',
+        type: 'backoffice',
+        icon: 'Users',
+        tags: ['manager', 'delegation', 'backoffice', 'orchestrator'],
+        isOfficial: true,
+        promptConfig: managerDelegatorPrompt as Prisma.InputJsonValue,
+        suggestedTools: [
+          'list-project-agents',
+          'delegate-to-agent',
+          'review-agent-activity',
+          'escalate-to-human',
+          'store-memory',
+          'date-time',
+        ],
+        suggestedLlm: {
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: 0.3,
+        } as Prisma.InputJsonValue,
+        suggestedModes: [] as Prisma.InputJsonValue,
+        suggestedChannels: ['dashboard'],
+        suggestedSkillSlugs: [],
+        metadata: { archetype: 'manager-delegator' } as Prisma.InputJsonValue,
+        maxTurns: 20,
+        maxTokensPerTurn: 6000,
+        budgetPerDayUsd: 15.0,
+        version: 1,
+      },
+      {
+        slug: 'knowledge-bot',
+        name: 'Bot de Conocimiento',
+        description:
+          'Responde preguntas basándose exclusivamente en la knowledge base del proyecto. No improvisa.',
+        type: 'conversational',
+        icon: 'BookOpen',
+        tags: ['knowledge', 'faq', 'conversational', 'rag'],
+        isOfficial: true,
+        promptConfig: knowledgeBotPrompt as Prisma.InputJsonValue,
+        suggestedTools: [
+          'knowledge-search',
+          'read-file',
+          'store-memory',
+          'escalate-to-human',
+          'date-time',
+        ],
+        suggestedLlm: {
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          temperature: 0.1,
+        } as Prisma.InputJsonValue,
+        suggestedModes: [] as Prisma.InputJsonValue,
+        suggestedChannels: ['whatsapp', 'telegram', 'slack'],
+        suggestedSkillSlugs: [],
+        metadata: { archetype: 'knowledge-bot' } as Prisma.InputJsonValue,
+        maxTurns: 10,
+        maxTokensPerTurn: 5000,
+        budgetPerDayUsd: 8.0,
+        version: 1,
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log(`Seeded ${result.count} agent templates (skipped ${5 - result.count} existing).`);
+}
+
 async function main(): Promise<void> {
   assertSafeToSeed();
   console.log('Seeding database...');
+
+  // Global catalogs first (no project dependencies)
+  await seedAgentTemplates();
 
   // ═══════════════════════════════════════════════════════════════
   // 1. DEMO PROJECT (basic — calculator, date-time, json-transform)
