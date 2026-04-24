@@ -58,6 +58,7 @@ import { openclawConnectRoutes } from './openclaw-connect.js';
 import { adminAuditRoutes } from './admin-audit.js';
 import { adminInvokeRoutes } from './admin-invoke.js';
 import { adminChatwootRoutes } from './admin-chatwoot.js';
+import { memberRoutes } from './members.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -82,6 +83,7 @@ export async function registerRoutes(
   await fastify.register(webhookGenericRoutes, deps);
   await fastify.register(fileRoutes, deps);
   await fastify.register(agentRoutes, deps);
+  await fastify.register(memberRoutes, deps);
   await fastify.register(dashboardRoutes, deps);
   await fastify.register(usageRoutes, deps);
   await fastify.register(wsDashboardRoutes, deps);
