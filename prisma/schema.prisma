@@ -19,6 +19,7 @@ model Project {
   owner       String
   tags        String[]
   configJson  Json     @map("config_json")
+  metadata    Json?
   status      String   @default("active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -42,8 +43,30 @@ model Project {
   campaignTemplates    CampaignTemplate[]
   clients              Client[]
   agentRuns            AgentRun[]
+  inAppNotifications   InAppNotification[]
 
   @@map("projects")
+}
+
+// ─── In-App Notifications ──────────────────────────────────────
+//
+// Persistent in-dashboard notifications (approval requests, system alerts, etc.).
+// Stored in DB (not only in-memory/SSE) so operators see pending notifications
+// if they reconnect after being offline.
+
+model InAppNotification {
+  id        String    @id @default(cuid())
+  projectId String    @map("project_id")
+  userId    String?   @map("user_id")      // null = for any member of the project
+  kind      String                         // e.g. 'approval_requested'
+  payload   Json                           // { approvalId, agentName, leadName, actionSummary, riskLevel, ... }
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, readAt])
+  @@map("in_app_notifications")
 }
 
 // ─── Contacts ───────────────────────────────────────────────────
