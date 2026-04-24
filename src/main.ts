@@ -805,7 +805,13 @@ async function start(): Promise<void> {
       logger.info('Proactive messenger enabled (Redis connected)', { component: 'main' });
 
       // Campaign runner (outbound campaigns via ProactiveMessenger)
-      campaignRunner = createCampaignRunner({ prisma, proactiveMessenger, logger, eventBus });
+      campaignRunner = createCampaignRunner({
+        prisma,
+        proactiveMessenger,
+        logger,
+        eventBus,
+        mcpManager,
+      });
       toolRegistry.register(createTriggerCampaignTool({ campaignRunner, prisma }));
       logger.info('Campaign runner enabled', { component: 'main' });
 

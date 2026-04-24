@@ -31,3 +31,13 @@ export type { ChannelIntegrationRepository } from '@/channels/types.js';
 
 export { createAgentRunRepository } from './agent-run-repository.js';
 export type { AgentRunRepository, AgentRun, AgentRunStep, AgentRunCreateInput, AgentRunUpdateInput, AgentRunStepCreateInput, AgentRunStepUpdateInput, AgentRunFilters } from './agent-run-repository.js';
+
+export { createAgentTemplateRepository } from './agent-template-repository.js';
+export type {
+  AgentTemplate,
+  AgentTemplateType,
+  AgentTemplatePromptConfig,
+  AgentTemplateLlmConfig,
+  AgentTemplateFilters,
+  AgentTemplateRepository,
+} from './agent-template-repository.js';

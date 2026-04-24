@@ -419,6 +419,46 @@ model Agent {
   @@map("agents")
 }
 
+// ─── Agent Templates (global catalog) ───────────────────────────
+
+model AgentTemplate {
+  id                  String    @id @default(cuid())
+
+  // Identity
+  slug                String    @unique
+  name                String
+  description         String
+  type                AgentType
+  icon                String?
+  tags                String[]
+  isOfficial          Boolean   @default(true) @map("is_official")
+
+  // Agent defaults (materialized by POST /projects/:id/agents/from-template)
+  promptConfig        Json                                    @map("prompt_config")
+  suggestedTools      String[]                                @map("suggested_tools")
+  suggestedLlm        Json?                                   @map("suggested_llm")
+  suggestedModes      Json?                                   @map("suggested_modes")
+  suggestedChannels   String[]                                @map("suggested_channels")
+  suggestedMcps       Json?                                   @map("suggested_mcps")
+  suggestedSkillSlugs String[]                                @map("suggested_skill_slugs")
+  metadata            Json?
+
+  // Limits
+  maxTurns            Int       @default(10)   @map("max_turns")
+  maxTokensPerTurn    Int       @default(4000) @map("max_tokens_per_turn")
+  budgetPerDayUsd     Float     @default(10.0) @map("budget_per_day_usd")
+
+  // Versioning (soft — no in-place mutation)
+  version             Int       @default(1)
+
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt      @map("updated_at")
+
+  @@index([type])
+  @@index([isOfficial])
+  @@map("agent_templates")
+}
+
 // ─── Channel Integrations ───────────────────────────────────
 
 model ChannelIntegration {

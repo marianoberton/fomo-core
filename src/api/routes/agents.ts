@@ -4,8 +4,16 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
-import type { AgentId, AgentMessageId } from '@/agents/types.js';
+import type {
+  AgentId,
+  AgentMessageId,
+  AgentMode,
+  AgentLLMConfig,
+} from '@/agents/types.js';
+import type { ProjectId } from '@/core/types.js';
+import type { IntegrationProvider } from '@/channels/types.js';
 import { checkChannelCollision } from '@/channels/agent-channel-router.js';
+import { createAgentTemplateRepository } from '@/infrastructure/repositories/agent-template-repository.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
 import {
@@ -85,6 +93,37 @@ const createAgentSchema = z.object({
   limits: limitsSchema.optional(),
   managerAgentId: z.string().optional().nullable(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const fromTemplateSchema = z.object({
+  templateSlug: z.string().min(1).max(100),
+  name: z.string().min(1).max(100),
+  overrides: z
+    .object({
+      description: z.string().max(500).optional(),
+      promptConfig: z
+        .object({
+          identity: z.string().min(1).optional(),
+          instructions: z.string().min(1).optional(),
+          safety: z.string().min(1).optional(),
+        })
+        .optional(),
+      llmConfig: z
+        .object({
+          provider: z.enum(['anthropic', 'openai', 'google', 'openrouter', 'ollama']),
+          model: z.string().min(1),
+          temperature: z.number().min(0).max(2).optional(),
+        })
+        .optional(),
+      toolAllowlist: z.array(z.string()).optional(),
+      channelConfig: z.object({ channels: z.array(z.string()) }).optional(),
+      maxTurns: z.number().int().min(1).max(100).optional(),
+      maxTokensPerTurn: z.number().int().min(100).max(32000).optional(),
+      budgetPerDayUsd: z.number().min(0).max(1000).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+      managerAgentId: z.string().optional(),
+    })
+    .optional(),
 });
 
 const updateAgentSchema = z.object({
@@ -280,6 +319,238 @@ export function agentRoutes(
             'Agent with this name already exists in the project',
             409,
           );
+        }
+        throw error;
+      }
+    },
+  );
+
+  // ─── Create Agent from Template ─────────────────────────────────
+
+  fastify.post(
+    '/projects/:projectId/agents/from-template',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId } = request.params as { projectId: string };
+      const parseResult = fromTemplateSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        await sendError(reply, 'VALIDATION_ERROR', parseResult.error.message, 400);
+        return;
+      }
+      const body = parseResult.data;
+      const warnings: string[] = [];
+
+      // 1. Template exists
+      const templateRepo = createAgentTemplateRepository(deps.prisma);
+      const template = await templateRepo.findBySlug(body.templateSlug);
+      if (!template) {
+        await sendNotFound(reply, 'AgentTemplate', body.templateSlug);
+        return;
+      }
+
+      // 2. Project exists
+      const project = await deps.projectRepository.findById(projectId as ProjectId);
+      if (!project) {
+        await sendNotFound(reply, 'Project', projectId);
+        return;
+      }
+
+      // 3. Name collision
+      const conflict = await agentRepository.findByName(projectId, body.name);
+      if (conflict) {
+        await sendError(
+          reply,
+          'CONFLICT',
+          `Agent "${body.name}" already exists in this project`,
+          409,
+        );
+        return;
+      }
+
+      // 4. Tool allowlist — every tool must exist in the registry
+      const toolAllowlist = body.overrides?.toolAllowlist ?? template.suggestedTools;
+      for (const toolId of toolAllowlist) {
+        if (!deps.toolRegistry.has(toolId)) {
+          await sendError(
+            reply,
+            'VALIDATION_ERROR',
+            `Tool "${toolId}" is not registered`,
+            400,
+          );
+          return;
+        }
+      }
+
+      // 5. managerAgentId — must exist in same project with type='backoffice'
+      const managerAgentId = body.overrides?.managerAgentId;
+      if (managerAgentId !== undefined && managerAgentId !== '') {
+        const manager = await agentRepository.findById(managerAgentId as AgentId);
+        if (
+          !manager ||
+          manager.projectId !== projectId ||
+          manager.type !== 'backoffice'
+        ) {
+          await sendError(
+            reply,
+            'VALIDATION_ERROR',
+            `managerAgentId "${managerAgentId}" must exist in this project with type='backoffice'`,
+            400,
+          );
+          return;
+        }
+      }
+
+      // 6. Channel availability — warnings only, not errors
+      const channels =
+        body.overrides?.channelConfig?.channels ?? template.suggestedChannels;
+      const integrations =
+        await deps.channelIntegrationRepository.findByProject(projectId as ProjectId);
+      const activeProviders = new Set(
+        integrations.filter((i) => i.status === 'active').map((i) => i.provider),
+      );
+      for (const ch of channels) {
+        if (ch === 'dashboard') continue; // always available in-app
+        if (!activeProviders.has(ch as IntegrationProvider)) {
+          warnings.push(`channel '${ch}' not configured`);
+        }
+      }
+
+      // 7. Modes — channel collision with other agents (only copilot-owner has modes)
+      const modes = (template.suggestedModes ?? []) as AgentMode[];
+      if (modes.length > 0) {
+        const collision = await checkChannelCollision(
+          agentRepository,
+          projectId,
+          undefined,
+          modes,
+        );
+        if (collision) {
+          await sendError(
+            reply,
+            'CHANNEL_COLLISION',
+            `Channel "${collision.channel}" is already claimed by agent "${collision.agentName}"`,
+            409,
+          );
+          return;
+        }
+      }
+
+      // 8. Prompt layers — seed project-level layers if missing (immutable rule)
+      const mergedPrompt = {
+        identity:
+          body.overrides?.promptConfig?.identity ?? template.promptConfig.identity,
+        instructions:
+          body.overrides?.promptConfig?.instructions ??
+          template.promptConfig.instructions,
+        safety:
+          body.overrides?.promptConfig?.safety ?? template.promptConfig.safety,
+      };
+      const layerTypes = ['identity', 'instructions', 'safety'] as const;
+      for (const layerType of layerTypes) {
+        const existingLayer = await deps.promptLayerRepository.getActiveLayer(
+          projectId as ProjectId,
+          layerType,
+        );
+        if (!existingLayer) {
+          await deps.promptLayerRepository.create({
+            projectId: projectId as ProjectId,
+            layerType,
+            content: mergedPrompt[layerType],
+            createdBy: `template:${template.slug}`,
+            changeReason: `Seeded from AgentTemplate "${template.slug}" v${template.version}`,
+          });
+        }
+      }
+
+      // 9. Skill instances — resolve slug → templateId, then instantiate
+      const skillIds: string[] = [];
+      for (const skillSlug of template.suggestedSkillSlugs) {
+        const skillTmpl = await deps.prisma.skillTemplate.findFirst({
+          where: { name: skillSlug },
+        });
+        if (!skillTmpl) {
+          warnings.push(`skill template '${skillSlug}' not found — skipped`);
+          continue;
+        }
+        const instance = await deps.skillService.createFromTemplate(
+          projectId,
+          skillTmpl.id,
+        );
+        skillIds.push(instance.id);
+      }
+
+      // 10. Suggested MCPs — v2 feature, warn if present
+      if (
+        Array.isArray(template.suggestedMcps) &&
+        template.suggestedMcps.length > 0
+      ) {
+        warnings.push(
+          'suggested MCP servers are not auto-provisioned yet — attach them manually',
+        );
+      }
+
+      // 11. Compose llmConfig from overrides or template
+      const llmConfig: AgentLLMConfig | undefined = body.overrides?.llmConfig
+        ? body.overrides.llmConfig
+        : template.suggestedLlm
+          ? {
+              provider:
+                template.suggestedLlm.provider as AgentLLMConfig['provider'],
+              model: template.suggestedLlm.model,
+              ...(template.suggestedLlm.temperature !== undefined && {
+                temperature: template.suggestedLlm.temperature,
+              }),
+            }
+          : undefined;
+
+      // 12. Create agent
+      try {
+        const agent = await agentRepository.create({
+          projectId,
+          name: body.name,
+          description: body.overrides?.description ?? template.description,
+          promptConfig: mergedPrompt,
+          ...(llmConfig && { llmConfig }),
+          toolAllowlist,
+          channelConfig: { allowedChannels: channels },
+          modes,
+          type: template.type,
+          skillIds,
+          limits: {
+            maxTurns: body.overrides?.maxTurns ?? template.maxTurns,
+            maxTokensPerTurn:
+              body.overrides?.maxTokensPerTurn ?? template.maxTokensPerTurn,
+            budgetPerDayUsd:
+              body.overrides?.budgetPerDayUsd ?? template.budgetPerDayUsd,
+          },
+          ...(managerAgentId !== undefined &&
+            managerAgentId !== '' && { managerAgentId }),
+          metadata: {
+            ...(template.metadata ?? {}),
+            ...(body.overrides?.metadata ?? {}),
+            createdFromTemplate: template.slug,
+            templateVersion: template.version,
+          },
+        });
+
+        logger.info('Agent created from template', {
+          component: 'agents',
+          projectId,
+          agentId: agent.id,
+          templateSlug: template.slug,
+          skillIds: skillIds.length,
+          warnings: warnings.length,
+        });
+
+        await sendSuccess(reply, { agent, warnings }, 201);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Unique constraint')) {
+          await sendError(
+            reply,
+            'CONFLICT',
+            `Agent with name "${body.name}" already exists`,
+            409,
+          );
+          return;
         }
         throw error;
       }

@@ -9,14 +9,21 @@
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { paginationSchema } from '../pagination.js';
 import { getVariantMetrics, calculateWinner } from '../../campaigns/ab-test-engine.js';
 import { getCampaignMetrics } from '@/campaigns/campaign-tracker.js';
 import { interpolateTemplate } from '@/campaigns/campaign-runner.js';
-import type { CampaignId, ABTestResult, AudienceFilter } from '../../campaigns/types.js';
+import type {
+  CampaignId,
+  ABTestResult,
+  AudienceFilter,
+  AudienceSource,
+} from '../../campaigns/types.js';
+import type { ProjectId } from '@/core/types.js';
+import type { AgentId } from '@/agents/types.js';
 import { calculateCost } from '@/providers/models.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
@@ -26,25 +33,66 @@ const audienceFilterSchema = z.object({
   role: z.string().optional(),
 });
 
-const createCampaignSchema = z.object({
-  agentId: z.string().min(1),
-  name: z.string().min(1).max(200),
-  template: z.string().min(1).max(10_000),
-  channel: z.enum(['whatsapp', 'telegram', 'slack']),
-  audienceFilter: audienceFilterSchema,
-  scheduledFor: z.string().datetime().optional(),
-  metadata: z.record(z.unknown()).optional(),
-});
+const audienceSourceSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('contacts'),
+    filter: audienceFilterSchema,
+  }),
+  z.object({
+    kind: z.literal('mcp'),
+    serverName: z.string().min(1).max(100),
+    toolName: z.string().min(1).max(200),
+    args: z.record(z.string(), z.unknown()),
+    mapping: z.object({
+      contactIdField: z.string().min(1),
+      phoneField: z.string().optional(),
+      emailField: z.string().optional(),
+      nameField: z.string().optional(),
+    }),
+    ttlHours: z.number().int().min(1).max(24 * 30).default(24),
+  }),
+]);
 
-const updateCampaignSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
-  template: z.string().min(1).max(10_000).optional(),
-  channel: z.enum(['whatsapp', 'telegram', 'slack']).optional(),
-  audienceFilter: audienceFilterSchema.optional(),
-  status: z.enum(['draft', 'active', 'paused']).optional(),
-  scheduledFor: z.string().datetime().nullable().optional(),
-  metadata: z.record(z.unknown()).optional(),
-});
+const createCampaignSchema = z
+  .object({
+    agentId: z.string().min(1),
+    name: z.string().min(1).max(200),
+    template: z.string().min(1).max(10_000),
+    channel: z.enum(['whatsapp', 'telegram', 'slack']),
+    audienceFilter: audienceFilterSchema.optional(),
+    audienceSource: audienceSourceSchema.optional(),
+    scheduledTaskId: z.string().min(1).optional(),
+    scheduledFor: z.string().datetime().optional(),
+    metadata: z.record(z.unknown()).optional(),
+  })
+  .refine((d) => d.audienceFilter !== undefined || d.audienceSource !== undefined, {
+    message: 'Either audienceFilter or audienceSource is required',
+    path: ['audienceFilter'],
+  });
+
+const updateCampaignSchema = z
+  .object({
+    agentId: z.string().min(1).optional(),
+    name: z.string().min(1).max(200).optional(),
+    template: z.string().min(1).max(10_000).optional(),
+    channel: z.enum(['whatsapp', 'telegram', 'slack']).optional(),
+    audienceFilter: audienceFilterSchema.optional(),
+    audienceSource: audienceSourceSchema.nullable().optional(),
+    scheduledTaskId: z.string().min(1).nullable().optional(),
+    status: z.enum(['draft', 'active', 'paused']).optional(),
+    scheduledFor: z.string().datetime().nullable().optional(),
+    metadata: z.record(z.unknown()).optional(),
+  })
+  .refine(
+    (d) =>
+      d.audienceFilter === undefined && d.audienceSource === undefined
+        ? true
+        : d.audienceFilter !== undefined || d.audienceSource !== null,
+    {
+      message: 'audienceSource cannot be null when audienceFilter is not provided',
+      path: ['audienceSource'],
+    },
+  );
 
 // ─── Routes ─────────────────────────────────────────────────────
 
@@ -53,7 +101,70 @@ export function campaignRoutes(
   fastify: FastifyInstance,
   opts: RouteDependencies,
 ): void {
-  const { prisma, campaignRunner, logger } = opts;
+  const { prisma, campaignRunner, agentRepository, mcpServerRepository, logger } = opts;
+
+  /**
+   * Validate an agentId belongs to the project and is active.
+   * Returns null if valid, otherwise a human-readable error string.
+   */
+  async function validateAgent(
+    agentId: string,
+    projectId: string,
+  ): Promise<string | null> {
+    const agent = await agentRepository.findById(agentId as AgentId);
+    if (!agent || agent.projectId !== projectId) {
+      return `Agent "${agentId}" not found in project`;
+    }
+    if (agent.status !== 'active') {
+      return `Agent "${agentId}" is not active (status=${agent.status})`;
+    }
+    return null;
+  }
+
+  /**
+   * Validate an AudienceSource — when kind='mcp', the MCP server instance
+   * must exist in the project with status='active'.
+   */
+  async function validateAudienceSource(
+    source: AudienceSource,
+    projectId: string,
+  ): Promise<string | null> {
+    if (source.kind !== 'mcp') return null;
+    const instances = await mcpServerRepository.listInstances(
+      projectId as ProjectId,
+      'active',
+    );
+    const match = instances.find((i) => i.name === source.serverName);
+    if (!match) {
+      return `MCP server "${source.serverName}" is not connected to this project (or not active)`;
+    }
+    return null;
+  }
+
+  /**
+   * Validate a scheduledTaskId — must exist in the project and not be linked
+   * to a different campaign.
+   */
+  async function validateScheduledTask(
+    scheduledTaskId: string,
+    projectId: string,
+    excludeCampaignId?: string,
+  ): Promise<{ error: string; status: number } | null> {
+    const task = await prisma.scheduledTask.findUnique({
+      where: { id: scheduledTaskId },
+      include: { campaign: true },
+    });
+    if (!task || task.projectId !== projectId) {
+      return { error: `ScheduledTask "${scheduledTaskId}" not found in project`, status: 400 };
+    }
+    if (task.campaign && task.campaign.id !== excludeCampaignId) {
+      return {
+        error: `ScheduledTask "${scheduledTaskId}" is already linked to campaign "${task.campaign.id}"`,
+        status: 409,
+      };
+    }
+    return null;
+  }
 
   // POST /projects/:projectId/campaigns
   fastify.post(
@@ -71,6 +182,39 @@ export function campaignRoutes(
       const { projectId } = request.params;
       const body = parseResult.data;
 
+      // Validate agent
+      const agentError = await validateAgent(body.agentId, projectId);
+      if (agentError) {
+        await sendError(reply, 'VALIDATION_ERROR', agentError, 400);
+        return;
+      }
+
+      // Validate MCP audience source (when applicable)
+      if (body.audienceSource) {
+        const sourceError = await validateAudienceSource(
+          body.audienceSource as AudienceSource,
+          projectId,
+        );
+        if (sourceError) {
+          await sendError(reply, 'VALIDATION_ERROR', sourceError, 400);
+          return;
+        }
+      }
+
+      // Validate scheduledTaskId (when provided)
+      if (body.scheduledTaskId) {
+        const taskError = await validateScheduledTask(body.scheduledTaskId, projectId);
+        if (taskError) {
+          await sendError(
+            reply,
+            taskError.status === 409 ? 'CONFLICT' : 'VALIDATION_ERROR',
+            taskError.error,
+            taskError.status,
+          );
+          return;
+        }
+      }
+
       const campaign = await prisma.campaign.create({
         data: {
           projectId,
@@ -78,7 +222,13 @@ export function campaignRoutes(
           name: body.name,
           template: body.template,
           channel: body.channel,
-          audienceFilter: body.audienceFilter as Prisma.InputJsonValue,
+          audienceFilter: (body.audienceFilter ?? {}) as Prisma.InputJsonValue,
+          ...(body.audienceSource !== undefined && {
+            audienceSource: body.audienceSource as Prisma.InputJsonValue,
+          }),
+          ...(body.scheduledTaskId !== undefined && {
+            scheduledTaskId: body.scheduledTaskId,
+          }),
           scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : null,
           metadata: body.metadata as Prisma.InputJsonValue,
         },
@@ -88,6 +238,8 @@ export function campaignRoutes(
         component: 'campaign-routes',
         campaignId: campaign.id,
         projectId,
+        agentId: body.agentId,
+        audienceMode: body.audienceSource?.kind ?? 'contacts',
       });
 
       await sendSuccess(reply, campaign, 201);
@@ -187,15 +339,65 @@ export function campaignRoutes(
       }
 
       const body = parseResult.data;
+      const { projectId, id: campaignId } = request.params;
+
+      // Validate agentId (if provided)
+      if (body.agentId !== undefined) {
+        const agentError = await validateAgent(body.agentId, projectId);
+        if (agentError) {
+          await sendError(reply, 'VALIDATION_ERROR', agentError, 400);
+          return;
+        }
+      }
+
+      // Validate audienceSource MCP (if provided and not null)
+      if (body.audienceSource) {
+        const sourceError = await validateAudienceSource(
+          body.audienceSource as AudienceSource,
+          projectId,
+        );
+        if (sourceError) {
+          await sendError(reply, 'VALIDATION_ERROR', sourceError, 400);
+          return;
+        }
+      }
+
+      // Validate scheduledTaskId (if provided and not null)
+      if (body.scheduledTaskId) {
+        const taskError = await validateScheduledTask(
+          body.scheduledTaskId,
+          projectId,
+          campaignId,
+        );
+        if (taskError) {
+          await sendError(
+            reply,
+            taskError.status === 409 ? 'CONFLICT' : 'VALIDATION_ERROR',
+            taskError.error,
+            taskError.status,
+          );
+          return;
+        }
+      }
 
       const updated = await prisma.campaign.update({
-        where: { id: request.params.id },
+        where: { id: campaignId },
         data: {
+          ...(body.agentId !== undefined && { agentId: body.agentId }),
           ...(body.name !== undefined && { name: body.name }),
           ...(body.template !== undefined && { template: body.template }),
           ...(body.channel !== undefined && { channel: body.channel }),
           ...(body.audienceFilter !== undefined && {
             audienceFilter: body.audienceFilter as Prisma.InputJsonValue,
+          }),
+          ...(body.audienceSource !== undefined && {
+            audienceSource:
+              body.audienceSource === null
+                ? Prisma.JsonNull
+                : (body.audienceSource as Prisma.InputJsonValue),
+          }),
+          ...(body.scheduledTaskId !== undefined && {
+            scheduledTaskId: body.scheduledTaskId,
           }),
           ...(body.status !== undefined && { status: body.status }),
           ...(body.scheduledFor !== undefined && {
@@ -208,6 +410,52 @@ export function campaignRoutes(
       });
 
       await sendSuccess(reply, updated);
+    },
+  );
+
+  // POST /projects/:projectId/campaigns/:id/refresh-audience
+  // Forces re-resolution of the audience (ignores cache).
+  fastify.post(
+    '/projects/:projectId/campaigns/:id/refresh-audience',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      if (!campaignRunner) {
+        await sendError(
+          reply,
+          'SERVICE_UNAVAILABLE',
+          'Campaign runner is not available. Redis must be configured (REDIS_URL).',
+          503,
+        );
+        return;
+      }
+
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!campaign || campaign.projectId !== request.params.projectId) {
+        await sendNotFound(reply, 'Campaign', request.params.id);
+        return;
+      }
+
+      const result = await campaignRunner.resolveAudience(request.params.id, {
+        force: true,
+      });
+
+      if (!result.ok) {
+        const status = result.error.statusCode ?? 500;
+        await sendError(reply, result.error.code, result.error.message, status);
+        return;
+      }
+
+      const { contacts, cache } = result.value;
+      await sendSuccess(reply, {
+        contactIds: contacts.map((c) => c.id),
+        count: contacts.length,
+        resolvedAt: cache?.resolvedAt ?? new Date().toISOString(),
+        expiresAt: cache?.expiresAt ?? null,
+      });
     },
   );
 
