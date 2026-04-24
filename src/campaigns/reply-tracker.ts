@@ -16,6 +16,8 @@ import type {
 } from '@/api/events/event-bus.js';
 import { markCampaignReply } from './campaign-tracker.js';
 import type { CampaignId } from './types.js';
+import type { ProjectId, SessionId } from '@/core/types.js';
+import type { ContactId } from '@/contacts/types.js';
 
 // ─── Config ─────────────────────────────────────────────────────
 
@@ -32,6 +34,13 @@ export interface ReplyTrackerDeps {
   replyWindowMs?: number;
 }
 
+export interface CheckAndMarkReplyParams {
+  projectId: ProjectId;
+  contactId: ContactId;
+  sessionId: SessionId;
+  receivedAt?: Date;
+}
+
 export interface ReplyTracker {
   start(): void;
   stop(): void;
@@ -40,6 +49,13 @@ export interface ReplyTracker {
    * code should prefer start() + emitting onto the bus.
    */
   handleInbound(event: ProjectEvent): Promise<void>;
+  /**
+   * Defensive entry point for direct callers (e.g. inbound-processor) that
+   * cannot assume the event-bus subscriber fired. Runs the same idempotent
+   * check as `handleInbound`: filters by `status = 'sent'`, so duplicate
+   * invocations (bus + direct) cannot double-mark a reply.
+   */
+  checkAndMarkReply(params: CheckAndMarkReplyParams): Promise<void>;
 }
 
 // ─── Factory ────────────────────────────────────────────────────
@@ -141,5 +157,16 @@ export function createReplyTracker(deps: ReplyTrackerDeps): ReplyTracker {
       }
     },
     handleInbound,
+    async checkAndMarkReply(params: CheckAndMarkReplyParams): Promise<void> {
+      await handleInbound({
+        kind: 'message.inbound',
+        projectId: params.projectId,
+        sessionId: params.sessionId,
+        contactId: params.contactId,
+        text: '',
+        channel: 'fallback',
+        ts: (params.receivedAt ?? new Date()).getTime(),
+      });
+    },
   };
 }
