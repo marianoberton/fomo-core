@@ -306,12 +306,20 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
           });
         }
 
-        // Defensive reply tracking — call the tracker directly alongside the
-        // event-bus subscriber. If the subscriber never registered or its
-        // handler crashed, CampaignSend.replied would silently never be set.
-        // The tracker itself is idempotent (filters by `status = 'sent'`),
+        // Defensive reply tracking — always called, even when the event bus
+        // succeeded. The tracker is idempotent (filters by `status = 'sent'`),
         // so the bus path and this direct call cannot double-mark a reply.
-        // Errors are swallowed — reply tracking must never break inbound.
+        //
+        // Cost: +1 indexed `findFirst` on CampaignSend per inbound message
+        // (~sub-ms with existing indexes on contactId/status/sentAt). Accepted
+        // for reliability: a silent event-bus failure (subscriber not
+        // registered at boot, handler crash, future move to Redis pub/sub
+        // with a dropped message) would silently break reply tracking and
+        // corrupt campaign metrics — Market Paper's conservative autonomy
+        // + volume makes that unacceptable.
+        //
+        // Errors are logged as warn and swallowed — reply tracking must
+        // never break inbound delivery.
         if (replyTracker) {
           logger.debug('Attempting fallback reply check', {
             component: 'inbound-processor',
