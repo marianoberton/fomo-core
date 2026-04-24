@@ -19,6 +19,7 @@ import {
   createAgentRunRepository,
 } from '@/infrastructure/repositories/index.js';
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
+import { createApprovalNotifierConfigRepository } from '@/infrastructure/repositories/approval-notifier-config-repository.js';
 import { createSecretService } from '@/secrets/secret-service.js';
 import { createApiKeyService } from '@/security/api-key-service.js';
 import { createDokployService } from '@/provisioning/dokploy-service.js';
@@ -227,6 +228,15 @@ async function start(): Promise<void> {
     // Encrypted secrets service (AES-256-GCM) — requires SECRETS_ENCRYPTION_KEY env var
     const secretService = createSecretService({ secretRepository });
 
+    // Per-project approval notifier config (token in SecretService, chatId +
+    // enabled flag in project.metadata). Wired into the dashboard-link
+    // Telegram notifier so admins can configure per-project credentials
+    // via the API without touching env vars.
+    const approvalNotifierConfigRepository = createApprovalNotifierConfigRepository({
+      prisma,
+      secretService,
+    });
+
     // API key service — per-project and master API keys
     const apiKeyService = createApiKeyService({ prisma, logger });
 
@@ -273,6 +283,7 @@ async function start(): Promise<void> {
       dashboardBaseUrl: process.env['APPROVAL_DASHBOARD_BASE_URL'],
       prisma,
       logger,
+      configRepo: approvalNotifierConfigRepository,
     });
     const inAppApprovalNotifier = createInAppApprovalNotifier({ prisma, logger });
     const dashboardLinkNotifier = createCompositeApprovalNotifier({
@@ -927,6 +938,7 @@ async function start(): Promise<void> {
       provisioningService: provisioningService,
       dokployService: dokployService,
       agentRunRepository,
+      approvalNotifierConfigRepository,
       taskRegistry: openclawTaskRegistry,
       eventBus,
       logger,

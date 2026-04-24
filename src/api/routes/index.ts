@@ -8,6 +8,7 @@ import { sessionRoutes } from './sessions.js';
 import { promptLayerRoutes } from './prompt-layers.js';
 import { traceRoutes } from './traces.js';
 import { approvalRoutes } from './approvals.js';
+import { approvalNotifierConfigRoutes } from './approval-notifier-config.js';
 import { notificationRoutes } from './notifications.js';
 import { toolRoutes } from './tools.js';
 import { chatRoutes } from './chat.js';
@@ -68,6 +69,9 @@ export async function registerRoutes(
   await fastify.register(promptLayerRoutes, deps);
   await fastify.register(traceRoutes, deps);
   await fastify.register(approvalRoutes, deps);
+  approvalNotifierConfigRoutes(fastify, deps, {
+    envDashboardBaseUrl: process.env['APPROVAL_DASHBOARD_BASE_URL'],
+  });
   notificationRoutes(fastify, deps);
   await fastify.register(toolRoutes, deps);
   await fastify.register(chatRoutes, deps);

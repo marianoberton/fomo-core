@@ -414,6 +414,23 @@ export function createMockAgentRunRepository(): {
   };
 }
 
+/** Create a mock ApprovalNotifierConfigRepository with all methods as vi.fn(). */
+export function createMockApprovalNotifierConfigRepository(): {
+  getTelegramConfig: ReturnType<typeof vi.fn>;
+  setTelegramConfig: ReturnType<typeof vi.fn>;
+  deleteTelegramConfig: ReturnType<typeof vi.fn>;
+  recordTestResult: ReturnType<typeof vi.fn>;
+  resolveTelegramConfig: ReturnType<typeof vi.fn>;
+} {
+  return {
+    getTelegramConfig: vi.fn().mockResolvedValue(null),
+    setTelegramConfig: vi.fn(),
+    deleteTelegramConfig: vi.fn().mockResolvedValue(undefined),
+    recordTestResult: vi.fn().mockResolvedValue(undefined),
+    resolveTelegramConfig: vi.fn().mockResolvedValue(null),
+  };
+}
+
 /** Assemble a complete RouteDependencies with all mocks. */
 export function createMockDeps(): RouteDependencies & {
   projectRepository: ReturnType<typeof createMockProjectRepository>;
@@ -441,6 +458,7 @@ export function createMockDeps(): RouteDependencies & {
   mcpServerRepository: ReturnType<typeof createMockMCPServerRepository>;
   skillService: ReturnType<typeof createMockSkillService>;
   agentRunRepository: ReturnType<typeof createMockAgentRunRepository>;
+  approvalNotifierConfigRepository: ReturnType<typeof createMockApprovalNotifierConfigRepository>;
 } {
   return {
     projectRepository: createMockProjectRepository(),
@@ -472,6 +490,7 @@ export function createMockDeps(): RouteDependencies & {
     mcpServerRepository: createMockMCPServerRepository(),
     skillService: createMockSkillService(),
     agentRunRepository: createMockAgentRunRepository(),
+    approvalNotifierConfigRepository: createMockApprovalNotifierConfigRepository(),
     // Minimal Prisma mock — just enough for require-project-access guards.
     // By default every findUnique returns a row with projectId='proj-1' so
     // guards pass. Tests that want a 403/404 from the guard can override
