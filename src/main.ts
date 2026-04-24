@@ -20,6 +20,7 @@ import {
 } from '@/infrastructure/repositories/index.js';
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
 import { createApprovalNotifierConfigRepository } from '@/infrastructure/repositories/approval-notifier-config-repository.js';
+import { createMemberRepository } from '@/infrastructure/repositories/member-repository.js';
 import { createSecretService } from '@/secrets/secret-service.js';
 import { createApiKeyService } from '@/security/api-key-service.js';
 import { createDokployService } from '@/provisioning/dokploy-service.js';
@@ -236,6 +237,9 @@ async function start(): Promise<void> {
       prisma,
       secretService,
     });
+
+    // Project member (RBAC) repository
+    const memberRepository = createMemberRepository(prisma);
 
     // API key service — per-project and master API keys
     const apiKeyService = createApiKeyService({ prisma, logger });
@@ -939,6 +943,7 @@ async function start(): Promise<void> {
       dokployService: dokployService,
       agentRunRepository,
       approvalNotifierConfigRepository,
+      memberRepository,
       taskRegistry: openclawTaskRegistry,
       eventBus,
       logger,

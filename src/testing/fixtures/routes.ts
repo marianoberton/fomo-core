@@ -491,6 +491,13 @@ export function createMockDeps(): RouteDependencies & {
     skillService: createMockSkillService(),
     agentRunRepository: createMockAgentRunRepository(),
     approvalNotifierConfigRepository: createMockApprovalNotifierConfigRepository(),
+    memberRepository: {
+      findByProjectId: vi.fn().mockResolvedValue([]),
+      findByEmail: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockResolvedValue(null),
+      updateRole: vi.fn().mockResolvedValue(null),
+      delete: vi.fn().mockResolvedValue(false),
+    },
     // Minimal Prisma mock — just enough for require-project-access guards.
     // By default every findUnique returns a row with projectId='proj-1' so
     // guards pass. Tests that want a 403/404 from the guard can override

@@ -31,6 +31,7 @@ import type { ProvisioningService } from '@/provisioning/provisioning-service.js
 import type { DokployService } from '@/provisioning/dokploy-service.js';
 import type { AgentRunRepository } from '@/infrastructure/repositories/agent-run-repository.js';
 import type { ApprovalNotifierConfigRepository } from '@/infrastructure/repositories/approval-notifier-config-repository.js';
+import type { MemberRepository } from '@/infrastructure/repositories/member-repository.js';
 import type { TaskRegistry } from '@/channels/openclaw-task-registry.js';
 import type { ProjectEventBus } from '@/api/events/event-bus.js';
 
@@ -149,6 +150,8 @@ export interface RouteDependencies {
   agentRunRepository: AgentRunRepository;
   /** Per-project dashboard-link approval notifier config repository. */
   approvalNotifierConfigRepository: ApprovalNotifierConfigRepository;
+  /** Project member (RBAC) repository. */
+  memberRepository: MemberRepository;
   /** OpenClaw task lifecycle registry. */
   taskRegistry: TaskRegistry;
   /** In-process project event bus for live push (WS + SSE). */

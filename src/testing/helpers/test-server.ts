@@ -19,6 +19,7 @@ import {
   createFileRepository,
   createAgentRepository,
   createAgentRunRepository,
+  createMemberRepository,
 } from '@/infrastructure/repositories/index.js';
 import { createSecretRepository } from '@/infrastructure/repositories/secret-repository.js';
 import { createApprovalNotifierConfigRepository } from '@/infrastructure/repositories/approval-notifier-config-repository.js';
@@ -199,6 +200,7 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     dokployService: createDokployService({ logger, dokployUrl: 'http://localhost:3000', dokployApiKey: 'test', dokployProjectId: 'test' }),
     agentRunRepository: createAgentRunRepository(prisma),
     approvalNotifierConfigRepository: createApprovalNotifierConfigRepository({ prisma, secretService }),
+    memberRepository: createMemberRepository(prisma),
     taskRegistry: createTaskRegistry(),
     eventBus: createProjectEventBus(),
     logger,

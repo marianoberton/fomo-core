@@ -26,9 +26,11 @@
  *   - string = project-scoped (access restricted to that project)
  */
 import { timingSafeEqual as cryptoTimingSafeEqual } from 'node:crypto';
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyRequest, FastifyReply, preHandlerHookHandler } from 'fastify';
+import type { ProjectRole } from '@prisma/client';
 import type { Logger } from '@/observability/logger.js';
 import type { ApiKeyService } from '@/security/api-key-service.js';
+import type { MemberRepository } from '@/infrastructure/repositories/member-repository.js';
 import { requireProjectAccess, requireScope } from './project-access.js';
 
 declare module 'fastify' {
@@ -45,6 +47,12 @@ declare module 'fastify' {
      * "*" = full access.  Empty array or undefined = no scope filtering.
      */
     apiKeyScopes?: string[];
+    /**
+     * Resolved ProjectMember role for the current (projectId, x-user-email) pair.
+     * Populated by `requireProjectRole` — used by handlers that need to
+     * branch on role beyond a simple pass/fail.
+     */
+    projectRole?: ProjectRole;
   }
 }
 
@@ -156,6 +164,141 @@ export function registerAuthMiddleware(
   // Ensures API keys with limited scopes (e.g. ["chat"]) can only
   // access matching endpoint categories.
   fastify.addHook('onRequest', requireScope);
+}
+
+// ─── RBAC: requireProjectRole ──────────────────────────────────
+//
+// Gate a route by the minimum ProjectRole the caller must hold on
+// the projectId targeted by the request.
+//
+// Bypass rules (in order):
+//   1. Master API key (apiKeyProjectId === null)  → allow, no member lookup.
+//   2. Project API key (apiKeyProjectId === string)
+//        → treated as `owner` for the scoped project; still 403 if the
+//          request targets a different projectId (already enforced by
+//          requireProjectAccess, which runs before this hook).
+//   3. `x-user-email` header present
+//        → look up ProjectMember(projectId, email); 403 if missing or
+//          role < minRole; attach `request.projectRole` and allow.
+//   4. None of the above → 401.
+//
+// NOTE: D3 of the plan picks `x-user-email` as a *trusted* header —
+// it is only safe to accept it when the request has already passed
+// the master-key Bearer check OR arrives over a trusted session
+// channel. Today the dashboard always runs behind the master key, so
+// this is safe. Swap for a signed session token in the auth-provider
+// track.
+
+/** Precedence: higher number = more power. */
+const ROLE_RANK: Record<ProjectRole, number> = {
+  viewer: 1,
+  operator: 2,
+  owner: 3,
+};
+
+/** True when the caller's role satisfies the required minimum. */
+function roleAtLeast(actual: ProjectRole, required: ProjectRole): boolean {
+  return ROLE_RANK[actual] >= ROLE_RANK[required];
+}
+
+/** Dependencies required to resolve a member from (projectId, email). */
+export interface RequireProjectRoleDeps {
+  memberRepository: MemberRepository;
+  logger: Logger;
+}
+
+/**
+ * Build a Fastify preHandler that enforces `minRole` on the requested
+ * projectId. Apply to routes that mutate project state (agents,
+ * members, approvals). Read-only routes can use `viewer` as the min.
+ *
+ * The returned hook extracts projectId from the same sources as
+ * `requireProjectAccess` (params → body → query). If no projectId is
+ * present the hook passes through (list endpoints filter in-handler).
+ */
+export function requireProjectRole(
+  minRole: ProjectRole,
+  deps: RequireProjectRoleDeps,
+): preHandlerHookHandler {
+  const { memberRepository, logger } = deps;
+
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    // (1) Master key — bypass.
+    if (request.apiKeyProjectId === null) return;
+
+    // Extract projectId from the request (mirrors project-access.ts).
+    const params = request.params as Record<string, string> | undefined;
+    const body = request.body as Record<string, unknown> | undefined;
+    const query = request.query as Record<string, string> | undefined;
+    const projectId =
+      params?.['projectId'] ??
+      (body?.['projectId'] as string | undefined) ??
+      query?.['projectId'];
+
+    if (!projectId) {
+      // No project scope on the route → defer to handler-level filtering.
+      return;
+    }
+
+    // (2) Project API key — treat as owner for its scoped project.
+    //     Cross-project access is already blocked by requireProjectAccess.
+    if (typeof request.apiKeyProjectId === 'string') {
+      request.projectRole = 'owner';
+      return;
+    }
+
+    // (3) x-user-email header — look up the ProjectMember.
+    const rawEmail = request.headers['x-user-email'];
+    const email = Array.isArray(rawEmail) ? rawEmail[0] : rawEmail;
+    if (email && email.trim().length > 0) {
+      const member = await memberRepository.findByEmail(projectId, email.trim().toLowerCase());
+      if (!member) {
+        logger.warn('requireProjectRole: no ProjectMember for user on project', {
+          component: 'auth-middleware',
+          projectId,
+          minRole,
+        });
+        await reply.code(403).send({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'You are not a member of this project',
+          },
+        });
+        return;
+      }
+      if (!roleAtLeast(member.role, minRole)) {
+        logger.warn('requireProjectRole: insufficient role', {
+          component: 'auth-middleware',
+          projectId,
+          minRole,
+          actualRole: member.role,
+        });
+        await reply.code(403).send({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: `Requires at least role "${minRole}"`,
+          },
+        });
+        return;
+      }
+      request.projectRole = member.role;
+      return;
+    }
+
+    // (4) Auth was skipped entirely (apiKeyProjectId === undefined) AND
+    //     no user-email header → 401. When apiKey auth is disabled in
+    //     dev the /api/v1 hook never runs and apiKeyProjectId is
+    //     undefined; we still require *some* actor claim to pass RBAC.
+    await reply.code(401).send({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Missing authentication — provide a master key or an x-user-email header',
+      },
+    });
+  };
 }
 
 /**
