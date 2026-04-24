@@ -4,10 +4,11 @@ Safe deploy procedure for Nexus Core to production (Dokploy + VPS via `hostinger
 
 - SSH alias: `hostinger-fomo`
 - Container: `compose-generate-multi-byte-system-fqoeno-app-1`
-- Branch `main` auto-deploys via Dokploy on every push (~2-3 min)
+- Backend branch `main` auto-deploys via Dokploy on every push (~2-3 min)
+- **Dashboard is a separate app in Dokploy with MANUAL deploy** — not auto. See section at the end.
 - Base image `node:22-alpine` — no `curl`, use `wget`
 
-## Steps
+## Steps (backend)
 
 ### 1. Pre-push build check
 
@@ -47,31 +48,86 @@ ssh hostinger-fomo "docker ps --format '{{.Names}}\t{{.Status}}' | grep fqoeno"
 ```
 
 - ✅ `Up X seconds` or `Up X minutes` (< 3 min) = fresh deploy
-- ❌ `Up X hours` = deploy didn't apply → check Dokploy UI for the `compose-generate-multi-byte-system-fqoeno` app
+- ❌ `Up X hours` = deploy didn't apply — check Dokploy UI
 
-If the deploy didn't apply:
+### 5. Check logs for migration + startup
+
 ```bash
-ssh hostinger-fomo "docker logs --tail 20 compose-generate-multi-byte-system-fqoeno-app-1 2>&1"
+ssh hostinger-fomo "docker logs --since 5m compose-generate-multi-byte-system-fqoeno-app-1 2>&1 | grep -iE 'migration|listening|error|fatal'"
 ```
 
-### 5. Smoke test the changed endpoint
+Must see:
+- `All migrations have been successfully applied` (if any migration ran)
+- `Server listening on 0.0.0.0:3002`
+- No `ERROR` / `FATAL` / `PrismaClient` errors
 
-Run a targeted test via `wget` inside the container against `http://127.0.0.1:3002`. Use `--header` flags for auth and any special headers. Use `127.0.0.1` not `localhost` (IPv6 resolves first).
+### 6. Smoke test the endpoint that changed
 
-Example — HTTP endpoint:
 ```bash
-ssh hostinger-fomo 'docker exec compose-generate-multi-byte-system-fqoeno-app-1 \
-  wget -S --header="Authorization: Bearer $NEXUS_API_KEY" \
-  http://127.0.0.1:3002/api/v1/health 2>&1 | head -5'
+ssh hostinger-fomo 'docker exec compose-generate-multi-byte-system-fqoeno-app-1 wget -qO- --header="Authorization: Bearer $NEXUS_API_KEY" "http://127.0.0.1:3002/api/v1/<path-you-changed>"'
 ```
 
-Example — WebSocket:
+## Dashboard deploy (manual)
+
+The dashboard (`fomo-core-dashboard` repo, `dashboard/` submodule in this repo) has **manual deploy** in Dokploy. Auto-deploy is disabled on purpose.
+
+### Flow when dashboard changes
+
+1. **Commit inside the submodule**:
+   ```bash
+   cd dashboard
+   git add .
+   git commit -m "type(scope): description"
+   git push origin main     # pushes to fomo-core-dashboard repo
+   cd ..
+   ```
+
+2. **Update the submodule pointer in the main repo**:
+   ```bash
+   git add dashboard
+   git commit -m "chore: update dashboard submodule"
+   git push origin main     # pushes pointer to fomo-core repo (does NOT trigger backend redeploy since no src/ changed)
+   ```
+
+3. **Trigger dashboard deploy manually in Dokploy**:
+   - Log into Dokploy UI.
+   - Navigate to the dashboard application (separate from backend).
+   - Click **Deploy** manually.
+   - Wait ~2 min for the build to complete.
+
+4. **Verify**:
+   - Open `https://fomo-core-dashboard.fomo.com.ar` in a browser.
+   - Do a hard refresh (`Ctrl+Shift+R`) — Next.js caches aggressively.
+   - Confirm the change is visible.
+
+### If the dashboard appears unchanged after deploy
+
+In order of likelihood:
+1. **Browser cache** — hard refresh again. Most common cause.
+2. **Deploy didn't actually run** — check Dokploy UI for latest build time.
+3. **Pushed to wrong branch** — the dashboard app deploys from `main` of `fomo-core-dashboard`. If you pushed to a feature branch, Dokploy won't trigger.
+4. **Build failed** — check Dokploy UI for build logs.
+
+## Rollback
+
+### Backend rollback
+
 ```bash
-ssh hostinger-fomo 'docker exec compose-generate-multi-byte-system-fqoeno-app-1 sh -c \
-  "wget -S --header=\"Upgrade: websocket\" --header=\"Connection: Upgrade\" \
-   --header=\"Sec-WebSocket-Version: 13\" --header=\"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\" \
-   \"http://127.0.0.1:3002/api/v1/ws?projectId=test\" 2>&1 | head -5"'
-# Expect: HTTP/1.1 101 Switching Protocols
+# Revert the last commit on main
+git revert HEAD
+git push origin main
+# Wait ~3 min, verify container restarted with new commit
 ```
 
-Report the final result: what was deployed, the smoke test output, and whether it passed.
+Or hard reset (riskier, only if safe):
+
+```bash
+git reset --hard <previous-good-commit>
+git push origin main --force
+```
+
+Then **verify the rollback deployed** using Step 4 above.
+
+### Dashboard rollback
+
+Same as above but operating inside `dashboard/` submodule, and **remember to trigger Dokploy deploy manually** after the push.

@@ -20,6 +20,9 @@ Self-hosted, model-agnostic autonomous agent framework. Fomo sells multi-agent s
 | Channel adapter | `src/channels/adapters/<name>.ts` |
 | Secrets | `src/secrets/secret-service.ts` |
 | Dashboard | `dashboard/` (separate git repo — commits go inside it) |
+| Agent archetype catalog | `prisma/schema.prisma` (`AgentTemplate` model) + `src/api/routes/agent-templates.ts` |
+| Materialize template → agent | `src/api/routes/agents.ts` → `POST /projects/:id/agents/from-template` |
+| Campaign audience from MCP | `src/campaigns/campaign-runner.ts` → `resolveAudience()` |
 
 ## Directory Structure
 
@@ -58,6 +61,9 @@ dashboard/          # Git submodule — Next.js admin dashboard
 | DB model change | Prisma migration → `pnpm db:generate` |
 | New channel | Adapter in `src/channels/adapters/` + register in ChannelResolver |
 | Agent proposes a recurring task | `propose-scheduled-task` tool → starts as `proposed`, requires human approval |
+| Creating an agent from scratch for a common pattern | Use a template — `POST /agents/from-template` with `templateSlug` |
+| Campaign needs audience from external system (HubSpot, CRM) | `audienceSource: { kind: 'mcp', serverName, toolName, args, mapping, ttlHours }` |
+| Add a new official AgentTemplate to the catalog | New entry in `prisma/seed.ts` `seedAgentTemplates()` + manual SQL seed in prod (see `seed-prod` skill) |
 
 ## Adding a New Tool
 
@@ -75,6 +81,80 @@ dashboard/          # Git submodule — Next.js admin dashboard
 1. Create `src/api/routes/<resource>.ts` — Zod request/response schemas
 2. Delegate to service layer (no business logic in handlers)
 3. Register route in `src/api/index.ts`
+
+## Agent Types & Templates (since April 2026)
+
+### AgentType enum (replaces legacy `operatingMode`)
+
+Three values based on what triggers the agent:
+
+- **`conversational`** — customer-facing, replies to inbound messages on channels (WhatsApp/Telegram/Slack). The channel inbound is the primary trigger.
+- **`process`** — scheduled/batch, triggered by cron or batch API call. No human sync conversation.
+- **`backoffice`** — internal/copilot/manager/admin, triggered by Fomo team or owner via UI/Slack/WhatsApp-owner. Disambiguated further via `metadata.archetype`.
+
+The legacy `operatingMode` field (5 values: customer-facing / internal / copilot / manager / admin) was dropped in migration `20260423000000_add_agent_type_and_campaign_links`. Dual-trigger agents (e.g., conversational agent with a scheduled task) keep their primary type — `scheduledTask.executor` does not filter by `agent.type`.
+
+### Platform-bridge legacy role SHIM
+
+`src/api/routes/platform-bridge.ts` serves fomo-platform (marketpaper-demo frontend), which still expects the old 5-value `role` string. The SHIM in `src/core/agent-role-shim.ts` maps `(type, metadata.archetype)` → legacy role:
+
+- `conversational` → `customer-facing`
+- `backoffice` + `archetype === 'manager'` → `manager`
+- `backoffice` + `archetype === 'copilot'` → `copilot`
+- `backoffice` + `archetype === 'admin'` → `admin`
+- `backoffice` (other) → `internal`
+- `process` → `internal`
+
+Deprecate `legacyRoleOf()` when fomo-platform migrates to consume `type` + `archetype` directly.
+
+### AgentTemplate catalog (global)
+
+`AgentTemplate` is a global catalog (no `projectId`) of reusable agent archetypes. Fomo publishes official templates; projects materialize them via `POST /projects/:id/agents/from-template`. Fields use no `default` prefix: `promptConfig`, `suggestedTools`, `suggestedLlm`, `suggestedModes`, `suggestedChannels`, `suggestedMcps`, `suggestedSkillSlugs`, `metadata`, `maxTurns`, `maxTokensPerTurn`, `budgetPerDayUsd`.
+
+Official seeded templates:
+
+| Slug | Type | Purpose |
+|------|------|---------|
+| `customer-support` | conversational | Attend customer inquiries, escalate when unsure |
+| `outbound-campaign` | process | Reactivation / prospecting; escalate on interest |
+| `copilot-owner` | backoffice | Chief of Staff for the business owner |
+| `manager-delegator` | backoffice | Routes requests to specialist sub-agents |
+| `knowledge-bot` | conversational | RAG-only answers from the KB |
+
+Read-only API:
+- `GET /api/v1/agent-templates?type=&tag=&q=&isOfficial=`
+- `GET /api/v1/agent-templates/:slug`
+
+Materializer (12-step validation):
+- `POST /api/v1/projects/:projectId/agents/from-template` → body `{ templateSlug, name, overrides? }`
+
+`overrides` can shadow any field from the template (description, promptConfig, llmConfig, toolAllowlist, channelConfig, limits, metadata, managerAgentId). The materializer validates template exists, project exists, name collision, tool registry coverage, managerAgentId (must be backoffice in same project), channel availability (warning only), mode collision. It seeds project-level PromptLayers if missing (respecting the "no mutable PromptLayers" rule — only creates when no active layer exists).
+
+### Campaign audience sources
+
+Campaigns now require `agentId` (was implicit before). `audienceSource` is an optional discriminated union:
+
+```ts
+type AudienceSource =
+  | { kind: 'contacts'; filter: AudienceFilter }        // legacy — local Contact table
+  | { kind: 'mcp';                                       // via MCP tool (HubSpot, etc)
+      serverName: string;
+      toolName: string;
+      args: Record<string, unknown>;
+      mapping: { contactIdField, phoneField?, emailField?, nameField? };
+      ttlHours: number }
+```
+
+Either `audienceFilter` OR `audienceSource` is required at creation time (Zod refine).
+
+`campaign-runner.ts` exports `resolveAudience(deps, campaign, { force? })`:
+- Cache hit (sourceHash match + expiresAt > now) → returns cached contactIds.
+- Cache miss → calls MCP, upserts Contacts by (projectId, phone) or (projectId, email), persists `audienceCache` on the campaign.
+- `force: true` ignores the cache.
+
+Endpoint `POST /api/v1/projects/:projectId/campaigns/:id/refresh-audience` calls `resolveAudience(…, { force: true })`.
+
+`CampaignSend.agentId` is populated from `campaign.agentId` for historical traceability (if the campaign's agent is changed later, sends keep the agent they were sent under).
 
 ## CRITICAL RULES
 
@@ -120,6 +200,12 @@ dashboard/          # Git submodule — Next.js admin dashboard
 - **`inputSchema.safeParse().data`** is typed `any` — cast: `result.data as { field: Type }`
 - **Fastify plugin**: outer function is sync (`void`), inner route handlers are `async`
 - **void return in try/catch**: use `await fn(); return;` not `return await fn()` when fn returns void
+- **`prisma migrate deploy` does NOT run seeds in production** — only schema migrations. Any table needing initial data (agent_templates, skill_templates, etc.) requires manual seeding via SQL. See `seed-prod` skill.
+- **`prisma/seed.ts` main() is gated by `ALLOW_PROD_SEED=1`** — running `pnpm db:seed` in prod without that env var throws `assertSafeToSeed` error. Intentional guardrail: `main()` seeds demo projects/agents that would clobber real client data.
+- **Dashboard deploy is MANUAL in Dokploy** — unlike the backend (auto-deploys on push to `main`). After pushing to `main` of the `fomo-core-dashboard` repo, go to Dokploy UI and click Deploy on the dashboard app.
+- **`submodule update` after pulling main** — if someone updated the dashboard pointer, a fresh pull leaves `dashboard/` pointing to the old commit. Run `git submodule update` to sync.
+- **AgentTemplate fields use NO `default` prefix** — it's `promptConfig`, not `defaultPromptConfig`. The "suggested*" prefix marks fields overridable at instantiation; `promptConfig` and `metadata` use no prefix.
+- **`suggestedChannels` is `string[]` not `{ channels: [...] }`** — flat array, no wrapper object.
 
 ## Commands
 
@@ -242,3 +328,25 @@ ssh hostinger-fomo "docker logs --since 10m compose-generate-multi-byte-system-f
 ### Fastify Hook Scope Rule
 
 When a route file calls `fastify.addHook('preHandler', hook)` **without** wrapping in `fastify.register()`, the hook applies to the entire parent scope. If a route function is called directly (`adminRoutes(fastify, deps)`) the hook bleeds into all siblings. Fix: wrap in `fastify.register(async (f) => { adminRoutes(f, deps); })` to encapsulate.
+
+### Dashboard deploy (manual)
+
+The dashboard app in Dokploy is configured with manual deploy (not auto like the backend). After pushing changes to `fomo-core-dashboard/main`:
+
+1. Log into Dokploy UI.
+2. Go to the dashboard application.
+3. Click "Deploy" manually.
+4. Wait ~2 min for the build.
+5. Verify at `https://fomo-core-dashboard.fomo.com.ar`.
+
+This is intentional — dashboard changes are more visual / user-facing and benefit from a manual gate before going live.
+
+### Seeding non-schema data in production
+
+`prisma migrate deploy` handles schema but not data. For catalogs (AgentTemplates, SkillTemplates, MCPTemplates) the flow is:
+
+1. Add the new entry to `prisma/seed.ts` (so dev + future resets are correct).
+2. Generate an idempotent SQL with `ON CONFLICT DO NOTHING`.
+3. Copy to VPS, run inside the postgres container.
+
+See `.claude/skills/seed-prod.md` for the full procedure.
