@@ -130,6 +130,46 @@ describe('createAgentChannelRouter', () => {
       expect(result).toBeNull();
     });
 
+    it('skips non-conversational agents even when channelMapping matches', async () => {
+      const conversational = createMockAgent({
+        id: 'agent-conv' as AgentId,
+        name: 'sales-agent',
+        type: 'conversational',
+        modes: [{ name: 'public', channelMapping: ['whatsapp'] }],
+      });
+      const backoffice = createMockAgent({
+        id: 'agent-back' as AgentId,
+        name: 'copilot-agent',
+        type: 'backoffice',
+        modes: [{ name: 'public', channelMapping: ['whatsapp'] }],
+      });
+      // Put backoffice first to prove order doesn't matter — filter is on type.
+      const repo = createMockRepository([backoffice, conversational]);
+      const router = createAgentChannelRouter({ agentRepository: repo, logger: mockLogger });
+
+      const result = await router.resolveAgent('project-1' as ProjectId, 'whatsapp');
+      expect(result).not.toBeNull();
+      expect(result?.agentId).toBe('agent-conv');
+    });
+
+    it('returns null when only non-conversational agents claim the channel', async () => {
+      const backoffice = createMockAgent({
+        id: 'agent-back' as AgentId,
+        type: 'backoffice',
+        modes: [{ name: 'public', channelMapping: ['whatsapp'] }],
+      });
+      const process = createMockAgent({
+        id: 'agent-proc' as AgentId,
+        type: 'process',
+        modes: [{ name: 'batch', channelMapping: ['whatsapp'] }],
+      });
+      const repo = createMockRepository([backoffice, process]);
+      const router = createAgentChannelRouter({ agentRepository: repo, logger: mockLogger });
+
+      const result = await router.resolveAgent('project-1' as ProjectId, 'whatsapp');
+      expect(result).toBeNull();
+    });
+
     it('returns first matching agent when multiple agents exist', async () => {
       const agent1 = createMockAgent({
         id: 'agent-1' as AgentId,

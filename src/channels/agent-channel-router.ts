@@ -62,6 +62,20 @@ export function createAgentChannelRouter(
       const agents = await agentRepository.listActive(projectId);
 
       for (const agent of agents) {
+        // Only conversational agents participate in inbound channel routing.
+        // `process` (batch/cron) and `backoffice` (copilot/manager/admin) agents
+        // must never respond to customer-facing inbound messages, even if a
+        // misconfigured `modes[].channelMapping` would otherwise match.
+        if (agent.type !== 'conversational') {
+          logger.debug('Skipping non-conversational agent for inbound routing', {
+            component: 'agent-channel-router',
+            agentId: agent.id,
+            agentType: agent.type,
+            sourceChannel,
+          });
+          continue;
+        }
+
         // Skip agents with no modes — they don't participate in channel routing
         if (agent.modes.length === 0) continue;
 
