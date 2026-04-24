@@ -44,8 +44,42 @@ model Project {
   clients              Client[]
   agentRuns            AgentRun[]
   inAppNotifications   InAppNotification[]
+  members              ProjectMember[]
 
   @@map("projects")
+}
+
+// ─── Project Members (RBAC) ────────────────────────────────────
+//
+// Human operators with access to a project, scoped by role.
+// Orthogonal to ApiKey: members represent dashboard users, API keys
+// represent machine callers. Middleware (requireProjectRole) checks
+// membership only when the request carries an `x-user-email` header;
+// Master / project API keys bypass.
+
+enum ProjectRole {
+  owner      // full access: create/delete agents, members, billing
+  operator   // create/edit agents, reply chats, resolve approvals; cannot manage members or billing
+  viewer     // read-only: lists, inbox, traces, cost; cannot create anything
+}
+
+model ProjectMember {
+  id         String      @id @default(cuid())
+  projectId  String      @map("project_id")
+  userId     String      @map("user_id")
+  email      String
+  role       ProjectRole
+  invitedBy  String?     @map("invited_by")
+  acceptedAt DateTime?   @map("accepted_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@unique([projectId, email])
+  @@index([userId])
+  @@map("project_members")
 }
 
 // ─── In-App Notifications ──────────────────────────────────────
