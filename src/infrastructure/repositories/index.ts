@@ -41,3 +41,15 @@ export type {
   AgentTemplateFilters,
   AgentTemplateRepository,
 } from './agent-template-repository.js';
+
+export {
+  createApprovalNotifierConfigRepository,
+  TELEGRAM_APPROVAL_BOT_TOKEN_SECRET_KEY,
+} from './approval-notifier-config-repository.js';
+export type {
+  ApprovalNotifierConfigRepository,
+  TelegramConfig,
+  TelegramConfigInput,
+  TelegramTestResult,
+  ResolvedTelegramConfig,
+} from './approval-notifier-config-repository.js';
