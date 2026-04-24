@@ -13,6 +13,7 @@ import {
   ProjectAccessDeniedError,
   ResourceNotFoundError,
 } from '../middleware/require-project-access.js';
+import { buildApprovalContext } from '@/notifiers/approval-context.js';
 
 const logger = createLogger({ name: 'approval-routes' });
 
@@ -27,6 +28,16 @@ const resolveApprovalSchema = z.object({
 const decideApprovalSchema = z.object({
   approved: z.boolean(),
   note: z.string().max(2000).optional(),
+});
+
+const approveBodySchema = z.object({
+  resolvedBy: z.string().min(1).max(200),
+  note: z.string().max(2000).optional(),
+});
+
+const rejectBodySchema = z.object({
+  resolvedBy: z.string().min(1).max(200),
+  reason: z.string().min(1).max(2000),
 });
 
 const approvalsFilterSchema = z.object({
@@ -45,6 +56,40 @@ export function approvalRoutes(
 
   function isGuardError(e: unknown): boolean {
     return e instanceof ProjectAccessDeniedError || e instanceof ResourceNotFoundError;
+  }
+
+  async function enrichApproval(
+    approval: Awaited<ReturnType<typeof approvalGate.get>>,
+  ): Promise<Record<string, unknown> | null> {
+    if (!approval) return null;
+    const context = await buildApprovalContext(prisma, approval);
+    return {
+      id: approval.id,
+      projectId: approval.projectId,
+      agentId: context.agentId,
+      agentName: context.agentName,
+      actionProposed: {
+        tool: approval.toolId,
+        input: approval.toolInput,
+        rationale: approval.resolutionNote ?? null,
+      },
+      context: {
+        contactName: context.leadName,
+        contactId: context.contactId,
+        leadInfo: context.leadContact,
+        sessionId: approval.sessionId,
+        conversationId: approval.sessionId,
+        projectName: context.projectName,
+      },
+      riskLevel: approval.riskLevel,
+      requestedAt: approval.requestedAt,
+      expiresAt: approval.expiresAt,
+      status: approval.status,
+      resolvedAt: approval.resolvedAt ?? null,
+      resolvedBy: approval.resolvedBy ?? null,
+      resolution: approval.resolutionNote ?? null,
+      actionSummary: context.actionSummary,
+    };
   }
 
   // GET /approvals — global list with filters and pagination
@@ -180,6 +225,155 @@ export function approvalRoutes(
         }); });
 
       return sendSuccess(reply, resolved);
+    },
+  );
+
+  // ─── Project-scoped approval detail + approve/reject ──────────
+  //
+  // Powers the dashboard approval view that Telegram + in-app
+  // notifications link to. The enriched shape bundles the agent name,
+  // contact, and action summary so the operator can decide with the
+  // full context in one request.
+
+  async function assertApprovalInProject(
+    reply: Parameters<typeof sendError>[0],
+    approvalId: string,
+    projectId: string,
+  ): Promise<boolean> {
+    const approval = await prisma.approvalRequest.findUnique({
+      where: { id: approvalId },
+      select: { projectId: true },
+    });
+    if (!approval) {
+      await sendNotFound(reply, 'ApprovalRequest', approvalId);
+      return false;
+    }
+    if (approval.projectId !== projectId) {
+      await sendError(
+        reply,
+        'NOT_IN_PROJECT',
+        `ApprovalRequest "${approvalId}" does not belong to project "${projectId}"`,
+        404,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  // GET /projects/:projectId/approvals/:approvalId
+  fastify.get<{ Params: { projectId: string; approvalId: string } }>(
+    '/projects/:projectId/approvals/:approvalId',
+    async (request, reply) => {
+      const { projectId, approvalId } = request.params;
+      if (!(await assertApprovalInProject(reply, approvalId, projectId))) return;
+
+      const approval = await approvalGate.get(approvalId as ApprovalId);
+      if (!approval) return sendNotFound(reply, 'ApprovalRequest', approvalId);
+
+      const enriched = await enrichApproval(approval);
+      return sendSuccess(reply, enriched);
+    },
+  );
+
+  // POST /projects/:projectId/approvals/:approvalId/approve
+  fastify.post<{ Params: { projectId: string; approvalId: string } }>(
+    '/projects/:projectId/approvals/:approvalId/approve',
+    async (request, reply) => {
+      const { projectId, approvalId } = request.params;
+      if (!(await assertApprovalInProject(reply, approvalId, projectId))) return;
+
+      const { resolvedBy, note } = approveBodySchema.parse(request.body);
+
+      // Idempotency — explicit pre-check so we can return the richer
+      // "currentStatus" context the dashboard uses to update its view.
+      const existing = await approvalGate.get(approvalId as ApprovalId);
+      if (!existing) return sendNotFound(reply, 'ApprovalRequest', approvalId);
+      if (existing.status !== 'pending') {
+        return sendError(
+          reply,
+          'APPROVAL_NOT_PENDING',
+          `Approval is already "${existing.status}"`,
+          409,
+          { currentStatus: existing.status },
+        );
+      }
+
+      const resolved = await approvalGate.resolve(
+        approvalId as ApprovalId,
+        'approved',
+        resolvedBy,
+        note,
+      );
+      if (!resolved) return sendNotFound(reply, 'ApprovalRequest', approvalId);
+      if (resolved.status !== 'approved') {
+        return sendError(
+          reply,
+          'APPROVAL_NOT_PENDING',
+          `Approval is already "${resolved.status}"`,
+          409,
+          { currentStatus: resolved.status },
+        );
+      }
+
+      resumeAfterApproval({ approvalId, decision: 'approved', resolvedBy, note })
+        .catch((err: unknown) => { logger.error('Failed to resume after approval', {
+          component: 'approval-routes',
+          approvalId,
+          error: err instanceof Error ? err.message : String(err),
+        }); });
+
+      const enriched = await enrichApproval(resolved);
+      return sendSuccess(reply, enriched);
+    },
+  );
+
+  // POST /projects/:projectId/approvals/:approvalId/reject
+  fastify.post<{ Params: { projectId: string; approvalId: string } }>(
+    '/projects/:projectId/approvals/:approvalId/reject',
+    async (request, reply) => {
+      const { projectId, approvalId } = request.params;
+      if (!(await assertApprovalInProject(reply, approvalId, projectId))) return;
+
+      const { resolvedBy, reason } = rejectBodySchema.parse(request.body);
+
+      const existing = await approvalGate.get(approvalId as ApprovalId);
+      if (!existing) return sendNotFound(reply, 'ApprovalRequest', approvalId);
+      if (existing.status !== 'pending') {
+        return sendError(
+          reply,
+          'APPROVAL_NOT_PENDING',
+          `Approval is already "${existing.status}"`,
+          409,
+          { currentStatus: existing.status },
+        );
+      }
+
+      const resolved = await approvalGate.resolve(
+        approvalId as ApprovalId,
+        'denied',
+        resolvedBy,
+        reason,
+      );
+      if (!resolved) return sendNotFound(reply, 'ApprovalRequest', approvalId);
+      if (resolved.status !== 'denied') {
+        return sendError(
+          reply,
+          'APPROVAL_NOT_PENDING',
+          `Approval is already "${resolved.status}"`,
+          409,
+          { currentStatus: resolved.status },
+        );
+      }
+
+      resumeAfterApproval({ approvalId, decision: 'denied', resolvedBy, note: reason })
+        .catch((err: unknown) => { logger.error('Failed to resume after approval', {
+          component: 'approval-routes',
+          approvalId,
+          error: err instanceof Error ? err.message : String(err),
+        }); });
+
+      const enriched = await enrichApproval(resolved);
+      return sendSuccess(reply, enriched);
     },
   );
 }

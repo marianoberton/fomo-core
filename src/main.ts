@@ -156,6 +156,11 @@ import { onboardingRoutes } from '@/api/routes/onboarding.js';
 import { webchatPublicRoutes } from '@/api/routes/webchat.js';
 import { telegramApprovalWebhookRoutes } from '@/api/routes/telegram-webhook.js';
 import { createTelegramApprovalNotifier } from '@/hitl/telegram-approval-notifier.js';
+import {
+  createTelegramApprovalNotifier as createTelegramDashboardLinkNotifier,
+  createInAppApprovalNotifier,
+  createCompositeApprovalNotifier,
+} from '@/notifiers/index.js';
 import { createSessionBroadcaster } from '@/hitl/session-broadcaster.js';
 import type { RouteDependencies } from '@/api/types.js';
 import { createAgentRunner } from '@/core/agent-runner.js';
@@ -259,10 +264,40 @@ async function start(): Promise<void> {
       messageApprovalMap: telegramMessageApprovalMap,
     });
 
+    // Dashboard-link approval notifiers — Telegram + in-app bell. Both link
+    // back to the same dashboard approval view. Composite fans out to all
+    // transports with error isolation.
+    const telegramDashboardLinkNotifier = createTelegramDashboardLinkNotifier({
+      botToken: process.env['TELEGRAM_APPROVAL_BOT_TOKEN'],
+      defaultChatId: process.env['TELEGRAM_APPROVAL_DEFAULT_CHAT_ID'],
+      dashboardBaseUrl: process.env['APPROVAL_DASHBOARD_BASE_URL'],
+      prisma,
+      logger,
+    });
+    const inAppApprovalNotifier = createInAppApprovalNotifier({ prisma, logger });
+    const dashboardLinkNotifier = createCompositeApprovalNotifier({
+      prisma,
+      logger,
+      notifiers: [telegramDashboardLinkNotifier, inAppApprovalNotifier],
+    });
+
+    // Compose the HITL (interactive) + dashboard-link notifiers so both
+    // fire for every approval request. The HITL one runs first (so the
+    // operator can act directly from Telegram buttons); the dashboard
+    // link is the persistent record for the web/mobile review.
+    const composedApprovalNotifier = async (
+      request: Parameters<typeof telegramNotifier>[0],
+    ): Promise<void> => {
+      await Promise.allSettled([
+        telegramNotifier(request),
+        dashboardLinkNotifier(request),
+      ]);
+    };
+
     // Create shared services
     const approvalGate = createApprovalGate({
       store: createPrismaApprovalStore(prisma),
-      notifier: telegramNotifier,
+      notifier: composedApprovalNotifier,
       expirationMs: 30 * 60 * 1000, // 30 minutes — realistic for human review
       eventBus,
     });

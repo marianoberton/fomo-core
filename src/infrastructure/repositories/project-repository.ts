@@ -16,6 +16,7 @@ export interface Project {
   owner: string;
   tags: string[];
   config: AgentConfig;
+  metadata?: Record<string, unknown>;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +29,7 @@ export interface ProjectCreateInput {
   owner: string;
   tags?: string[];
   config: AgentConfig;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ProjectUpdateInput {
@@ -36,6 +38,7 @@ export interface ProjectUpdateInput {
   environment?: string;
   tags?: string[];
   config?: AgentConfig;
+  metadata?: Record<string, unknown>;
   status?: string;
 }
 
@@ -64,6 +67,7 @@ function toAppModel(record: {
   owner: string;
   tags: string[];
   configJson: unknown;
+  metadata: unknown;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -76,6 +80,7 @@ function toAppModel(record: {
     owner: record.owner,
     tags: record.tags,
     config: record.configJson as AgentConfig,
+    metadata: (record.metadata as Record<string, unknown> | null) ?? undefined,
     status: record.status,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -97,6 +102,7 @@ export function createProjectRepository(prisma: PrismaClient): ProjectRepository
           owner: input.owner,
           tags: input.tags ?? [],
           configJson: input.config as unknown as Prisma.InputJsonValue,
+          metadata: input.metadata as unknown as Prisma.InputJsonValue | undefined,
           status: 'active',
         },
       });
@@ -120,6 +126,9 @@ export function createProjectRepository(prisma: PrismaClient): ProjectRepository
             ...(input.tags !== undefined && { tags: input.tags }),
             ...(input.config !== undefined && {
               configJson: input.config as unknown as Prisma.InputJsonValue,
+            }),
+            ...(input.metadata !== undefined && {
+              metadata: input.metadata as unknown as Prisma.InputJsonValue,
             }),
             ...(input.status !== undefined && { status: input.status }),
           },

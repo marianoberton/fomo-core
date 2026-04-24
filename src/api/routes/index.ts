@@ -8,6 +8,7 @@ import { sessionRoutes } from './sessions.js';
 import { promptLayerRoutes } from './prompt-layers.js';
 import { traceRoutes } from './traces.js';
 import { approvalRoutes } from './approvals.js';
+import { notificationRoutes } from './notifications.js';
 import { toolRoutes } from './tools.js';
 import { chatRoutes } from './chat.js';
 import { chatStreamRoutes } from './chat-stream.js';
@@ -67,6 +68,7 @@ export async function registerRoutes(
   await fastify.register(promptLayerRoutes, deps);
   await fastify.register(traceRoutes, deps);
   await fastify.register(approvalRoutes, deps);
+  notificationRoutes(fastify, deps);
   await fastify.register(toolRoutes, deps);
   await fastify.register(chatRoutes, deps);
   await fastify.register(chatStreamRoutes, deps);
