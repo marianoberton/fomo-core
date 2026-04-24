@@ -70,6 +70,8 @@ const createCampaignSchema = z
     path: ['audienceFilter'],
   });
 
+// PATCH cannot set status='cancelled' — use POST /:id/cancel instead so the
+// cancellation is traced and the cancelledAt timestamp is populated.
 const updateCampaignSchema = z
   .object({
     agentId: z.string().min(1).optional(),
@@ -661,6 +663,252 @@ export function campaignRoutes(
       });
 
       await sendSuccess(reply, result.value);
+    },
+  );
+
+  // ── Lifecycle ─────────────────────────────────────────────────
+
+  // POST /projects/:projectId/campaigns/:id/pause
+  fastify.post(
+    '/projects/:projectId/campaigns/:id/pause',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!campaign || campaign.projectId !== request.params.projectId) {
+        await sendNotFound(reply, 'Campaign', request.params.id);
+        return;
+      }
+      if (campaign.status !== 'active') {
+        await sendError(
+          reply,
+          'CONFLICT',
+          `Campaign status is "${campaign.status}", must be "active" to pause`,
+          409,
+        );
+        return;
+      }
+
+      const now = new Date();
+      const updated = await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: { status: 'paused', pausedAt: now },
+      });
+
+      logger.info('Campaign paused', {
+        component: 'campaign-routes',
+        campaignId: campaign.id,
+        agentId: campaign.agentId,
+      });
+
+      await sendSuccess(reply, {
+        id: updated.id,
+        status: updated.status,
+        pausedAt: updated.pausedAt,
+      });
+    },
+  );
+
+  // POST /projects/:projectId/campaigns/:id/resume
+  fastify.post(
+    '/projects/:projectId/campaigns/:id/resume',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!campaign || campaign.projectId !== request.params.projectId) {
+        await sendNotFound(reply, 'Campaign', request.params.id);
+        return;
+      }
+      if (campaign.status !== 'paused') {
+        await sendError(
+          reply,
+          'CONFLICT',
+          `Campaign status is "${campaign.status}", must be "paused" to resume`,
+          409,
+        );
+        return;
+      }
+
+      const now = new Date();
+      const updated = await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: { status: 'active', resumedAt: now, pausedAt: null },
+      });
+
+      logger.info('Campaign resumed', {
+        component: 'campaign-routes',
+        campaignId: campaign.id,
+        agentId: campaign.agentId,
+      });
+
+      await sendSuccess(reply, {
+        id: updated.id,
+        status: updated.status,
+        resumedAt: updated.resumedAt,
+      });
+    },
+  );
+
+  // POST /projects/:projectId/campaigns/:id/cancel
+  fastify.post(
+    '/projects/:projectId/campaigns/:id/cancel',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const campaign = await prisma.campaign.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!campaign || campaign.projectId !== request.params.projectId) {
+        await sendNotFound(reply, 'Campaign', request.params.id);
+        return;
+      }
+      if (campaign.status === 'completed' || campaign.status === 'cancelled') {
+        await sendError(
+          reply,
+          'CONFLICT',
+          `Campaign status is "${campaign.status}", cannot cancel`,
+          409,
+        );
+        return;
+      }
+
+      const now = new Date();
+      const updated = await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: { status: 'cancelled', cancelledAt: now },
+      });
+
+      logger.info('Campaign cancelled', {
+        component: 'campaign-routes',
+        campaignId: campaign.id,
+        agentId: campaign.agentId,
+      });
+
+      await sendSuccess(reply, {
+        id: updated.id,
+        status: updated.status,
+        cancelledAt: updated.cancelledAt,
+      });
+    },
+  );
+
+  // POST /projects/:projectId/campaigns/:id/sends/:sendId/mark-delivered
+  fastify.post(
+    '/projects/:projectId/campaigns/:id/sends/:sendId/mark-delivered',
+    async (
+      request: FastifyRequest<{
+        Params: { projectId: string; id: string; sendId: string };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const send = await prisma.campaignSend.findUnique({
+        where: { id: request.params.sendId },
+        include: { campaign: { select: { id: true, projectId: true } } },
+      });
+      if (
+        !send ||
+        send.campaignId !== request.params.id ||
+        send.campaign.projectId !== request.params.projectId
+      ) {
+        await sendNotFound(reply, 'CampaignSend', request.params.sendId);
+        return;
+      }
+      if (send.status !== 'sent') {
+        await sendError(
+          reply,
+          'CONFLICT',
+          `Send status is "${send.status}", must be "sent" to mark delivered`,
+          409,
+        );
+        return;
+      }
+
+      const now = new Date();
+      const updated = await prisma.campaignSend.update({
+        where: { id: send.id },
+        data: { status: 'delivered', deliveredAt: now },
+      });
+
+      await sendSuccess(reply, {
+        sendId: updated.id,
+        status: updated.status,
+        deliveredAt: updated.deliveredAt,
+      });
+    },
+  );
+
+  // POST /projects/:projectId/campaigns/:id/sends/:sendId/mark-unsubscribed
+  // Allowed from any status — opt-outs can arrive anytime.
+  fastify.post(
+    '/projects/:projectId/campaigns/:id/sends/:sendId/mark-unsubscribed',
+    async (
+      request: FastifyRequest<{
+        Params: { projectId: string; id: string; sendId: string };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const send = await prisma.campaignSend.findUnique({
+        where: { id: request.params.sendId },
+        include: { campaign: { select: { id: true, projectId: true } } },
+      });
+      if (
+        !send ||
+        send.campaignId !== request.params.id ||
+        send.campaign.projectId !== request.params.projectId
+      ) {
+        await sendNotFound(reply, 'CampaignSend', request.params.sendId);
+        return;
+      }
+
+      const now = new Date();
+
+      // Read + write the Contact inside the transaction so concurrent updates
+      // to contact.tags (e.g. another unsubscribe, a tag edit) can't race.
+      const updated = await prisma.$transaction(async (tx) => {
+        const s = await tx.campaignSend.update({
+          where: { id: send.id },
+          data: { status: 'unsubscribed', unsubscribedAt: now },
+        });
+
+        const contact = await tx.contact.findUnique({
+          where: { id: send.contactId },
+          select: { id: true, tags: true },
+        });
+
+        let contactUpdated = false;
+        if (contact && !contact.tags.includes('opted_out')) {
+          await tx.contact.update({
+            where: { id: contact.id },
+            data: { tags: [...contact.tags, 'opted_out'] },
+          });
+          contactUpdated = true;
+        }
+
+        return { send: s, contactUpdated };
+      });
+
+      logger.info('Campaign send marked unsubscribed', {
+        component: 'campaign-routes',
+        campaignId: send.campaignId,
+        sendId: send.id,
+        contactId: send.contactId,
+        contactUpdated: updated.contactUpdated,
+      });
+
+      await sendSuccess(reply, {
+        sendId: updated.send.id,
+        status: updated.send.status,
+        unsubscribedAt: updated.send.unsubscribedAt,
+        contactUpdated: updated.contactUpdated,
+      });
     },
   );
 }

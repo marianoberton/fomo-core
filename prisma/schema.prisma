@@ -673,6 +673,7 @@ enum CampaignStatus {
   active
   paused
   completed
+  cancelled
 }
 
 enum CampaignSendStatus {
@@ -681,6 +682,8 @@ enum CampaignSendStatus {
   failed
   replied
   converted
+  delivered
+  unsubscribed
 }
 
 model Campaign {
@@ -697,6 +700,9 @@ model Campaign {
   audienceCache    Json?          @map("audience_cache")  // { contacts: [...], cachedAt: ISO, expiresAt: ISO }
   scheduledFor     DateTime?      @map("scheduled_for")
   completedAt      DateTime?      @map("completed_at")
+  pausedAt         DateTime?      @map("paused_at")
+  resumedAt        DateTime?      @map("resumed_at")
+  cancelledAt      DateTime?      @map("cancelled_at")
   metadata         Json?
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
@@ -712,15 +718,17 @@ model Campaign {
 }
 
 model CampaignSend {
-  id         String             @id @default(cuid())
-  campaignId String             @map("campaign_id")
-  agentId    String             @map("agent_id")
-  contactId  String             @map("contact_id")
-  status     CampaignSendStatus @default(queued)
-  variantId  String?            @map("variant_id") // null if not an A/B test
-  error      String?
-  sentAt     DateTime?          @map("sent_at")
-  createdAt  DateTime           @default(now()) @map("created_at")
+  id             String             @id @default(cuid())
+  campaignId     String             @map("campaign_id")
+  agentId        String             @map("agent_id")
+  contactId      String             @map("contact_id")
+  status         CampaignSendStatus @default(queued)
+  variantId      String?            @map("variant_id") // null if not an A/B test
+  error          String?
+  sentAt         DateTime?          @map("sent_at")
+  deliveredAt    DateTime?          @map("delivered_at")
+  unsubscribedAt DateTime?          @map("unsubscribed_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
 
   campaign Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   agent    Agent          @relation(fields: [agentId], references: [id], onDelete: Restrict)

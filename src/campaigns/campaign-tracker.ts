@@ -147,8 +147,10 @@ export async function getCampaignMetrics(
 
   let totalSent = 0;
   let totalFailed = 0;
+  let totalDelivered = 0;
   let totalReplied = 0;
   let totalConverted = 0;
+  let totalUnsubscribed = 0;
   let totalResponseMs = 0;
   let responseCount = 0;
 
@@ -160,16 +162,27 @@ export async function getCampaignMetrics(
   for (const send of sends) {
     const status = send.status;
 
-    // Sent = any status beyond queued (sent, replied, converted)
-    const isSent = status === 'sent' || status === 'replied' || status === 'converted';
+    // Sent = any terminal status where the message reached the recipient
+    // (delivered/unsubscribed imply the message arrived before the opt-out).
+    const isSent =
+      status === 'sent' ||
+      status === 'delivered' ||
+      status === 'replied' ||
+      status === 'converted' ||
+      status === 'unsubscribed';
     const isFailed = status === 'failed';
+    const isDelivered =
+      status === 'delivered' || status === 'replied' || status === 'converted';
     const isReplied = status === 'replied' || status === 'converted';
     const isConverted = status === 'converted';
+    const isUnsubscribed = status === 'unsubscribed';
 
     if (isSent) totalSent++;
     if (isFailed) totalFailed++;
+    if (isDelivered) totalDelivered++;
     if (isReplied) totalReplied++;
     if (isConverted) totalConverted++;
+    if (isUnsubscribed) totalUnsubscribed++;
 
     // Response time: sentAt → repliedAt
     if (send.reply && send.sentAt) {
@@ -197,8 +210,10 @@ export async function getCampaignMetrics(
     campaignId,
     totalSent,
     totalFailed,
+    totalDelivered,
     totalReplied,
     totalConverted,
+    totalUnsubscribed,
     replyRate: totalSent > 0 ? totalReplied / totalSent : 0,
     conversionRate: totalSent > 0 ? totalConverted / totalSent : 0,
     avgResponseTimeMs: responseCount > 0 ? Math.round(totalResponseMs / responseCount) : null,

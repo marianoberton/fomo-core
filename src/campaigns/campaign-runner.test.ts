@@ -282,6 +282,88 @@ describe('createCampaignRunner', () => {
     });
   });
 
+  it('breaks mid-run when campaign is paused and leaves status untouched', async () => {
+    const contacts = Array.from({ length: 15 }, (_, i) => ({
+      id: `ct${i}`,
+      name: `User${i}`,
+      phone: `+549115555${String(i).padStart(4, '0')}`,
+      telegramId: null,
+      slackId: null,
+    }));
+    // First call: initial load (active). Subsequent: re-check returns paused.
+    prisma.campaign.findUnique
+      .mockResolvedValueOnce({
+        id: 'c1',
+        projectId: 'p1',
+        status: 'active',
+        channel: 'whatsapp',
+        template: 'Hi {{name}}',
+        audienceFilter: {},
+      })
+      .mockResolvedValue({ status: 'paused' });
+    prisma.contact.findMany.mockResolvedValue(contacts);
+    prisma.campaignSend.create.mockResolvedValue({ id: 'send1' });
+    messenger.send.mockResolvedValue({ success: true });
+    prisma.campaignSend.update.mockResolvedValue({});
+    prisma.campaign.update.mockResolvedValue({});
+
+    const result = await runner.executeCampaign('c1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // Re-check fires at processed === 10, so 10 of 15 go through.
+      expect(result.value.sent).toBe(10);
+      expect(result.value.totalContacts).toBe(15);
+    }
+    // Must NOT mark the campaign completed when a lifecycle break happened.
+    const updateCalls = prisma.campaign.update.mock.calls;
+    expect(
+      updateCalls.some(
+        (call: unknown[]) =>
+          typeof call[0] === 'object' &&
+          call[0] !== null &&
+          (call[0] as { data?: { status?: string } }).data?.status === 'completed',
+      ),
+    ).toBe(false);
+  });
+
+  it('breaks mid-run when campaign is cancelled', async () => {
+    const contacts = Array.from({ length: 12 }, (_, i) => ({
+      id: `ct${i}`,
+      name: `User${i}`,
+      phone: `+549115555${String(i).padStart(4, '0')}`,
+      telegramId: null,
+      slackId: null,
+    }));
+    prisma.campaign.findUnique
+      .mockResolvedValueOnce({
+        id: 'c1',
+        projectId: 'p1',
+        status: 'active',
+        channel: 'whatsapp',
+        template: 'Hi',
+        audienceFilter: {},
+      })
+      .mockResolvedValue({ status: 'cancelled' });
+    prisma.contact.findMany.mockResolvedValue(contacts);
+    prisma.campaignSend.create.mockResolvedValue({ id: 'send1' });
+    messenger.send.mockResolvedValue({ success: true });
+    prisma.campaignSend.update.mockResolvedValue({});
+    prisma.campaign.update.mockResolvedValue({});
+
+    const result = await runner.executeCampaign('c1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.sent).toBe(10);
+    }
+    const completedCall = prisma.campaign.update.mock.calls.find(
+      (call: unknown[]) =>
+        (call[0] as { data?: { status?: string } }).data?.status === 'completed',
+    );
+    expect(completedCall).toBeUndefined();
+  });
+
   it('resolves telegram recipient from telegramId', async () => {
     prisma.campaign.findUnique.mockResolvedValue({
       id: 'c1',
