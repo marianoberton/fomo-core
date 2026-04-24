@@ -64,6 +64,7 @@ describe('GET /projects/:projectId/scheduled-tasks', () => {
     expect(deps.taskManager.listTasks).toHaveBeenCalledWith(
       'proj-1',
       'active',
+      undefined,
     );
   });
 });
@@ -139,6 +140,153 @@ describe('POST /projects/:projectId/scheduled-tasks', () => {
     });
 
     expect(response.statusCode).toBe(400);
+  });
+
+  it('creates a task with agentId when agent belongs to the project', async () => {
+    const created = createSampleScheduledTask({ agentId: 'agent-1' as never });
+    deps.agentRepository.findById.mockResolvedValue({
+      id: 'agent-1',
+      projectId: 'proj-1',
+    });
+    deps.taskManager.createTask.mockResolvedValue({
+      ok: true,
+      value: created,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/projects/proj-1/scheduled-tasks',
+      payload: {
+        name: 'Daily Report',
+        cronExpression: '0 9 * * *',
+        agentId: 'agent-1',
+        taskPayload: { message: 'Run report' },
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(deps.taskManager.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'agent-1', projectId: 'proj-1' }),
+    );
+  });
+
+  it('rejects agentId that does not exist', async () => {
+    deps.agentRepository.findById.mockResolvedValue(null);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/projects/proj-1/scheduled-tasks',
+      payload: {
+        name: 'Daily Report',
+        cronExpression: '0 9 * * *',
+        agentId: 'missing',
+        taskPayload: { message: 'Run report' },
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body) as {
+      success: boolean;
+      error: { code: string };
+    };
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(deps.taskManager.createTask).not.toHaveBeenCalled();
+  });
+
+  it('rejects agentId belonging to a different project', async () => {
+    deps.agentRepository.findById.mockResolvedValue({
+      id: 'agent-2',
+      projectId: 'proj-other',
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/projects/proj-1/scheduled-tasks',
+      payload: {
+        name: 'Daily Report',
+        cronExpression: '0 9 * * *',
+        agentId: 'agent-2',
+        taskPayload: { message: 'Run report' },
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body) as {
+      success: boolean;
+      error: { code: string; message: string };
+    };
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.message).toMatch(/different project/);
+    expect(deps.taskManager.createTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /scheduled-tasks/:id/agent', () => {
+  it('updates the agentId when valid', async () => {
+    const existing = createSampleScheduledTask();
+    const updated = createSampleScheduledTask({ agentId: 'agent-9' as never });
+    deps.taskManager.getTask.mockResolvedValue(existing);
+    deps.agentRepository.findById.mockResolvedValue({
+      id: 'agent-9',
+      projectId: 'proj-1',
+    });
+    deps.taskManager.setAgent.mockResolvedValue({ ok: true, value: updated });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/scheduled-tasks/task-1/agent',
+      payload: { agentId: 'agent-9' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(deps.taskManager.setAgent).toHaveBeenCalledWith('task-1', 'agent-9');
+  });
+
+  it('detaches the agent when agentId is null', async () => {
+    const existing = createSampleScheduledTask({ agentId: 'agent-9' as never });
+    const updated = createSampleScheduledTask();
+    deps.taskManager.getTask.mockResolvedValue(existing);
+    deps.taskManager.setAgent.mockResolvedValue({ ok: true, value: updated });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/scheduled-tasks/task-1/agent',
+      payload: { agentId: null },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(deps.taskManager.setAgent).toHaveBeenCalledWith('task-1', null);
+    expect(deps.agentRepository.findById).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the task does not exist', async () => {
+    deps.taskManager.getTask.mockResolvedValue(null);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/scheduled-tasks/missing/agent',
+      payload: { agentId: 'agent-1' },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('rejects agentId from a different project', async () => {
+    const existing = createSampleScheduledTask();
+    deps.taskManager.getTask.mockResolvedValue(existing);
+    deps.agentRepository.findById.mockResolvedValue({
+      id: 'agent-x',
+      projectId: 'proj-other',
+    });
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/scheduled-tasks/task-1/agent',
+      payload: { agentId: 'agent-x' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(deps.taskManager.setAgent).not.toHaveBeenCalled();
   });
 });
 

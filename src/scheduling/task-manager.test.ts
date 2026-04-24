@@ -396,7 +396,7 @@ describe('TaskManager', () => {
       expect(tasks).toEqual([sampleTask]);
 
        
-      expect(repo.listByProject).toHaveBeenCalledWith('proj-1', 'active');
+      expect(repo.listByProject).toHaveBeenCalledWith('proj-1', 'active', undefined);
     });
   });
 

@@ -81,12 +81,17 @@ export function createTaskExecutor(
       taskId: task.id,
       taskName: task.name,
       projectId: task.projectId,
+      agentId: task.agentId,
     });
 
-    // 1. Prepare the agent run via shared chat setup
+    // When task.agentId is set, the agent's LLM config, tool allowlist and
+    // prompt layers override the project defaults used in the legacy path.
+    // First run after A5 backfill for tasks with historical metadata.agentId
+    // may produce different outputs than the pre-A5 default-agent run.
     const setupResult = await prepareChatRun(
       {
         projectId: task.projectId,
+        agentId: task.agentId,
         message: task.taskPayload.message,
         metadata: task.taskPayload.metadata,
       },

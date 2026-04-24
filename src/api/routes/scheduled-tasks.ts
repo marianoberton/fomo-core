@@ -8,6 +8,7 @@ import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { paginationSchema, paginate } from '../pagination.js';
 import { createTaskExecutor } from '@/scheduling/task-executor.js';
 import type { ScheduledTaskId } from '@/core/types.js';
+import type { AgentId } from '@/agents/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ const createTaskSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   cronExpression: z.string().min(9).max(100),
+  agentId: z.string().min(1).optional(),
   taskPayload: z.object({
     message: z.string().min(1).max(2000),
     metadata: z.record(z.unknown()).optional(),
@@ -32,6 +34,10 @@ const approveSchema = z.object({
   approvedBy: z.string().min(1).optional().default('admin'),
 });
 
+const patchAgentSchema = z.object({
+  agentId: z.string().min(1).nullable(),
+});
+
 // ─── Routes ─────────────────────────────────────────────────────
 
 /** Register scheduled task routes on a Fastify instance. */
@@ -39,10 +45,13 @@ export function scheduledTaskRoutes(
   fastify: FastifyInstance,
   opts: RouteDependencies,
 ): void {
-  const { taskManager } = opts;
+  const { taskManager, agentRepository } = opts;
 
   // GET /projects/:projectId/scheduled-tasks
-  const taskListQuerySchema = z.object({ status: z.string().optional() });
+  const taskListQuerySchema = z.object({
+    status: z.string().optional(),
+    agentId: z.string().optional(),
+  });
 
   fastify.get(
     '/projects/:projectId/scheduled-tasks',
@@ -52,10 +61,11 @@ export function scheduledTaskRoutes(
     ) => {
       const { projectId } = request.params;
       const query = paginationSchema.merge(taskListQuerySchema).parse(request.query);
-      const { limit, offset, status } = query;
+      const { limit, offset, status, agentId } = query;
       const tasks = await taskManager.listTasks(
         projectId as Parameters<typeof taskManager.listTasks>[0],
         status,
+        agentId ? (agentId as AgentId) : undefined,
       );
       await sendSuccess(reply, paginate(tasks, limit, offset));
     },
@@ -95,8 +105,26 @@ export function scheduledTaskRoutes(
       const { projectId } = request.params;
       const body = parseResult.data;
 
+      if (body.agentId) {
+        const agent = await agentRepository.findById(body.agentId as AgentId);
+        if (!agent) {
+          await sendError(reply, 'VALIDATION_ERROR', `Agent "${body.agentId}" not found`, 400);
+          return;
+        }
+        if (agent.projectId !== projectId) {
+          await sendError(
+            reply,
+            'VALIDATION_ERROR',
+            `Agent "${body.agentId}" belongs to a different project`,
+            400,
+          );
+          return;
+        }
+      }
+
       const result = await taskManager.createTask({
         projectId: projectId as Parameters<typeof taskManager.createTask>[0]['projectId'],
+        agentId: body.agentId ? (body.agentId as AgentId) : undefined,
         name: body.name,
         description: body.description,
         cronExpression: body.cronExpression,
@@ -117,6 +145,59 @@ export function scheduledTaskRoutes(
       }
 
       await sendSuccess(reply, result.value, 201);
+    },
+  );
+
+  // PATCH /scheduled-tasks/:id/agent — change the agent executor
+  fastify.patch(
+    '/scheduled-tasks/:id/agent',
+    async (
+      request: FastifyRequest<{ Params: { id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const parseResult = patchAgentSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        await sendError(reply, 'VALIDATION_ERROR', parseResult.error.message, 400);
+        return;
+      }
+
+      const taskId = request.params.id as ScheduledTaskId;
+      const task = await taskManager.getTask(taskId);
+      if (!task) {
+        await sendNotFound(reply, 'ScheduledTask', request.params.id);
+        return;
+      }
+
+      const { agentId } = parseResult.data;
+
+      if (agentId) {
+        const agent = await agentRepository.findById(agentId as AgentId);
+        if (!agent) {
+          await sendError(reply, 'VALIDATION_ERROR', `Agent "${agentId}" not found`, 400);
+          return;
+        }
+        if (agent.projectId !== task.projectId) {
+          await sendError(
+            reply,
+            'VALIDATION_ERROR',
+            `Agent "${agentId}" belongs to a different project`,
+            400,
+          );
+          return;
+        }
+      }
+
+      const result = await taskManager.setAgent(
+        taskId,
+        agentId ? (agentId as AgentId) : null,
+      );
+
+      if (!result.ok) {
+        await sendError(reply, result.error.code, result.error.message, result.error.statusCode);
+        return;
+      }
+
+      await sendSuccess(reply, result.value);
     },
   );
 

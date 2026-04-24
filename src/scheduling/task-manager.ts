@@ -9,6 +9,7 @@ import type { Result } from '@/core/result.js';
 import { ok, err } from '@/core/result.js';
 import { NexusError, ValidationError } from '@/core/errors.js';
 import type { ProjectId, ScheduledTaskId } from '@/core/types.js';
+import type { AgentId } from '@/agents/types.js';
 import type {
   ScheduledTask,
   ScheduledTaskRun,
@@ -34,10 +35,16 @@ export interface TaskManager {
   pauseTask(id: ScheduledTaskId): Promise<Result<ScheduledTask, NexusError>>;
   /** Resume a paused task — restores to active with new nextRunAt. */
   resumeTask(id: ScheduledTaskId): Promise<Result<ScheduledTask, NexusError>>;
+  /** Update the agentId of a task (pass null to detach). */
+  setAgent(id: ScheduledTaskId, agentId: AgentId | null): Promise<Result<ScheduledTask, NexusError>>;
   /** Get a task by ID. */
   getTask(id: ScheduledTaskId): Promise<ScheduledTask | null>;
-  /** List tasks for a project with optional status filter. */
-  listTasks(projectId: ProjectId, status?: string): Promise<ScheduledTask[]>;
+  /** List tasks for a project with optional status and/or agentId filter. */
+  listTasks(
+    projectId: ProjectId,
+    status?: string,
+    agentId?: AgentId,
+  ): Promise<ScheduledTask[]>;
   /** List runs for a task. */
   listRuns(taskId: ScheduledTaskId, limit?: number): Promise<ScheduledTaskRun[]>;
   /** Validate a cron expression. Returns the next 3 run times on success. */
@@ -257,16 +264,45 @@ export function createTaskManager(options: TaskManagerOptions): TaskManager {
       return ok(updated);
     },
 
+    async setAgent(
+      id: ScheduledTaskId,
+      agentId: AgentId | null,
+    ): Promise<Result<ScheduledTask, NexusError>> {
+      const task = await repository.findById(id);
+      if (!task) {
+        return err(new NexusError({
+          message: `Scheduled task not found: ${id}`,
+          code: 'TASK_NOT_FOUND',
+          statusCode: 404,
+        }));
+      }
+
+      const updated = await repository.update(id, { agentId });
+      if (!updated) {
+        return err(new NexusError({
+          message: `Failed to update task agent: ${id}`,
+          code: 'TASK_UPDATE_FAILED',
+          statusCode: 500,
+        }));
+      }
+
+      return ok(updated);
+    },
+
     async getTask(id: ScheduledTaskId): Promise<ScheduledTask | null> {
       return repository.findById(id);
     },
 
-    async listTasks(projectId: ProjectId, status?: string): Promise<ScheduledTask[]> {
+    async listTasks(
+      projectId: ProjectId,
+      status?: string,
+      agentId?: AgentId,
+    ): Promise<ScheduledTask[]> {
       const validStatuses = ['proposed', 'active', 'paused', 'rejected', 'completed', 'expired'];
       const taskStatus = status && validStatuses.includes(status)
         ? status as ScheduledTask['status']
         : undefined;
-      return repository.listByProject(projectId, taskStatus);
+      return repository.listByProject(projectId, taskStatus, agentId);
     },
 
     async listRuns(taskId: ScheduledTaskId, limit?: number): Promise<ScheduledTaskRun[]> {

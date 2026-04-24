@@ -7,6 +7,7 @@
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import type { ProjectId, ScheduledTaskId, ScheduledTaskRunId, TraceId } from '@/core/types.js';
+import type { AgentId } from '@/agents/types.js';
 import type {
   ScheduledTask,
   ScheduledTaskRun,
@@ -27,8 +28,12 @@ export interface ScheduledTaskRepository {
   findById(id: ScheduledTaskId): Promise<ScheduledTask | null>;
   /** Update task fields. */
   update(id: ScheduledTaskId, data: ScheduledTaskUpdateInput): Promise<ScheduledTask | null>;
-  /** List tasks for a project, optionally filtered by status. */
-  listByProject(projectId: ProjectId, status?: ScheduledTaskStatus): Promise<ScheduledTask[]>;
+  /** List tasks for a project, optionally filtered by status and/or agentId. */
+  listByProject(
+    projectId: ProjectId,
+    status?: ScheduledTaskStatus,
+    agentId?: AgentId,
+  ): Promise<ScheduledTask[]>;
   /** Get all active tasks that are due for execution (nextRunAt <= now). */
   getTasksDueForExecution(now: Date): Promise<ScheduledTask[]>;
   /** Create a new run record for a task. */
@@ -47,6 +52,7 @@ export interface ScheduledTaskUpdateInput {
   lastRunAt?: Date;
   nextRunAt?: Date | null;
   runCount?: number;
+  agentId?: AgentId | null;
 }
 
 export interface ScheduledTaskRunUpdateInput {
@@ -67,6 +73,7 @@ export interface ScheduledTaskRunUpdateInput {
 function toTaskAppModel(record: {
   id: string;
   projectId: string;
+  agentId: string | null;
   name: string;
   description: string | null;
   cronExpression: string;
@@ -91,6 +98,7 @@ function toTaskAppModel(record: {
   return {
     id: record.id as ScheduledTaskId,
     projectId: record.projectId as ProjectId,
+    agentId: record.agentId ? (record.agentId as AgentId) : undefined,
     name: record.name,
     description: record.description ?? undefined,
     cronExpression: record.cronExpression,
@@ -156,6 +164,7 @@ export function createScheduledTaskRepository(prisma: PrismaClient): ScheduledTa
         data: {
           id: nanoid(),
           projectId: input.projectId,
+          agentId: input.agentId ?? null,
           name: input.name,
           description: input.description ?? null,
           cronExpression: input.cronExpression,
@@ -191,6 +200,7 @@ export function createScheduledTaskRepository(prisma: PrismaClient): ScheduledTa
             lastRunAt: data.lastRunAt,
             nextRunAt: data.nextRunAt,
             runCount: data.runCount,
+            agentId: data.agentId,
           },
         });
         return toTaskAppModel(record);
@@ -202,10 +212,14 @@ export function createScheduledTaskRepository(prisma: PrismaClient): ScheduledTa
     async listByProject(
       projectId: ProjectId,
       status?: ScheduledTaskStatus,
+      agentId?: AgentId,
     ): Promise<ScheduledTask[]> {
       const where: Prisma.ScheduledTaskWhereInput = { projectId };
       if (status) {
         where.status = status;
+      }
+      if (agentId) {
+        where.agentId = agentId;
       }
 
       const records = await prisma.scheduledTask.findMany({
