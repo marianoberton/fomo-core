@@ -27,6 +27,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { MCPToolExecutionError } from '@/mcp/errors.js';
 import { createHubSpotApiClient } from './api-client.js';
 
 // ─── Validate Environment ────────────────────────────────────────────
@@ -242,7 +243,59 @@ const TOOL_DEFINITIONS = [
       required: ['dealId', 'subject'],
     },
   },
+  {
+    name: 'update-contact',
+    description:
+      'Update arbitrary properties on a HubSpot contact. ' +
+      'Accepts standard HubSpot properties (lifecyclestage, hs_lead_status, etc.) ' +
+      'and custom properties specific to the project (e.g. estado_reactivacion, ultima_clasificacion_ia). ' +
+      'Use this to write back the outcome of a conversation to the CRM.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        contactId: {
+          type: 'string',
+          description: 'HubSpot contact ID (numeric only, from search-contacts results)',
+        },
+        properties: {
+          type: 'object',
+          description:
+            'Map of HubSpot property keys to values. Values must be strings, numbers, or booleans. ' +
+            'At least one key is required.',
+          additionalProperties: {
+            type: ['string', 'number', 'boolean'],
+          },
+        },
+      },
+      required: ['contactId', 'properties'],
+    },
+  },
 ] as const;
+
+/**
+ * Narrow the `properties` argument to `Record<string, string | number | boolean>`.
+ * Returns the typed record on success, or a human-readable reason on failure.
+ */
+function validateProperties(
+  value: unknown,
+): { ok: true; value: Record<string, string | number | boolean> } | { ok: false; reason: string } {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, reason: 'properties must be an object' };
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) {
+    return { ok: false, reason: 'properties must contain at least one key' };
+  }
+  for (const [key, v] of entries) {
+    if (typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean') {
+      return {
+        ok: false,
+        reason: `properties.${key} must be string, number, or boolean (got ${typeof v})`,
+      };
+    }
+  }
+  return { ok: true, value: value as Record<string, string | number | boolean> };
+}
 
 // ─── Request Handlers ────────────────────────────────────────────────
 
@@ -321,6 +374,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ownerId: args['ownerId'] as string | undefined,
         });
         break;
+
+      case 'update-contact': {
+        const contactId = args['contactId'];
+        if (typeof contactId !== 'string' || !/^\d+$/.test(contactId)) {
+          throw new MCPToolExecutionError(
+            'hubspot-crm',
+            'update-contact',
+            'Invalid contactId: must be a numeric string',
+          );
+        }
+        const validated = validateProperties(args['properties']);
+        if (!validated.ok) {
+          throw new MCPToolExecutionError(
+            'hubspot-crm',
+            'update-contact',
+            `Invalid properties: ${validated.reason}`,
+          );
+        }
+        result = await api.updateContact({
+          contactId,
+          properties: validated.value,
+        });
+        break;
+      }
 
       default:
         return {
