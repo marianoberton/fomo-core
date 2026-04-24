@@ -4,9 +4,10 @@
  * Tests the API client and tool definitions without requiring a real HubSpot instance.
  * Uses mocked fetch to simulate HubSpot API v3 responses.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach, type MockInstance } from 'vitest';
 import { createHubSpotApiClient } from './api-client.js';
 import type { HSContact, HSDeal, HSCompany, HSNote, HSTask } from './api-client.js';
+import { MCPToolExecutionError } from '@/mcp/errors.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────
 
@@ -573,6 +574,199 @@ describe('HubSpotCRMMCPServer', () => {
     });
   });
 
+  describe('API Client — updateContact', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let stderrSpy: MockInstance<any>;
+
+    beforeEach(() => {
+      stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    });
+
+    afterEach(() => {
+      stderrSpy.mockRestore();
+    });
+
+    function getLogLines(): Record<string, unknown>[] {
+      return stderrSpy.mock.calls.map((call) => {
+        const raw = call[0] as string;
+        return JSON.parse(raw.trim()) as Record<string, unknown>;
+      });
+    }
+
+    it('happy path: returns success and sends PATCH with exact body', async () => {
+      mockFetchSuccess({
+        id: '101',
+        properties: { lifecyclestage: 'customer', estado_reactivacion: 'interesado' },
+      });
+
+      const api = createHubSpotApiClient(TEST_CONFIG);
+      const result = await api.updateContact({
+        contactId: '101',
+        properties: {
+          lifecyclestage: 'customer',
+          estado_reactivacion: 'interesado',
+          score: 85,
+          opted_in: true,
+        },
+      });
+
+      expect(result).toEqual({
+        success: true,
+        contactId: '101',
+        updated: ['lifecyclestage', 'estado_reactivacion', 'score', 'opted_in'],
+      });
+
+      // URL + method
+      expect(getLastFetchUrl()).toBe(
+        'https://api.hubapi.com/crm/v3/objects/contacts/101',
+      );
+      const opts = getLastFetchOptions();
+      expect(opts?.method).toBe('PATCH');
+
+      // Exact body
+      expect(JSON.parse(opts?.body as string)).toEqual({
+        properties: {
+          lifecyclestage: 'customer',
+          estado_reactivacion: 'interesado',
+          score: 85,
+          opted_in: true,
+        },
+      });
+
+      // Log emitted with keys only
+      const logs = getLogLines();
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toMatchObject({
+        component: 'hubspot-mcp',
+        event: 'contact_update',
+        status: 'ok',
+        contactId: '101',
+        updated: ['lifecyclestage', 'estado_reactivacion', 'score', 'opted_in'],
+      });
+    });
+
+    it('does NOT log property values (only keys)', async () => {
+      mockFetchSuccess({ id: '101', properties: {} });
+      const api = createHubSpotApiClient(TEST_CONFIG);
+
+      await api.updateContact({
+        contactId: '101',
+        properties: {
+          estado_reactivacion: 'SECRET_COMMERCIAL_VALUE_42',
+          score: 999,
+        },
+      });
+
+      const rawLogs = stderrSpy.mock.calls.map((c) => c[0] as string).join('\n');
+      expect(rawLogs).not.toContain('SECRET_COMMERCIAL_VALUE_42');
+      expect(rawLogs).not.toContain('999');
+      // Keys should appear
+      expect(rawLogs).toContain('estado_reactivacion');
+      expect(rawLogs).toContain('score');
+    });
+
+    it('404: throws MCPToolExecutionError with "not found" message', async () => {
+      mockFetchError(
+        404,
+        '{"status":"error","message":"resource not found","correlationId":"abc"}',
+      );
+      const api = createHubSpotApiClient(TEST_CONFIG);
+
+      let caught: unknown;
+      try {
+        await api.updateContact({
+          contactId: '999',
+          properties: { lifecyclestage: 'lead' },
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught).toBeInstanceOf(MCPToolExecutionError);
+      expect((caught as Error).message).toContain('Contact 999 not found in HubSpot');
+    });
+
+    it('400: throws MCPToolExecutionError surfacing HubSpot detail', async () => {
+      mockFetchError(
+        400,
+        '{"status":"error","message":"Property values were not valid: Property \\"estado_inexistente\\" does not exist"}',
+      );
+      const api = createHubSpotApiClient(TEST_CONFIG);
+
+      let caught: unknown;
+      try {
+        await api.updateContact({
+          contactId: '101',
+          properties: { estado_inexistente: 'x' },
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught).toBeInstanceOf(MCPToolExecutionError);
+      const msg = (caught as Error).message;
+      expect(msg).toContain('Invalid property');
+      expect(msg).toContain('estado_inexistente');
+      expect(msg).toContain('does not exist');
+    });
+
+    it('429: throws MCPToolExecutionError and emits warn-level log', async () => {
+      mockFetchError(429, '{"message":"You have reached your rate limit"}');
+      const api = createHubSpotApiClient(TEST_CONFIG);
+
+      let caught: unknown;
+      try {
+        await api.updateContact({
+          contactId: '101',
+          properties: { lifecyclestage: 'customer' },
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught).toBeInstanceOf(MCPToolExecutionError);
+      expect((caught as Error).message).toContain('HubSpot rate limit exceeded');
+
+      const logs = getLogLines();
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toMatchObject({
+        component: 'hubspot-mcp',
+        event: 'contact_update',
+        status: 'rate_limited',
+        level: 'warn',
+        contactId: '101',
+        updated: ['lifecyclestage'],
+      });
+    });
+
+    it('5xx: throws MCPToolExecutionError and emits error-level log', async () => {
+      mockFetchError(503, 'Service Unavailable');
+      const api = createHubSpotApiClient(TEST_CONFIG);
+
+      let caught: unknown;
+      try {
+        await api.updateContact({
+          contactId: '101',
+          properties: { lifecyclestage: 'customer' },
+        });
+      } catch (e) {
+        caught = e;
+      }
+
+      expect(caught).toBeInstanceOf(MCPToolExecutionError);
+      expect((caught as Error).message).toContain('HubSpot server error (503)');
+
+      const logs = getLogLines();
+      expect(logs[0]).toMatchObject({
+        component: 'hubspot-mcp',
+        event: 'contact_update',
+        status: 'server_error',
+        level: 'error',
+        httpStatus: 503,
+      });
+    });
+  });
+
   describe('API Client — Error Handling', () => {
     it('throws on HTTP errors with status and body', async () => {
       mockFetchError(401, '{"message":"Invalid token"}');
@@ -644,10 +838,11 @@ describe('HubSpotCRMMCPServer', () => {
       'update-deal-stage',
       'add-deal-note',
       'create-deal-task',
+      'update-contact',
     ];
 
-    it('exposes exactly 8 tools', () => {
-      expect(expectedTools).toHaveLength(8);
+    it('exposes exactly 9 tools', () => {
+      expect(expectedTools).toHaveLength(9);
     });
 
     it('all tool names are kebab-case', () => {
@@ -661,6 +856,10 @@ describe('HubSpotCRMMCPServer', () => {
       for (const tool of writeTools) {
         expect(expectedTools).toContain(tool);
       }
+    });
+
+    it('update-contact is registered in the expected tools list', () => {
+      expect(expectedTools).toContain('update-contact');
     });
   });
 });

@@ -8,6 +8,8 @@
  *   HUBSPOT_ACCESS_TOKEN — HubSpot Private App token
  */
 
+import { MCPToolExecutionError } from '@/mcp/errors.js';
+
 // ─── Response Types ──────────────────────────────────────────────────
 
 export interface HSContact {
@@ -44,6 +46,12 @@ export interface HSTask {
   properties: Record<string, string | null>;
 }
 
+export interface HSUpdateContactResult {
+  success: boolean;
+  contactId: string;
+  updated: string[];
+}
+
 export interface HSSearchResponse<T> {
   total: number;
   results: T[];
@@ -72,6 +80,7 @@ export interface HubSpotApiClient {
   updateDealStage(params: { dealId: string; stage: string; pipeline?: string }): Promise<HSDeal>;
   addDealNote(params: { dealId: string; body: string }): Promise<HSNote>;
   createDealTask(params: { dealId: string; subject: string; body?: string; priority?: string; dueDate?: string; ownerId?: string }): Promise<HSTask>;
+  updateContact(params: { contactId: string; properties: Record<string, string | number | boolean> }): Promise<HSUpdateContactResult>;
 }
 
 // ─── Client Factory ──────────────────────────────────────────────────
@@ -122,6 +131,31 @@ export function createHubSpotApiClient(config: HubSpotApiConfig): HubSpotApiClie
   /** Strip non-digit characters for phone comparison. */
   function normalizePhone(phone: string): string {
     return phone.replace(/\D/g, '');
+  }
+
+  /**
+   * Emit a structured JSON log line to stderr.
+   * stdout is reserved for the MCP protocol; stderr is the log channel.
+   * Only non-PII fields are accepted by callers (component, event, contactId, updated keys, status, level).
+   */
+  function logEvent(payload: Record<string, unknown>): void {
+    process.stderr.write(`${JSON.stringify({ component: 'hubspot-mcp', ...payload })}\n`);
+  }
+
+  /**
+   * Extract a human-readable error message from a HubSpot error body (JSON or plain text).
+   */
+  function extractHubSpotMessage(body: string): string {
+    try {
+      const parsed: unknown = JSON.parse(body);
+      if (parsed && typeof parsed === 'object' && 'message' in parsed) {
+        const msg = (parsed as { message: unknown }).message;
+        if (typeof msg === 'string' && msg.length > 0) return msg;
+      }
+    } catch {
+      // not JSON — fall through
+    }
+    return body;
   }
 
   return {
@@ -365,6 +399,95 @@ export function createHubSpotApiClient(config: HubSpotApiConfig): HubSpotApiClie
       );
 
       return task;
+    },
+
+    /**
+     * Update arbitrary properties on a HubSpot contact (PATCH).
+     * Accepts any HubSpot property key — standard (lifecyclestage, hs_lead_status…)
+     * or custom (e.g. estado_reactivacion, ultima_clasificacion_ia).
+     *
+     * Logs ONLY the updated keys (never values) to protect PII / commercial data.
+     * Errors are surfaced as MCPToolExecutionError with HubSpot-specific messages.
+     */
+    async updateContact(params: {
+      contactId: string;
+      properties: Record<string, string | number | boolean>;
+    }): Promise<HSUpdateContactResult> {
+      const updatedKeys = Object.keys(params.properties);
+      const res = await fetch(
+        `${BASE_URL}/crm/v3/objects/contacts/${params.contactId}`,
+        {
+          method: 'PATCH',
+          headers: makeHeaders(),
+          body: JSON.stringify({ properties: params.properties }),
+        },
+      );
+
+      if (res.ok) {
+        logEvent({
+          event: 'contact_update',
+          status: 'ok',
+          contactId: params.contactId,
+          updated: updatedKeys,
+        });
+        return { success: true, contactId: params.contactId, updated: updatedKeys };
+      }
+
+      const body = await res.text();
+
+      if (res.status === 404) {
+        throw new MCPToolExecutionError(
+          'hubspot-crm',
+          'update-contact',
+          `Contact ${params.contactId} not found in HubSpot`,
+        );
+      }
+
+      if (res.status === 400) {
+        const detail = extractHubSpotMessage(body);
+        throw new MCPToolExecutionError(
+          'hubspot-crm',
+          'update-contact',
+          `Invalid property: ${detail}`,
+        );
+      }
+
+      if (res.status === 429) {
+        logEvent({
+          event: 'contact_update',
+          status: 'rate_limited',
+          level: 'warn',
+          contactId: params.contactId,
+          updated: updatedKeys,
+        });
+        throw new MCPToolExecutionError(
+          'hubspot-crm',
+          'update-contact',
+          'HubSpot rate limit exceeded',
+        );
+      }
+
+      if (res.status >= 500) {
+        logEvent({
+          event: 'contact_update',
+          status: 'server_error',
+          level: 'error',
+          contactId: params.contactId,
+          updated: updatedKeys,
+          httpStatus: res.status,
+        });
+        throw new MCPToolExecutionError(
+          'hubspot-crm',
+          'update-contact',
+          `HubSpot server error (${String(res.status)})`,
+        );
+      }
+
+      throw new MCPToolExecutionError(
+        'hubspot-crm',
+        'update-contact',
+        `HubSpot API error (${String(res.status)}): ${extractHubSpotMessage(body)}`,
+      );
     },
   };
 }
