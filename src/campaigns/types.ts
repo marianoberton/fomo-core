@@ -11,8 +11,15 @@ export type CampaignSendId = string & { readonly __brand: 'CampaignSendId' };
 
 // ─── Enums ──────────────────────────────────────────────────────
 
-export type CampaignStatus = 'draft' | 'active' | 'paused' | 'completed';
-export type CampaignSendStatus = 'queued' | 'sent' | 'failed' | 'replied' | 'converted';
+export type CampaignStatus = 'draft' | 'active' | 'paused' | 'completed' | 'cancelled';
+export type CampaignSendStatus =
+  | 'queued'
+  | 'sent'
+  | 'failed'
+  | 'replied'
+  | 'converted'
+  | 'delivered'
+  | 'unsubscribed';
 export type CampaignChannel = 'whatsapp' | 'telegram' | 'slack';
 
 // ─── Audience Filter ────────────────────────────────────────────
@@ -140,6 +147,9 @@ export interface Campaign {
   abTest?: ABTestConfig;
   scheduledFor?: Date;
   completedAt?: Date;
+  pausedAt?: Date;
+  resumedAt?: Date;
+  cancelledAt?: Date;
   /**
    * Additional campaign config. May include:
    * - `abTest: ABTestConfig` — A/B test settings
@@ -160,6 +170,8 @@ export interface CampaignSend {
   variantId?: string | null;
   error?: string;
   sentAt?: Date;
+  deliveredAt?: Date;
+  unsubscribedAt?: Date;
   createdAt: Date;
 }
 
@@ -184,10 +196,13 @@ export interface CampaignReply {
 /** Aggregated metrics for a campaign. */
 export interface CampaignMetrics {
   campaignId: CampaignId;
+  /** Messages that reached the provider (sent/delivered/unsubscribed/replied/converted). */
   totalSent: number;
   totalFailed: number;
+  totalDelivered: number;
   totalReplied: number;
   totalConverted: number;
+  totalUnsubscribed: number;
   /** totalReplied / totalSent (0-1). */
   replyRate: number;
   /** totalConverted / totalSent (0-1). */

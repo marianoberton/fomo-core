@@ -17,6 +17,7 @@ function createMockTaskManager(): { [K in keyof TaskManager]: ReturnType<typeof 
     rejectTask: vi.fn(),
     pauseTask: vi.fn(),
     resumeTask: vi.fn(),
+    setAgent: vi.fn(),
     getTask: vi.fn(),
     listTasks: vi.fn(),
     listRuns: vi.fn(),

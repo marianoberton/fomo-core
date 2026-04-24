@@ -427,6 +427,7 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
       let sent = 0;
       let failed = 0;
       let skipped = 0;
+      let lifecycleBreak: 'paused' | 'cancelled' | null = null;
       const channel = campaign.channel as CampaignChannel;
 
       // Extract optional template + provider overrides from metadata
@@ -434,7 +435,33 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
       const templateConfig = meta?.['templateConfig'] as CampaignTemplateConfig | undefined;
       const channelProvider = (meta?.['channelProvider'] as 'whatsapp' | 'whatsapp-waha' | undefined) ?? channel as ChannelType;
 
+      let processed = 0;
       for (const contact of contacts) {
+        // Re-check lifecycle every PROGRESS_BATCH contacts so an operator can
+        // pause/cancel a long run mid-way. Break cleanly on paused/cancelled
+        // so partial stats still get written and the runner exits normally.
+        if (processed > 0 && processed % PROGRESS_BATCH === 0) {
+          const current = await prisma.campaign.findUnique({
+            where: { id: campaignId },
+            select: { status: true },
+          });
+          if (current?.status === 'paused' || current?.status === 'cancelled') {
+            lifecycleBreak = current.status;
+            logger.info(`Campaign ${current.status} mid-run`, {
+              component: 'campaign-runner',
+              campaignId,
+              action: current.status,
+              processed,
+              sent,
+              failed,
+              skipped,
+              totalContacts: contacts.length,
+            });
+            break;
+          }
+        }
+        processed++;
+
         const recipient = resolveRecipient(contact, channel);
 
         if (!recipient) {
@@ -548,11 +575,15 @@ export function createCampaignRunner(deps: CampaignRunnerDeps): CampaignRunner {
         });
       }
 
-      // 5. Update campaign status
-      await prisma.campaign.update({
-        where: { id: campaignId },
-        data: { status: 'completed', completedAt: new Date() },
-      });
+      // 5. Update campaign status — leave paused/cancelled untouched so the
+      // operator keeps control; only mark completed when the run finished
+      // naturally (no mid-run lifecycle break).
+      if (!lifecycleBreak) {
+        await prisma.campaign.update({
+          where: { id: campaignId },
+          data: { status: 'completed', completedAt: new Date() },
+        });
+      }
 
       const result: CampaignExecutionResult = {
         campaignId: campaignId as CampaignId,

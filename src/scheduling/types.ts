@@ -8,6 +8,7 @@
  * Only `active` tasks are eligible for execution.
  */
 import type { ProjectId, ScheduledTaskId, ScheduledTaskRunId, TraceId } from '@/core/types.js';
+import type { AgentId } from '@/agents/types.js';
 
 // ─── Enums ──────────────────────────────────────────────────────
 
@@ -44,6 +45,12 @@ export interface TaskPayload {
 export interface ScheduledTask {
   id: ScheduledTaskId;
   projectId: ProjectId;
+  /**
+   * Optional agent executor. When set, the task runs with that agent's
+   * LLM config, tool allowlist and prompt layers. When null, the task
+   * runs with the project's default agent config (legacy behaviour).
+   */
+  agentId?: AgentId;
   name: string;
   description?: string;
   cronExpression: string;
@@ -88,6 +95,7 @@ export interface ScheduledTaskRun {
 
 export interface ScheduledTaskCreateInput {
   projectId: ProjectId;
+  agentId?: AgentId;
   name: string;
   description?: string;
   cronExpression: string;
