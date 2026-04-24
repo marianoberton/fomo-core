@@ -582,6 +582,12 @@ async function start(): Promise<void> {
 
     const messageDeduplicator = createInMemoryDedup({ logger });
 
+    // Campaign reply tracker — listens to message.inbound on the bus and
+    // marks CampaignSend.replied when a contact responds within the window.
+    // Constructed here so the inbound processor can also call it directly
+    // as a defensive fallback in case the bus subscriber fails silently.
+    const replyTracker = createReplyTracker({ prisma, eventBus, logger });
+
     const inboundProcessor = createInboundProcessor({
       channelResolver,
       contactRepository,
@@ -591,6 +597,7 @@ async function start(): Promise<void> {
       messageDeduplicator,
       sessionBroadcaster,
       eventBus,
+      replyTracker,
       runAgent,
     });
 
@@ -845,9 +852,8 @@ async function start(): Promise<void> {
     // OpenClaw task registry — in-memory task lifecycle tracking (always created)
     const openclawTaskRegistry = createTaskRegistry();
 
-    // Campaign reply tracker — listens to message.inbound on the bus and
-    // marks CampaignSend.replied when a contact responds within the window.
-    const replyTracker = createReplyTracker({ prisma, eventBus, logger });
+    // Reply tracker is already constructed alongside the inbound processor;
+    // start its bus subscription now that we're past route assembly.
     replyTracker.start();
 
     // Assemble route dependencies
