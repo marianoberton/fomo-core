@@ -12,14 +12,15 @@
  * - OpenClaw Manager (sourceChannel=openclaw in rawPayload) → direct agent invocation, skip channel send
  */
 import type { Logger } from '@/observability/logger.js';
-import type { ProjectId } from '@/core/types.js';
+import type { ProjectId, SessionId } from '@/core/types.js';
 import type { ChannelResolver } from './channel-resolver.js';
 import type { ChannelType, InboundMessage, IntegrationProvider, SendResult } from './types.js';
-import type { ContactRepository, ChannelIdentifier } from '@/contacts/types.js';
+import type { ContactRepository, ChannelIdentifier, ContactId } from '@/contacts/types.js';
 import type { SessionRepository, Session } from '@/infrastructure/repositories/session-repository.js';
 import type { AgentChannelRouter } from './agent-channel-router.js';
 import type { MessageDeduplicator } from './message-dedup.js';
 import type { ProjectEventBus } from '@/api/events/event-bus.js';
+import type { ReplyTracker } from '@/campaigns/reply-tracker.js';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -36,6 +37,13 @@ export interface InboundProcessorDeps {
   sessionBroadcaster?: import('@/hitl/session-broadcaster.js').SessionBroadcaster;
   /** Optional project event bus for live event fan-out (WS/SSE). */
   eventBus?: ProjectEventBus;
+  /**
+   * Optional reply tracker — defensive fallback alongside the event-bus
+   * subscriber. If the bus subscriber fails silently (not registered, crashes),
+   * this direct call still marks the reply. Idempotent: duplicate calls no-op
+   * because the tracker filters by `status = 'sent'`.
+   */
+  replyTracker?: ReplyTracker;
   /** Function to run the agent and get a response */
   runAgent: (params: {
     projectId: ProjectId;
@@ -95,6 +103,7 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
     messageDeduplicator,
     sessionBroadcaster,
     eventBus,
+    replyTracker,
     runAgent,
   } = deps;
 
@@ -295,6 +304,43 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
             channel: message.channel,
             ts: Date.now(),
           });
+        }
+
+        // Defensive reply tracking — always called, even when the event bus
+        // succeeded. The tracker is idempotent (filters by `status = 'sent'`),
+        // so the bus path and this direct call cannot double-mark a reply.
+        //
+        // Cost: +1 indexed `findFirst` on CampaignSend per inbound message
+        // (~sub-ms with existing indexes on contactId/status/sentAt). Accepted
+        // for reliability: a silent event-bus failure (subscriber not
+        // registered at boot, handler crash, future move to Redis pub/sub
+        // with a dropped message) would silently break reply tracking and
+        // corrupt campaign metrics — Market Paper's conservative autonomy
+        // + volume makes that unacceptable.
+        //
+        // Errors are logged as warn and swallowed — reply tracking must
+        // never break inbound delivery.
+        if (replyTracker) {
+          logger.debug('Attempting fallback reply check', {
+            component: 'inbound-processor',
+            contactId: contact.id,
+            sessionId: session.id,
+          });
+          try {
+            await replyTracker.checkAndMarkReply({
+              projectId,
+              contactId: contact.id as ContactId,
+              sessionId: session.id as SessionId,
+              receivedAt: message.receivedAt,
+            });
+          } catch (err) {
+            logger.warn('Reply-tracker fallback failed', {
+              component: 'inbound-processor',
+              contactId: contact.id,
+              sessionId: session.id,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
         }
 
         // 3. If session is paused (operator takeover), persist message but skip agent

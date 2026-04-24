@@ -13,6 +13,7 @@ import type { AgentChannelRouter } from './agent-channel-router.js';
 import type { Logger } from '@/observability/logger.js';
 import type { AgentId } from '@/agents/types.js';
 import type { MessageDeduplicator } from './message-dedup.js';
+import type { ReplyTracker } from '@/campaigns/reply-tracker.js';
 
 // ─── Mock Logger ────────────────────────────────────────────────
 
@@ -418,6 +419,115 @@ describe('InboundProcessor', () => {
           sourceChannel: 'whatsapp',
         }),
       );
+    });
+  });
+
+  describe('reply-tracker fallback', () => {
+    function createReplyTrackerMock(): {
+      [K in keyof ReplyTracker]: ReturnType<typeof vi.fn>;
+    } {
+      return {
+        start: vi.fn(),
+        stop: vi.fn(),
+        handleInbound: vi.fn().mockResolvedValue(undefined),
+        checkAndMarkReply: vi.fn().mockResolvedValue(undefined),
+      };
+    }
+
+    it('calls checkAndMarkReply with the correct params on happy path', async () => {
+      const replyTracker = createReplyTrackerMock();
+      const receivedAt = new Date('2026-04-24T10:00:00Z');
+      const deps = createDeps({ replyTracker: replyTracker as unknown as ReplyTracker });
+      const processor = createInboundProcessor(deps);
+
+      await processor.process(createMessage({ receivedAt }));
+
+      expect(replyTracker.checkAndMarkReply).toHaveBeenCalledTimes(1);
+      expect(replyTracker.checkAndMarkReply).toHaveBeenCalledWith({
+        projectId: 'project-1',
+        contactId: 'contact-1',
+        sessionId: 'session-1',
+        receivedAt,
+      });
+    });
+
+    it('is idempotent when the CampaignSend is already replied (tracker no-ops)', async () => {
+      // The tracker's own query filters by `status = 'sent'`, so a repeat
+      // invocation for an already-replied send is a no-op at the DB layer.
+      // We simulate that here with a resolved-to-undefined mock: no throw,
+      // no side effect signalled back to the processor.
+      const replyTracker = createReplyTrackerMock();
+      replyTracker.checkAndMarkReply.mockResolvedValue(undefined);
+
+      const deps = createDeps({ replyTracker: replyTracker as unknown as ReplyTracker });
+      const processor = createInboundProcessor(deps);
+
+      const result1 = await processor.process(createMessage());
+      const result2 = await processor.process(createMessage());
+
+      expect(result1.success).toBe(true);
+      expect(result2.success).toBe(true);
+      expect(replyTracker.checkAndMarkReply).toHaveBeenCalledTimes(2);
+      // No warn logged for either call — idempotent path must not noise up logs
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it('completes the flow and logs warn when checkAndMarkReply throws', async () => {
+      const replyTracker = createReplyTrackerMock();
+      replyTracker.checkAndMarkReply.mockRejectedValue(new Error('DB unavailable'));
+
+      const deps = createDeps({ replyTracker: replyTracker as unknown as ReplyTracker });
+      const processor = createInboundProcessor(deps);
+
+      const result = await processor.process(createMessage());
+
+      // Main flow must succeed despite the tracker crashing
+      expect(result.success).toBe(true);
+      expect(deps.runAgent).toHaveBeenCalledTimes(1);
+      const resolver = deps.channelResolver as unknown as { send: ReturnType<typeof vi.fn> };
+      expect(resolver.send).toHaveBeenCalledTimes(1);
+
+      // The failure is logged as a warn with the error message
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Reply-tracker fallback failed',
+        expect.objectContaining({
+          component: 'inbound-processor',
+          contactId: 'contact-1',
+          sessionId: 'session-1',
+          error: 'DB unavailable',
+        }),
+      );
+    });
+
+    it('still calls checkAndMarkReply when contact has no active CampaignSend (tracker decides no-op)', async () => {
+      // The processor does not know whether the contact has an active
+      // CampaignSend — it unconditionally calls the tracker, which decides.
+      // A resolved-undefined mock simulates the "no eligible send" path.
+      const replyTracker = createReplyTrackerMock();
+      replyTracker.checkAndMarkReply.mockResolvedValue(undefined);
+
+      const deps = createDeps({ replyTracker: replyTracker as unknown as ReplyTracker });
+      const processor = createInboundProcessor(deps);
+
+      const result = await processor.process(createMessage());
+
+      expect(result.success).toBe(true);
+      expect(replyTracker.checkAndMarkReply).toHaveBeenCalledTimes(1);
+      // Flow continues: agent runs, response is sent
+      expect(deps.runAgent).toHaveBeenCalledTimes(1);
+      const resolver = deps.channelResolver as unknown as { send: ReturnType<typeof vi.fn> };
+      expect(resolver.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips the fallback call entirely when replyTracker is not provided', async () => {
+      const deps = createDeps(); // no replyTracker
+      const processor = createInboundProcessor(deps);
+
+      const result = await processor.process(createMessage());
+
+      expect(result.success).toBe(true);
+      // No warn — absence of the tracker is not an error
+      expect(mockLogger.warn).not.toHaveBeenCalled();
     });
   });
 });
