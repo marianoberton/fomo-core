@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -51,21 +52,20 @@ export function campaignTemplateRoutes(
   fastify: FastifyInstance,
   opts: RouteDependencies,
 ): void {
-  const { prisma, logger } = opts;
+  const { prisma, logger, memberRepository } = opts;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // POST /projects/:projectId/campaign-templates
   fastify.post(
     '/projects/:projectId/campaign-templates',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId } = request.params as { projectId: string };
       const parsed = createSchema.safeParse(request.body);
       if (!parsed.success) {
         await sendError(reply, 'VALIDATION_ERROR', parsed.error.message, 400);
         return;
       }
-      const { projectId } = request.params;
       const data = parsed.data;
       const variables =
         data.variables && data.variables.length > 0
@@ -143,10 +143,9 @@ export function campaignTemplateRoutes(
   // PUT /projects/:projectId/campaign-templates/:id
   fastify.put(
     '/projects/:projectId/campaign-templates/:id',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, id } = request.params as { projectId: string; id: string };
       const parsed = updateSchema.safeParse(request.body);
       if (!parsed.success) {
         await sendError(reply, 'VALIDATION_ERROR', parsed.error.message, 400);
@@ -154,10 +153,10 @@ export function campaignTemplateRoutes(
       }
 
       const existing = await prisma.campaignTemplate.findUnique({
-        where: { id: request.params.id },
+        where: { id },
       });
-      if (!existing || existing.projectId !== request.params.projectId) {
-        await sendNotFound(reply, 'CampaignTemplate', request.params.id);
+      if (!existing || existing.projectId !== projectId) {
+        await sendNotFound(reply, 'CampaignTemplate', id);
         return;
       }
 
@@ -172,7 +171,7 @@ export function campaignTemplateRoutes(
 
       try {
         const updated = await prisma.campaignTemplate.update({
-          where: { id: request.params.id },
+          where: { id },
           data: {
             ...(data.name !== undefined && { name: data.name }),
             ...(data.body !== undefined && { body: data.body }),
@@ -203,18 +202,17 @@ export function campaignTemplateRoutes(
   // DELETE /projects/:projectId/campaign-templates/:id
   fastify.delete(
     '/projects/:projectId/campaign-templates/:id',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, id } = request.params as { projectId: string; id: string };
       const existing = await prisma.campaignTemplate.findUnique({
-        where: { id: request.params.id },
+        where: { id },
       });
-      if (!existing || existing.projectId !== request.params.projectId) {
-        await sendNotFound(reply, 'CampaignTemplate', request.params.id);
+      if (!existing || existing.projectId !== projectId) {
+        await sendNotFound(reply, 'CampaignTemplate', id);
         return;
       }
-      await prisma.campaignTemplate.delete({ where: { id: request.params.id } });
+      await prisma.campaignTemplate.delete({ where: { id } });
       await reply.status(204).send();
     },
   );

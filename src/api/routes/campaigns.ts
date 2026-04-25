@@ -25,6 +25,7 @@ import type {
 import type { ProjectId } from '@/core/types.js';
 import type { AgentId } from '@/agents/types.js';
 import { calculateCost } from '@/providers/models.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -103,7 +104,8 @@ export function campaignRoutes(
   fastify: FastifyInstance,
   opts: RouteDependencies,
 ): void {
-  const { prisma, campaignRunner, agentRepository, mcpServerRepository, logger } = opts;
+  const { prisma, campaignRunner, agentRepository, mcpServerRepository, logger, memberRepository } = opts;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   /**
    * Validate an agentId belongs to the project and is active.
@@ -169,12 +171,10 @@ export function campaignRoutes(
   }
 
   // POST /projects/:projectId/campaigns
-  fastify.post(
+  fastify.post<{ Params: { projectId: string } }>(
     '/projects/:projectId/campaigns',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const parseResult = createCampaignSchema.safeParse(request.body);
       if (!parseResult.success) {
         await sendError(reply, 'VALIDATION_ERROR', parseResult.error.message, 400);
@@ -319,12 +319,10 @@ export function campaignRoutes(
   );
 
   // PATCH /projects/:projectId/campaigns/:id
-  fastify.patch(
+  fastify.patch<{ Params: { projectId: string; id: string } }>(
     '/projects/:projectId/campaigns/:id',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const parseResult = updateCampaignSchema.safeParse(request.body);
       if (!parseResult.success) {
         await sendError(reply, 'VALIDATION_ERROR', parseResult.error.message, 400);
@@ -417,12 +415,10 @@ export function campaignRoutes(
 
   // POST /projects/:projectId/campaigns/:id/refresh-audience
   // Forces re-resolution of the audience (ignores cache).
-  fastify.post(
+  fastify.post<{ Params: { projectId: string; id: string } }>(
     '/projects/:projectId/campaigns/:id/refresh-audience',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       if (!campaignRunner) {
         await sendError(
           reply,
@@ -524,12 +520,10 @@ export function campaignRoutes(
   );
 
   // DELETE /projects/:projectId/campaigns/:id
-  fastify.delete(
+  fastify.delete<{ Params: { projectId: string; id: string } }>(
     '/projects/:projectId/campaigns/:id',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const existing = await prisma.campaign.findUnique({
         where: { id: request.params.id },
       });
@@ -543,12 +537,10 @@ export function campaignRoutes(
   );
 
   // POST /projects/:projectId/campaigns/:id/dry-run
-  fastify.post(
+  fastify.post<{ Params: { projectId: string; id: string } }>(
     '/projects/:projectId/campaigns/:id/dry-run',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const campaign = await prisma.campaign.findUnique({
         where: { id: request.params.id },
       });
@@ -615,12 +607,10 @@ export function campaignRoutes(
   );
 
   // POST /projects/:projectId/campaigns/:id/execute
-  fastify.post(
+  fastify.post<{ Params: { projectId: string; id: string } }>(
     '/projects/:projectId/campaigns/:id/execute',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       if (!campaignRunner) {
         await sendError(
           reply,
@@ -669,12 +659,10 @@ export function campaignRoutes(
   // ── Lifecycle ─────────────────────────────────────────────────
 
   // POST /projects/:projectId/campaigns/:id/pause
-  fastify.post(
+  fastify.post<{ Params: { projectId: string; id: string } }>(
     '/projects/:projectId/campaigns/:id/pause',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const campaign = await prisma.campaign.findUnique({
         where: { id: request.params.id },
       });
@@ -713,12 +701,10 @@ export function campaignRoutes(
   );
 
   // POST /projects/:projectId/campaigns/:id/resume
-  fastify.post(
+  fastify.post<{ Params: { projectId: string; id: string } }>(
     '/projects/:projectId/campaigns/:id/resume',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const campaign = await prisma.campaign.findUnique({
         where: { id: request.params.id },
       });
@@ -757,12 +743,10 @@ export function campaignRoutes(
   );
 
   // POST /projects/:projectId/campaigns/:id/cancel
-  fastify.post(
+  fastify.post<{ Params: { projectId: string; id: string } }>(
     '/projects/:projectId/campaigns/:id/cancel',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const campaign = await prisma.campaign.findUnique({
         where: { id: request.params.id },
       });
@@ -801,14 +785,10 @@ export function campaignRoutes(
   );
 
   // POST /projects/:projectId/campaigns/:id/sends/:sendId/mark-delivered
-  fastify.post(
+  fastify.post<{ Params: { projectId: string; id: string; sendId: string } }>(
     '/projects/:projectId/campaigns/:id/sends/:sendId/mark-delivered',
-    async (
-      request: FastifyRequest<{
-        Params: { projectId: string; id: string; sendId: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const send = await prisma.campaignSend.findUnique({
         where: { id: request.params.sendId },
         include: { campaign: { select: { id: true, projectId: true } } },
@@ -847,14 +827,10 @@ export function campaignRoutes(
 
   // POST /projects/:projectId/campaigns/:id/sends/:sendId/mark-unsubscribed
   // Allowed from any status — opt-outs can arrive anytime.
-  fastify.post(
+  fastify.post<{ Params: { projectId: string; id: string; sendId: string } }>(
     '/projects/:projectId/campaigns/:id/sends/:sendId/mark-unsubscribed',
-    async (
-      request: FastifyRequest<{
-        Params: { projectId: string; id: string; sendId: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const send = await prisma.campaignSend.findUnique({
         where: { id: request.params.sendId },
         include: { campaign: { select: { id: true, projectId: true } } },

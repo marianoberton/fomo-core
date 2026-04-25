@@ -26,6 +26,7 @@ import { createAgentRunner } from '@/core/agent-runner.js';
 import type { ExecutionTrace } from '@/core/types.js';
 import type { Logger } from '@/observability/logger.js';
 import type { TaskRegistry } from '@/channels/openclaw-task-registry.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -194,7 +195,8 @@ export function agentRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { agentRepository, agentRegistry, agentComms, logger } = deps;
+  const { agentRepository, agentRegistry, agentComms, logger, memberRepository } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // ─── List Agents ────────────────────────────────────────────────
 
@@ -275,6 +277,7 @@ export function agentRoutes(
 
   fastify.post(
     '/projects/:projectId/agents',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const parseResult = createAgentSchema.safeParse(request.body);
@@ -329,6 +332,7 @@ export function agentRoutes(
 
   fastify.post(
     '/projects/:projectId/agents/from-template',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const parseResult = fromTemplateSchema.safeParse(request.body);
@@ -609,6 +613,7 @@ export function agentRoutes(
 
   fastify.put(
     '/projects/:projectId/agents/:agentId',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, agentId } = request.params as { projectId: string; agentId: string };
       const parseResult = updateAgentSchema.safeParse(request.body);
@@ -676,6 +681,7 @@ export function agentRoutes(
 
   fastify.delete(
     '/projects/:projectId/agents/:agentId',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, agentId } = request.params as { projectId: string; agentId: string };
 
@@ -762,6 +768,7 @@ export function agentRoutes(
 
   fastify.post(
     '/projects/:projectId/agents/:agentId/pause',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { agentId } = request.params as { projectId: string; agentId: string };
 
@@ -780,6 +787,7 @@ export function agentRoutes(
 
   fastify.post(
     '/projects/:projectId/agents/:agentId/resume',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { agentId } = request.params as { projectId: string; agentId: string };
 
@@ -1043,6 +1051,7 @@ export function agentRoutes(
 
   fastify.post(
     '/projects/:projectId/agents/:agentId/invoke',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, agentId } = request.params as { projectId: string; agentId: string };
       return handleInvokeAgent(request, reply, agentId, projectId);
