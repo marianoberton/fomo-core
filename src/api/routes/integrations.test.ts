@@ -14,6 +14,7 @@ import { createMockDeps } from '@/testing/fixtures/routes.js';
 function createApp() {
   const deps = createMockDeps();
   const app = Fastify();
+  app.addHook('onRequest', async (request) => { request.apiKeyProjectId = null; });
   registerErrorHandler(app);
   integrationRoutes(app, deps);
   return { app, deps };
