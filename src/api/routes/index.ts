@@ -103,14 +103,14 @@ export async function registerRoutes(
   workforceMetricsRoutes(fastify, deps);
   operationsSummaryRoutes(fastify, deps);
   verticalRoutes(fastify, deps);
-  mcpServerRoutes(fastify, { mcpServerRepository: deps.mcpServerRepository, logger: deps.logger });
+  mcpServerRoutes(fastify, { mcpServerRepository: deps.mcpServerRepository, logger: deps.logger, memberRepository: deps.memberRepository });
   operatorMessageRoutes(fastify, deps);
   modelRoutes(fastify, deps);
-  webchatAdminRoutes(fastify, { prisma: deps.prisma, logger: deps.logger });
+  webchatAdminRoutes(fastify, { prisma: deps.prisma, logger: deps.logger, memberRepository: deps.memberRepository });
   mediaRoutes(fastify, deps);
   vapiRoutes(fastify, deps);
   whatsappTemplateRoutes(fastify, deps);
-  apiKeyRoutes(fastify, { apiKeyService: deps.apiKeyService, logger: deps.logger });
+  apiKeyRoutes(fastify, { apiKeyService: deps.apiKeyService, logger: deps.logger, memberRepository: deps.memberRepository });
   provisioningRoutes(fastify, {
     provisioningService: deps.provisioningService,
     dokployService: deps.dokployService,
