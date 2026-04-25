@@ -13,6 +13,7 @@ import {
   sendWhatsAppTemplate,
 } from '@/channels/adapters/whatsapp.js';
 import type { ProjectId } from '@/core/types.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -31,7 +32,8 @@ export function whatsappTemplateRoutes(
   fastify: FastifyInstance,
   opts: RouteDependencies,
 ): void {
-  const { secretService, channelResolver, logger } = opts;
+  const { secretService, channelResolver, logger, memberRepository } = opts;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // ─── GET /projects/:projectId/whatsapp/templates ─────────────
   fastify.get(
@@ -77,12 +79,10 @@ export function whatsappTemplateRoutes(
   );
 
   // ─── POST /projects/:projectId/whatsapp/templates/send ───────
-  fastify.post(
+  fastify.post<{ Params: { projectId: string } }>(
     '/projects/:projectId/whatsapp/templates/send',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const { projectId } = request.params;
 
       const parseResult = sendTemplateSchema.safeParse(request.body);

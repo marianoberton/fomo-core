@@ -15,6 +15,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 import { createLogger } from '@/observability/logger.js';
 import type { TelegramConfig } from '@/infrastructure/repositories/approval-notifier-config-repository.js';
 
@@ -107,8 +108,9 @@ export function approvalNotifierConfigRoutes(
   deps: RouteDependencies,
   extras: ApprovalNotifierConfigRouteExtras = {},
 ): void {
-  const { prisma, approvalNotifierConfigRepository: configRepo } = deps;
+  const { prisma, approvalNotifierConfigRepository: configRepo, memberRepository, logger } = deps;
   const { envDashboardBaseUrl } = extras;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
   const doFetch = extras.fetchImpl ?? fetch;
 
   // GET /projects/:projectId/approval-notifier-config
@@ -125,6 +127,7 @@ export function approvalNotifierConfigRoutes(
   // PUT /projects/:projectId/approval-notifier-config
   fastify.put<{ Params: { projectId: string } }>(
     '/projects/:projectId/approval-notifier-config',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const { projectId } = request.params;
 
@@ -155,6 +158,7 @@ export function approvalNotifierConfigRoutes(
   // DELETE /projects/:projectId/approval-notifier-config/telegram
   fastify.delete<{ Params: { projectId: string } }>(
     '/projects/:projectId/approval-notifier-config/telegram',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const { projectId } = request.params;
 
@@ -175,6 +179,7 @@ export function approvalNotifierConfigRoutes(
   // POST /projects/:projectId/approval-notifier-config/test
   fastify.post<{ Params: { projectId: string } }>(
     '/projects/:projectId/approval-notifier-config/test',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const { projectId } = request.params;
 

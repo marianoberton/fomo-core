@@ -19,6 +19,8 @@ import type { PrismaClient, ChannelIntegration } from '@prisma/client';
 import type { SessionRepository } from '@/infrastructure/repositories/session-repository.js';
 import type { ProjectId, SessionId } from '@/core/types.js';
 import type { Logger } from '@/observability/logger.js';
+import type { MemberRepository } from '@/infrastructure/repositories/member-repository.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -40,6 +42,7 @@ export interface WebchatPublicDeps {
 export interface WebchatAdminDeps {
   prisma: PrismaClient;
   logger: Logger;
+  memberRepository: MemberRepository;
 }
 
 /** Webchat configuration stored in ChannelIntegration.config JSON. */
@@ -431,7 +434,8 @@ export function webchatAdminRoutes(
   fastify: FastifyInstance,
   deps: WebchatAdminDeps,
 ): void {
-  const { prisma, logger } = deps;
+  const { prisma, logger, memberRepository } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   /** Get webchat config for a project. */
   fastify.get<{ Params: { projectId: string } }>(
@@ -469,6 +473,7 @@ export function webchatAdminRoutes(
   /** Create or update webchat config for a project. */
   fastify.put<{ Params: { projectId: string } }>(
     '/projects/:projectId/webchat',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const { projectId } = request.params;
 
