@@ -6,6 +6,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 import type { MemoryCategory } from '@/memory/types.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────
@@ -43,13 +44,15 @@ export function knowledgeRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { knowledgeService } = deps;
+  const { knowledgeService, memberRepository, logger } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // ─── POST /projects/:projectId/knowledge ──────────────────────
   // Add a single knowledge entry
 
   fastify.post(
     '/projects/:projectId/knowledge',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
 
@@ -125,6 +128,7 @@ export function knowledgeRoutes(
 
   fastify.post(
     '/projects/:projectId/knowledge/bulk',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
 

@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import type { RouteDependencies } from '../types.js';
 import type { ProjectId } from '@/core/types.js';
 import { sendSuccess, sendError } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 import { paginationSchema, paginate } from '../pagination.js';
 import {
   requireContactAccess,
@@ -71,7 +72,8 @@ export function contactRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { contactRepository } = deps;
+  const { contactRepository, memberRepository, logger } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   function isGuardError(e: unknown): boolean {
     return e instanceof ProjectAccessDeniedError || e instanceof ResourceNotFoundError;
@@ -202,6 +204,7 @@ export function contactRoutes(
 
   fastify.post(
     '/projects/:projectId/contacts/bulk-import',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const { prisma, logger } = deps;

@@ -6,7 +6,9 @@ import { z } from 'zod';
 import type { ProjectId } from '@/core/types.js';
 import type { MCPServerRepository } from '@/infrastructure/repositories/mcp-server-repository.js';
 import type { Logger } from '@/observability/logger.js';
+import type { MemberRepository } from '@/infrastructure/repositories/member-repository.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -44,6 +46,7 @@ const updateInstanceSchema = z.object({
 export interface MCPServerRouteDeps {
   mcpServerRepository: MCPServerRepository;
   logger: Logger;
+  memberRepository: MemberRepository;
 }
 
 // ─── Route Registration ─────────────────────────────────────────
@@ -52,7 +55,8 @@ export function mcpServerRoutes(
   fastify: FastifyInstance,
   deps: MCPServerRouteDeps,
 ): void {
-  const { mcpServerRepository, logger } = deps;
+  const { mcpServerRepository, logger, memberRepository } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // ─── List Templates ──────────────────────────────────────────────
 
@@ -112,6 +116,7 @@ export function mcpServerRoutes(
 
   fastify.post(
     '/projects/:projectId/mcp-servers',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const parseResult = createInstanceSchema.safeParse(request.body);
@@ -168,6 +173,7 @@ export function mcpServerRoutes(
 
   fastify.patch(
     '/projects/:projectId/mcp-servers/:id',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { id } = request.params as { projectId: string; id: string };
       const parseResult = updateInstanceSchema.safeParse(request.body);
@@ -193,6 +199,7 @@ export function mcpServerRoutes(
 
   fastify.delete(
     '/projects/:projectId/mcp-servers/:id',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { id } = request.params as { projectId: string; id: string };
 
