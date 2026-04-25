@@ -232,6 +232,7 @@ export function requireProjectRole(
     const query = request.query as Record<string, string> | undefined;
     const projectId =
       params?.['projectId'] ??
+      params?.['id'] ??
       (body?.['projectId'] as string | undefined) ??
       query?.['projectId'];
 
