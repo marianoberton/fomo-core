@@ -800,6 +800,59 @@ export function campaignRoutes(
     },
   );
 
+  // GET /projects/:projectId/campaigns/:id/sends
+  const sendsQuerySchema = z.object({
+    status: z
+      .enum(['queued', 'sent', 'failed', 'delivered', 'unsubscribed', 'replied', 'converted'])
+      .optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+  });
+
+  fastify.get(
+    '/projects/:projectId/campaigns/:id/sends',
+    async (
+      request: FastifyRequest<{ Params: { projectId: string; id: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const { projectId, id } = request.params;
+
+      const campaign = await prisma.campaign.findUnique({
+        where: { id },
+        select: { id: true, projectId: true },
+      });
+      if (!campaign || campaign.projectId !== projectId) {
+        await sendNotFound(reply, 'Campaign', id);
+        return;
+      }
+
+      const parseResult = sendsQuerySchema.safeParse(request.query);
+      if (!parseResult.success) {
+        await sendError(reply, 'VALIDATION_ERROR', parseResult.error.message, 400);
+        return;
+      }
+
+      const { status, limit, offset } = parseResult.data;
+
+      const where: Prisma.CampaignSendWhereInput = { campaignId: id };
+      if (status) {
+        where.status = status;
+      }
+
+      const [items, total] = await Promise.all([
+        prisma.campaignSend.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.campaignSend.count({ where }),
+      ]);
+
+      await sendSuccess(reply, { items, total, limit, offset });
+    },
+  );
+
   // POST /projects/:projectId/campaigns/:id/sends/:sendId/mark-delivered
   fastify.post(
     '/projects/:projectId/campaigns/:id/sends/:sendId/mark-delivered',
