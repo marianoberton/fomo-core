@@ -40,6 +40,7 @@ function createApp(): { app: FastifyInstance; prisma: MockPrismaCampaign } {
   };
   const deps = { ...createMockDeps(), prisma: prisma as unknown as ReturnType<typeof createMockDeps>['prisma'] };
   const app = Fastify();
+  app.addHook('onRequest', async (request) => { request.apiKeyProjectId = null; });
   registerErrorHandler(app);
   campaignRoutes(app, deps);
   return { app, prisma };

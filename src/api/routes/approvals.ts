@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { ApprovalId, ProjectId } from '@/core/types.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 import { paginationSchema, paginate } from '../pagination.js';
 import { createLogger } from '@/observability/logger.js';
 import {
@@ -52,7 +53,8 @@ export function approvalRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { approvalGate, resumeAfterApproval, prisma } = deps;
+  const { approvalGate, resumeAfterApproval, prisma, memberRepository, logger } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   function isGuardError(e: unknown): boolean {
     return e instanceof ProjectAccessDeniedError || e instanceof ResourceNotFoundError;
@@ -278,6 +280,7 @@ export function approvalRoutes(
   // POST /projects/:projectId/approvals/:approvalId/approve
   fastify.post<{ Params: { projectId: string; approvalId: string } }>(
     '/projects/:projectId/approvals/:approvalId/approve',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const { projectId, approvalId } = request.params;
       if (!(await assertApprovalInProject(reply, approvalId, projectId))) return;
@@ -330,6 +333,7 @@ export function approvalRoutes(
   // POST /projects/:projectId/approvals/:approvalId/reject
   fastify.post<{ Params: { projectId: string; approvalId: string } }>(
     '/projects/:projectId/approvals/:approvalId/reject',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const { projectId, approvalId } = request.params;
       if (!(await assertApprovalInProject(reply, approvalId, projectId))) return;

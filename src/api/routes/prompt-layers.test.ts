@@ -17,6 +17,7 @@ let deps: ReturnType<typeof createMockDeps>;
 beforeEach(async () => {
   deps = createMockDeps();
   app = Fastify();
+  app.addHook('onRequest', async (request) => { request.apiKeyProjectId = null; });
   registerErrorHandler(app);
   await app.register(
     (instance, opts: RouteDependencies, done) => {

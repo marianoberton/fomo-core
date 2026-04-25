@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import type { AgentId } from '@/agents/types.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -49,7 +50,8 @@ export function skillRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { skillService, agentRepository, agentRegistry, logger } = deps;
+  const { skillService, agentRepository, agentRegistry, logger, memberRepository } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // ─── Skill Templates (Global) ─────────────────────────────────
 
@@ -106,6 +108,7 @@ export function skillRoutes(
 
   fastify.post(
     '/projects/:projectId/skills',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const parseResult = createInstanceSchema.safeParse(request.body);
@@ -135,6 +138,7 @@ export function skillRoutes(
 
   fastify.post(
     '/projects/:projectId/skills/from-template',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const parseResult = createFromTemplateSchema.safeParse(request.body);
@@ -178,6 +182,7 @@ export function skillRoutes(
 
   fastify.patch(
     '/projects/:projectId/skills/:skillId',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { skillId } = request.params as { projectId: string; skillId: string };
       const parseResult = updateInstanceSchema.safeParse(request.body);
@@ -201,6 +206,7 @@ export function skillRoutes(
 
   fastify.delete(
     '/projects/:projectId/skills/:skillId',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { skillId } = request.params as { projectId: string; skillId: string };
 
@@ -243,6 +249,7 @@ export function skillRoutes(
 
   fastify.post(
     '/projects/:projectId/agents/:agentId/skills',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { agentId } = request.params as { projectId: string; agentId: string };
       const parseResult = assignSkillsSchema.safeParse(request.body);
@@ -274,6 +281,7 @@ export function skillRoutes(
 
   fastify.delete(
     '/projects/:projectId/agents/:agentId/skills/:skillId',
+    { preHandler: rbacOperator },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { agentId, skillId } = request.params as { projectId: string; agentId: string; skillId: string };
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from '@/api/types.js';
 import { sendSuccess, sendError, sendNotFound } from '@/api/error-handler.js';
+import { requireProjectRole } from '@/api/auth-middleware.js';
 
 /** Schema for creating a project-scoped API key. */
 const createProjectKeySchema = z.object({
@@ -26,9 +27,10 @@ const createMasterKeySchema = z.object({
  */
 export function apiKeyRoutes(
   fastify: FastifyInstance,
-  deps: Pick<RouteDependencies, 'apiKeyService' | 'logger'>,
+  deps: Pick<RouteDependencies, 'apiKeyService' | 'logger' | 'memberRepository'>,
 ): void {
-  const { apiKeyService, logger } = deps;
+  const { apiKeyService, logger, memberRepository } = deps;
+  const rbacOwner = requireProjectRole('owner', { memberRepository, logger });
 
   /**
    * Verify that the caller has access to a project.
@@ -69,6 +71,7 @@ export function apiKeyRoutes(
    */
   fastify.post(
     '/projects/:projectId/api-keys',
+    { preHandler: rbacOwner },
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const { projectId } = request.params as { projectId: string };
 
@@ -142,6 +145,7 @@ export function apiKeyRoutes(
    */
   fastify.delete(
     '/projects/:projectId/api-keys/:id',
+    { preHandler: rbacOwner },
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const { projectId, id } = request.params as { projectId: string; id: string };
 

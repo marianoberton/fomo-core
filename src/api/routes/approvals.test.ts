@@ -22,6 +22,7 @@ const sampleApproval = {
 function createApp(): { app: FastifyInstance; deps: ReturnType<typeof createMockDeps> } {
   const deps = createMockDeps();
   const app = Fastify();
+  app.addHook('onRequest', async (request) => { request.apiKeyProjectId = null; });
   registerErrorHandler(app);
   approvalRoutes(app, deps);
   return { app, deps };

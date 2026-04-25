@@ -26,6 +26,7 @@ function createApp(): { app: FastifyInstance; prisma: MockPrismaContact } {
   };
   const deps = { ...createMockDeps(), prisma: prisma as unknown as ReturnType<typeof createMockDeps>['prisma'] };
   const app = Fastify();
+  app.addHook('onRequest', async (request) => { request.apiKeyProjectId = null; });
   registerErrorHandler(app);
   contactRoutes(app, deps);
   return { app, prisma };

@@ -7,6 +7,7 @@ import type { AgentConfig, ProjectId } from '@/core/types.js';
 import { loadProjectConfig } from '@/config/loader.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 import { paginationSchema, paginate } from '../pagination.js';
 
 // ─── Zod Schemas ────────────────────────────────────────────────
@@ -46,7 +47,8 @@ export function projectRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { projectRepository } = deps;
+  const { projectRepository, memberRepository, logger } = deps;
+  const rbacOwner = requireProjectRole('owner', { memberRepository, logger });
 
   // GET /projects — list with optional filters and pagination
   fastify.get('/projects', async (request, reply) => {
@@ -79,7 +81,7 @@ export function projectRoutes(
   });
 
   // PUT /projects/:id
-  fastify.put<{ Params: { id: string } }>('/projects/:id', async (request, reply) => {
+  fastify.put<{ Params: { id: string } }>('/projects/:id', { preHandler: rbacOwner }, async (request, reply) => {
     const input = updateProjectSchema.parse(request.body);
     const project = await projectRepository.update(
       request.params.id as ProjectId,
@@ -93,14 +95,14 @@ export function projectRoutes(
   });
 
   // DELETE /projects/:id
-  fastify.delete<{ Params: { id: string } }>('/projects/:id', async (request, reply) => {
+  fastify.delete<{ Params: { id: string } }>('/projects/:id', { preHandler: rbacOwner }, async (request, reply) => {
     const deleted = await projectRepository.delete(request.params.id as ProjectId);
     if (!deleted) return sendNotFound(reply, 'Project', request.params.id);
     return sendSuccess(reply, { deleted: true });
   });
 
   // POST /projects/:id/pause
-  fastify.post<{ Params: { id: string } }>('/projects/:id/pause', async (request, reply) => {
+  fastify.post<{ Params: { id: string } }>('/projects/:id/pause', { preHandler: rbacOwner }, async (request, reply) => {
     const project = await projectRepository.update(request.params.id as ProjectId, {
       status: 'paused',
     });
@@ -109,7 +111,7 @@ export function projectRoutes(
   });
 
   // POST /projects/:id/resume
-  fastify.post<{ Params: { id: string } }>('/projects/:id/resume', async (request, reply) => {
+  fastify.post<{ Params: { id: string } }>('/projects/:id/resume', { preHandler: rbacOwner }, async (request, reply) => {
     const project = await projectRepository.update(request.params.id as ProjectId, {
       status: 'active',
     });

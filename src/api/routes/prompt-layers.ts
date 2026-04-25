@@ -10,6 +10,7 @@ import { z } from 'zod';
 import type { ProjectId, PromptLayerId } from '@/core/types.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Zod Schemas ────────────────────────────────────────────────
 
@@ -31,7 +32,8 @@ export function promptLayerRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { promptLayerRepository } = deps;
+  const { promptLayerRepository, memberRepository, logger } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // GET /projects/:projectId/prompt-layers — list all layers (optional ?layerType= filter)
   fastify.get<{ Params: { projectId: string }; Querystring: { layerType?: string } }>(
@@ -77,6 +79,7 @@ export function promptLayerRoutes(
   // POST /projects/:projectId/prompt-layers — create a new layer version
   fastify.post<{ Params: { projectId: string } }>(
     '/projects/:projectId/prompt-layers',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const input = createPromptLayerSchema.parse(request.body);
       const layer = await promptLayerRepository.create({

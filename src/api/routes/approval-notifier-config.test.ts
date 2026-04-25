@@ -41,6 +41,7 @@ function createApp(options: {
   });
 
   const app = Fastify();
+  app.addHook('onRequest', async (request) => { request.apiKeyProjectId = null; });
   registerErrorHandler(app);
   approvalNotifierConfigRoutes(app, deps, {
     fetchImpl: fetchImpl as unknown as typeof fetch,

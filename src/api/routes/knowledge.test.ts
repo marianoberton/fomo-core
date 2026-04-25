@@ -50,6 +50,7 @@ function createApp(service: KnowledgeService | null = makeKnowledgeService()): {
   const deps = createMockDeps();
   (deps as typeof deps & { knowledgeService: KnowledgeService | null }).knowledgeService = service;
   const app = Fastify();
+  app.addHook('onRequest', async (request) => { request.apiKeyProjectId = null; });
   registerErrorHandler(app);
   knowledgeRoutes(app, deps as Parameters<typeof knowledgeRoutes>[1]);
   return { app, deps };

@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendNotFound, sendError } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 import type { ProjectId } from '@/core/types.js';
 import {
   TelegramIntegrationConfigSchema,
@@ -200,7 +201,8 @@ export function integrationRoutes(
   fastify: FastifyInstance,
   deps: RouteDependencies,
 ): void {
-  const { channelIntegrationRepository, channelResolver, secretService, logger } = deps;
+  const { channelIntegrationRepository, channelResolver, secretService, logger, memberRepository } = deps;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // ─── GET /projects/:projectId/integrations ─────────────────────
 
@@ -225,6 +227,7 @@ export function integrationRoutes(
 
   fastify.post<{ Params: { projectId: string } }>(
     '/projects/:projectId/integrations',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const projectId = request.params.projectId as ProjectId;
       const input = CreateIntegrationSchema.parse(request.body);
@@ -319,6 +322,7 @@ export function integrationRoutes(
 
   fastify.put<{ Params: { projectId: string; integrationId: string } }>(
     '/projects/:projectId/integrations/:integrationId',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const projectId = request.params.projectId as ProjectId;
 
@@ -384,6 +388,7 @@ export function integrationRoutes(
 
   fastify.delete<{ Params: { projectId: string; integrationId: string } }>(
     '/projects/:projectId/integrations/:integrationId',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const projectId = request.params.projectId as ProjectId;
 
@@ -541,6 +546,7 @@ export function integrationRoutes(
 
   fastify.post<{ Params: { projectId: string; integrationId: string } }>(
     '/projects/:projectId/integrations/:integrationId/waha/session',
+    { preHandler: rbacOperator },
     async (request, reply) => {
       const integration = await channelIntegrationRepository.findById(request.params.integrationId);
       if (integration?.projectId !== request.params.projectId) {

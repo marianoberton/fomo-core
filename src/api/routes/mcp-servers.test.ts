@@ -81,15 +81,30 @@ function createMockLogger() {
 let server: FastifyInstance;
 let repo: ReturnType<typeof createMockRepo>;
 
+function createMockMemberRepository() {
+  return {
+    findByEmail: vi.fn().mockResolvedValue(null),
+    findByProjectId: vi.fn().mockResolvedValue([]),
+    upsert: vi.fn().mockResolvedValue(null),
+    updateRole: vi.fn().mockResolvedValue(null),
+    delete: vi.fn().mockResolvedValue(null),
+  };
+}
+
 async function buildServer() {
   repo = createMockRepo();
   const logger = createMockLogger();
+  const memberRepository = createMockMemberRepository();
 
   server = Fastify({ logger: false });
+  // Simulate master key (apiKeyProjectId = null) so RBAC preHandlers pass through.
+  server.addHook('onRequest', async (request) => {
+    request.apiKeyProjectId = null;
+  });
   registerErrorHandler(server);
   await server.register(
     async (prefixed) => {
-      mcpServerRoutes(prefixed, { mcpServerRepository: repo, logger });
+      mcpServerRoutes(prefixed, { mcpServerRepository: repo, logger, memberRepository });
     },
     { prefix: '/api/v1' },
   );

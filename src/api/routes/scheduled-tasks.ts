@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 import { paginationSchema, paginate } from '../pagination.js';
 import { createTaskExecutor } from '@/scheduling/task-executor.js';
 import type { ScheduledTaskId } from '@/core/types.js';
@@ -45,7 +46,8 @@ export function scheduledTaskRoutes(
   fastify: FastifyInstance,
   opts: RouteDependencies,
 ): void {
-  const { taskManager, agentRepository } = opts;
+  const { taskManager, agentRepository, memberRepository, logger } = opts;
+  const rbacOperator = requireProjectRole('operator', { memberRepository, logger });
 
   // GET /projects/:projectId/scheduled-tasks
   const taskListQuerySchema = z.object({
@@ -90,12 +92,10 @@ export function scheduledTaskRoutes(
   );
 
   // POST /projects/:projectId/scheduled-tasks
-  fastify.post(
+  fastify.post<{ Params: { projectId: string } }>(
     '/projects/:projectId/scheduled-tasks',
-    async (
-      request: FastifyRequest<{ Params: { projectId: string } }>,
-      reply: FastifyReply,
-    ) => {
+    { preHandler: rbacOperator },
+    async (request, reply) => {
       const parseResult = createTaskSchema.safeParse(request.body);
       if (!parseResult.success) {
         await sendError(reply, 'VALIDATION_ERROR', parseResult.error.message, 400);
