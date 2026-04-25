@@ -6,6 +6,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError } from '../error-handler.js';
+import { requireProjectRole } from '../auth-middleware.js';
 
 // ─── Request Schemas ─────────────────────────────────────────────
 
@@ -23,7 +24,8 @@ const UpdateSecretSchema = z.object({
 // ─── Route Registration ─────────────────────────────────────────
 
 export function secretRoutes(fastify: FastifyInstance, deps: RouteDependencies): void {
-  const { secretService, logger } = deps;
+  const { secretService, logger, memberRepository } = deps;
+  const rbacOwner = requireProjectRole('owner', { memberRepository, logger });
 
   // ─── GET /projects/:projectId/secrets ───────────────────────────
   // List all secret keys for a project (no values, ever)
@@ -42,6 +44,7 @@ export function secretRoutes(fastify: FastifyInstance, deps: RouteDependencies):
 
   fastify.post(
     '/projects/:projectId/secrets',
+    { preHandler: rbacOwner },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       try {
@@ -66,6 +69,7 @@ export function secretRoutes(fastify: FastifyInstance, deps: RouteDependencies):
 
   fastify.put(
     '/projects/:projectId/secrets/:key',
+    { preHandler: rbacOwner },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, key } = request.params as { projectId: string; key: string };
 
@@ -87,6 +91,7 @@ export function secretRoutes(fastify: FastifyInstance, deps: RouteDependencies):
 
   fastify.delete(
     '/projects/:projectId/secrets/:key',
+    { preHandler: rbacOwner },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, key } = request.params as { projectId: string; key: string };
 
