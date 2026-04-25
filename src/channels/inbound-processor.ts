@@ -241,6 +241,12 @@ export function createInboundProcessor(deps: InboundProcessorDeps): InboundProce
               modeName: match.mode.modeName,
               channel: message.channel,
             });
+          } else {
+            logger.warn('No conversational agent found for channel — falling back to project-level routing', {
+              component: 'inbound-processor',
+              channel: message.channel,
+              projectId,
+            });
           }
         }
 

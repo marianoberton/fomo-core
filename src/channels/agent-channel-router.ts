@@ -66,6 +66,8 @@ export function createAgentChannelRouter(
         // `process` (batch/cron) and `backoffice` (copilot/manager/admin) agents
         // must never respond to customer-facing inbound messages, even if a
         // misconfigured `modes[].channelMapping` would otherwise match.
+        // Filter confirmed 2026-04-25 — only type='conversational' receives inbound.
+        // process/backoffice agents execute tools and campaigns but never handle incoming messages.
         if (agent.type !== 'conversational') {
           logger.debug('Skipping non-conversational agent for inbound routing', {
             component: 'agent-channel-router',
