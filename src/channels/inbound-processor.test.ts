@@ -422,6 +422,50 @@ describe('InboundProcessor', () => {
     });
   });
 
+  describe('type=conversational filter invariant (via agentChannelRouter)', () => {
+    it('routes to conversational agent when router resolves a match', async () => {
+      const mockRouter: { [K in keyof AgentChannelRouter]: ReturnType<typeof vi.fn> } = {
+        resolveAgent: vi.fn().mockResolvedValue({
+          agentId: 'agent-conv' as AgentId,
+          mode: { modeName: 'public', toolAllowlist: ['calculator'], promptOverrides: undefined, mcpServerNames: [] },
+        }),
+      };
+
+      const deps = createDeps({ agentChannelRouter: mockRouter });
+      const processor = createInboundProcessor(deps);
+
+      const result = await processor.process(createMessage());
+
+      expect(result.success).toBe(true);
+      expect(deps.runAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'agent-conv', sourceChannel: 'whatsapp' }),
+      );
+    });
+
+    it('logs warning and falls back to project-level routing when no conversational agent is found', async () => {
+      // Simulates the case where all agents in the project are process/backoffice —
+      // agentChannelRouter returns null because none pass the type='conversational' filter.
+      const mockRouter: { [K in keyof AgentChannelRouter]: ReturnType<typeof vi.fn> } = {
+        resolveAgent: vi.fn().mockResolvedValue(null),
+      };
+
+      const deps = createDeps({ agentChannelRouter: mockRouter });
+      const processor = createInboundProcessor(deps);
+
+      const result = await processor.process(createMessage());
+
+      expect(result.success).toBe(true);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'No conversational agent found for channel — falling back to project-level routing',
+        expect.objectContaining({ component: 'inbound-processor', channel: 'whatsapp' }),
+      );
+      // Flow continues: project-level agent (agentId=undefined) handles the message
+      expect(deps.runAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: undefined, sourceChannel: 'whatsapp' }),
+      );
+    });
+  });
+
   describe('reply-tracker fallback', () => {
     function createReplyTrackerMock(): {
       [K in keyof ReplyTracker]: ReturnType<typeof vi.fn>;
