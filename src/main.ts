@@ -791,7 +791,7 @@ async function start(): Promise<void> {
     await server.register(cors, {
       origin: corsOrigin ? corsOrigin.split(',') : true,
       methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email'],
     });
     await server.register(helmet);
     await server.register(rateLimit, { max: 100, timeWindow: '1 minute' });
