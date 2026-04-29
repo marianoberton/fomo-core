@@ -60,6 +60,8 @@ import { adminInvokeRoutes } from './admin-invoke.js';
 import { adminChatwootRoutes } from './admin-chatwoot.js';
 import { memberRoutes } from './members.js';
 import { researchScriptsRoutes } from './research-scripts.js';
+import { researchVerticalsRoutes } from './research-verticals.js';
+import { researchTargetsRoutes } from './research-targets.js';
 import { requireSuperAdmin } from '@/research/compliance/super-admin-guard.js';
 
 /** Register all API routes on the Fastify instance. */
@@ -137,6 +139,14 @@ export async function registerRoutes(
     (f) => { platformBridgeRoutes(f, deps); },
     { prefix: '/platform' },
   );
+
+  // Research module — super_admin only (scoped so guard doesn't bleed)
+  await fastify.register(async (f: FastifyInstance) => {
+    researchVerticalsRoutes(f, deps);
+  });
+  await fastify.register(async (f: FastifyInstance) => {
+    researchTargetsRoutes(f, deps);
+  });
 
   // Admin routes — master-key only (wrapped in register() so the preHandler hook
   // scopes only to admin routes and does not bleed into the global /api/v1 scope)
