@@ -1,0 +1,20 @@
+{
+  "verticalSlug": "retail",
+  "scriptLevel": "L1",
+  "hasRag": false,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 8.4,
+  "scores": {
+    "response_speed": 9,
+    "information_completeness": 8,
+    "proactive_engagement": 8,
+    "payment_options": 9,
+    "conversion_intent": 8
+  },
+  "detectedKeywords": ["envío", "seña", "Andreani", "Mercado Pago", "talle"],
+  "handoffToHuman": false,
+  "firstResponseMs": 18000,
+  "avgResponseMs": 37800,
+  "turnsCompleted": 10
+}

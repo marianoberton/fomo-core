@@ -1,0 +1,55 @@
+{
+  "sessionId": "ses_fixture_tecnologia_01",
+  "verticalSlug": "tecnologia",
+  "scriptLevel": "L2",
+  "targetPhone": "+5491112345009",
+  "probePhone": "+5491198760009",
+  "startedAt": "2025-01-23T15:00:00.000Z",
+  "completedAt": "2025-01-23T15:15:00.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Hola! Busco un CRM para un equipo de 5 vendedores. Qué opciones manejan?",
+      "timestamp": "2025-01-23T15:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Hola! Para equipos de hasta 10 personas tenemos el plan Team a $35.000/mes. Incluye: gestión de leads, pipeline visual, automatizaciones, integración con WhatsApp y reportes básicos. También hay una demo gratuita de 14 días. ¿Qué proceso de ventas manejan actualmente?",
+      "timestamp": "2025-01-23T15:00:45.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Usamos planillas de Excel. Cuánto tarda la implementación?",
+      "timestamp": "2025-01-23T15:01:05.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "La implementación base tarda 3-5 días hábiles. Incluye: importación de sus contactos de Excel, capacitación del equipo (2hs online) y soporte por 30 días. Para migraciones más complejas tenemos el servicio Professional a $85.000 único. ¿Cuántos contactos tienen actualmente?",
+      "timestamp": "2025-01-23T15:02:00.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Unos 2000 contactos. Tienen integración con Mercado Libre?",
+      "timestamp": "2025-01-23T15:02:20.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Sí, tenemos integración nativa con Mercado Libre que sincroniza preguntas, ventas y stock en tiempo real. También integramos con Tienda Nube, Shopify y el catálogo de WhatsApp Business. La integración ML viene incluida en el plan Team. ¿Quiere empezar la demo?",
+      "timestamp": "2025-01-23T15:03:15.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí, cómo funciona la demo?",
+      "timestamp": "2025-01-23T15:03:35.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "La demo es 100% funcional por 14 días sin tarjeta de crédito. Le creo el acceso ahora con su email y en 5 minutos tiene el entorno listo con datos de ejemplo. Si decide contratar antes de los 14 días, tiene 20% off en los primeros 3 meses. ¿Cuál es su mail?",
+      "timestamp": "2025-01-23T15:04:20.000Z",
+      "sanitized": false
+    }
+  ]
+}

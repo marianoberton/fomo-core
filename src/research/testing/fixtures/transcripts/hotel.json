@@ -1,0 +1,66 @@
+{
+  "sessionId": "ses_fixture_hotel_01",
+  "verticalSlug": "hotel",
+  "scriptLevel": "L2",
+  "targetPhone": "+5492614000003",
+  "probePhone": "+5491198760003",
+  "startedAt": "2025-01-17T09:00:00.000Z",
+  "completedAt": "2025-01-17T09:12:15.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Hola! Quisiera reservar una habitación para el fin de semana del 8 al 10 de febrero, 2 personas.",
+      "timestamp": "2025-01-17T09:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Buenas! Bienvenido al Hotel del Sol Mendoza. Para ese fin de semana tenemos disponibles habitación Superior a $85.000/noche, Suite Junior a $120.000/noche y Suite Deluxe a $165.000/noche. Todas incluyen desayuno buffet. ¿Qué categoría prefiere?",
+      "timestamp": "2025-01-17T09:00:35.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "La Superior está bien. Tiene vista a la montaña?",
+      "timestamp": "2025-01-17T09:01:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "La Superior tiene dos opciones: patio interno ($85.000) o vista parcial montaña ($92.000). Para el fin de semana del 8/2 tengo disponible la de vista parcial. ¿Le interesa? Le puedo hacer la reserva ahora con seña del 30%.",
+      "timestamp": "2025-01-17T09:01:50.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí me interesa. Cómo hago la seña?",
+      "timestamp": "2025-01-17T09:02:10.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "La seña son $55.200 (30% de las 2 noches). Puede pagar por transferencia al CBU 0000003100012345678901 o con tarjeta de crédito. Si paga con tarjeta tiene 6 cuotas sin interés. ¿Cómo prefiere?",
+      "timestamp": "2025-01-17T09:03:15.000Z",
+      "sanitized": true
+    },
+    {
+      "direction": "outbound",
+      "text": "Por transferencia. Me pasás el alias?",
+      "timestamp": "2025-01-17T09:03:30.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "El alias es HOTEL.SOL.MENDOZA. Cuando haga la transferencia, mándeme el comprobante por acá y le confirmo la reserva con un voucher. ¿A nombre de quién la hago?",
+      "timestamp": "2025-01-17T09:04:20.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "A nombre de Ana García. Qué más necesitan?",
+      "timestamp": "2025-01-17T09:04:40.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Solo eso Ana. Una vez que recibamos la transferencia le enviamos el voucher de confirmación con todos los detalles. Check-in es a partir de las 14hs. ¿Tiene alguna preferencia de cama o alguna necesidad especial?",
+      "timestamp": "2025-01-17T09:05:30.000Z",
+      "sanitized": false
+    }
+  ]
+}

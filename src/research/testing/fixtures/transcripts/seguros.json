@@ -1,0 +1,67 @@
+{
+  "sessionId": "ses_fixture_seguros_01",
+  "verticalSlug": "seguros",
+  "scriptLevel": "L2",
+  "targetPhone": "+5491112345006",
+  "probePhone": "+5491198760006",
+  "startedAt": "2025-01-20T10:30:00.000Z",
+  "completedAt": "2025-01-20T10:42:00.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Buen día! Necesito cotizar un seguro para mi auto. Toyota Corolla 2022.",
+      "timestamp": "2025-01-20T10:30:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Buen día! Con gusto le cotizo. Para el Toyota Corolla 2022 trabajamos con Zurich, Sancor y La Segunda. Necesito algunos datos: ¿tiene cochera? ¿Es el titular quien maneja o hay conductores adicionales?",
+      "timestamp": "2025-01-20T10:30:40.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Tengo cochera, soy yo el único que maneja. 35 años.",
+      "timestamp": "2025-01-20T10:31:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Perfecto. Con esos datos, las coberturas disponibles son: Responsabilidad Civil $28.000/mes, Todo Riesgo con franquicia $52.000/mes, Todo Riesgo sin franquicia $68.000/mes. ¿Qué cobertura le interesa? Todo Riesgo incluye robo total y parcial.",
+      "timestamp": "2025-01-20T10:32:15.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Todo Riesgo con franquicia. Qué cubre exactamente?",
+      "timestamp": "2025-01-20T10:32:40.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Todo Riesgo con franquicia cubre: daños propios (choque, vuelco, granizo, inundación), robo total y parcial, daños a terceros (RC ilimitada), asistencia en viaje 24hs, auto sustituto por 5 días. La franquicia es del 10% del daño. ¿Le preparo la propuesta?",
+      "timestamp": "2025-01-20T10:33:45.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí, prepárela. Qué necesitan de mí?",
+      "timestamp": "2025-01-20T10:34:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Necesito: cédula del auto, DNI del titular y código postal. Con eso emito la propuesta formal y puede firmar digitalmente. ¿Me los puede acercar ahora?",
+      "timestamp": "2025-01-20T10:34:50.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí. El CP es 1425. DNI 28456789.",
+      "timestamp": "2025-01-20T10:35:10.000Z",
+      "sanitized": true
+    },
+    {
+      "direction": "inbound",
+      "text": "Muchas gracias. Le preparo la propuesta ahora y en 10 minutos le llega por este medio. ¿Tiene alguna consulta más mientras tanto?",
+      "timestamp": "2025-01-20T10:35:55.000Z",
+      "sanitized": false
+    }
+  ]
+}

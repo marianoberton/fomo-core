@@ -1,0 +1,21 @@
+{
+  "verticalSlug": "seguros",
+  "scriptLevel": "L2",
+  "hasRag": true,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 8.6,
+  "scores": {
+    "response_speed": 8,
+    "information_completeness": 9,
+    "proactive_engagement": 9,
+    "pricing_transparency": 8,
+    "conversion_intent": 9
+  },
+  "detectedKeywords": ["cobertura", "franquicia", "DNI", "propuesta", "Todo Riesgo"],
+  "handoffToHuman": false,
+  "hasSanitizedTurns": true,
+  "firstResponseMs": 40000,
+  "avgResponseMs": 50700,
+  "turnsCompleted": 10
+}

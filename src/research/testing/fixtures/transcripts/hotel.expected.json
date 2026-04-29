@@ -1,0 +1,21 @@
+{
+  "verticalSlug": "hotel",
+  "scriptLevel": "L2",
+  "hasRag": true,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 8.5,
+  "scores": {
+    "response_speed": 9,
+    "upsell_attempt": 8,
+    "booking_conversion": 9,
+    "pricing_transparency": 8,
+    "payment_options": 8
+  },
+  "detectedKeywords": ["reserva", "seña", "transferencia", "voucher", "CBU"],
+  "handoffToHuman": false,
+  "hasSanitizedTurns": true,
+  "firstResponseMs": 35000,
+  "avgResponseMs": 44500,
+  "turnsCompleted": 10
+}

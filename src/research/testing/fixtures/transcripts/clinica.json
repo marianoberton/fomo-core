@@ -1,0 +1,66 @@
+{
+  "sessionId": "ses_fixture_clinica_01",
+  "verticalSlug": "clinica",
+  "scriptLevel": "L3",
+  "targetPhone": "+5491112345011",
+  "probePhone": "+5491198760011",
+  "startedAt": "2025-01-25T09:00:00.000Z",
+  "completedAt": "2025-01-25T09:18:00.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Buen día. Necesito turno con odontología para una extracción. Tienen disponibilidad esta semana?",
+      "timestamp": "2025-01-25T09:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Buenos días! Para odontología con servicio de extracción tenemos turnos el miércoles 22 a las 10hs y el viernes 24 a las 15hs con el Dr. Ramírez. ¿Cuál prefiere? Si es urgencia, también tenemos guardia odontológica de lunes a viernes de 8 a 12hs.",
+      "timestamp": "2025-01-25T09:00:25.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "El viernes a las 15hs. Tienen obra social? Soy de OSDE.",
+      "timestamp": "2025-01-25T09:01:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Sí, aceptamos OSDE planes 210, 310 y 410. La extracción simple está cubierta al 100% en todos los planes. Si requiere extracción de muela del juicio o con anestesia general hay diferencia a cargo que varía por plan. ¿Cuál es su plan OSDE?",
+      "timestamp": "2025-01-25T09:01:50.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Plan 310. Necesito traer algo?",
+      "timestamp": "2025-01-25T09:02:10.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Para el turno necesita traer: carnet de OSDE vigente, DNI y las últimas 2 radiografías si las tiene (si no, las tomamos acá con costo adicional de $8.500). El turno dura aproximadamente 45 minutos. ¿Confirmo el turno para el viernes 24 a las 15hs?",
+      "timestamp": "2025-01-25T09:03:00.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí, confirmado. Me pueden recordar el turno el día anterior?",
+      "timestamp": "2025-01-25T09:03:20.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Por supuesto. Le mandamos un recordatorio automático por WhatsApp el jueves a las 18hs. ¿Me confirma su nombre completo para la reserva?",
+      "timestamp": "2025-01-25T09:04:00.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Ramona López. Y una pregunta: el Dr. Ramírez tiene muchos años de experiencia?",
+      "timestamp": "2025-01-25T09:04:20.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "El Dr. Ramírez tiene 18 años de experiencia en odontología general y 10 años especializado en cirugía oral. Es egresado de la UBA con posgrado en la Universidad Austral. Tiene calificación de 4.8/5 en nuestra plataforma de pacientes. ¡Está en buenas manos, Ramona!",
+      "timestamp": "2025-01-25T09:05:15.000Z",
+      "sanitized": false
+    }
+  ]
+}

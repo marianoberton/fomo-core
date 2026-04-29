@@ -1,0 +1,16 @@
+{
+  "verticalSlug": "automotriz",
+  "scriptLevel": "L1",
+  "sessionAborted": true,
+  "abortReason": "OPT_OUT_DETECTED",
+  "hasRag": false,
+  "hasHumanHandoff": false,
+  "sentiment": "negative",
+  "scoreTotal": 0,
+  "scores": {},
+  "detectedKeywords": ["baja", "no quiero más mensajes"],
+  "optOutDetected": true,
+  "optOutTurnIndex": 3,
+  "turnsCompleted": 4,
+  "analysisSkipped": true
+}

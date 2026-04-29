@@ -1,0 +1,20 @@
+{
+  "verticalSlug": "restaurante",
+  "scriptLevel": "L1",
+  "hasRag": false,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 8.8,
+  "scores": {
+    "response_speed": 10,
+    "upsell_attempt": 9,
+    "booking_conversion": 9,
+    "personalization": 8,
+    "payment_options": 8
+  },
+  "detectedKeywords": ["cumpleaños", "torta", "reserva", "Mercado Pago", "adelanto"],
+  "handoffToHuman": false,
+  "firstResponseMs": 20000,
+  "avgResponseMs": 37000,
+  "turnsCompleted": 8
+}

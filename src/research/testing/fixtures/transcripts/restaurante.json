@@ -1,0 +1,55 @@
+{
+  "sessionId": "ses_fixture_restaurante_01",
+  "verticalSlug": "restaurante",
+  "scriptLevel": "L1",
+  "targetPhone": "+5491112345004",
+  "probePhone": "+5491198760004",
+  "startedAt": "2025-01-18T12:00:00.000Z",
+  "completedAt": "2025-01-18T12:05:20.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Hola! Tienen mesa disponible para esta noche, 4 personas a las 21hs?",
+      "timestamp": "2025-01-18T12:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Hola! Sí, tenemos disponibilidad para 4 personas a las 21hs. ¿Es para alguna ocasión especial? Así le preparamos algo especial si lo necesitan.",
+      "timestamp": "2025-01-18T12:00:20.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Es un cumpleaños. Pueden hacer algo especial?",
+      "timestamp": "2025-01-18T12:00:40.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Claro que sí! Para cumpleaños ofrecemos: postre sorpresa con vela sin costo, dedicatoria en la mesa y podemos coordinar con el festejado para que sea una sorpresa. También tenemos opción de torta pedida con 48hs de anticipación ($8.500 por 8 porciones). ¿Le interesa alguna de estas opciones?",
+      "timestamp": "2025-01-18T12:01:15.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí, quiero la torta. Cómo la reservo?",
+      "timestamp": "2025-01-18T12:01:30.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Para confirmar la mesa y la torta necesito: su nombre, teléfono de contacto y un adelanto de $5.000 de la torta. El adelanto puede ser por Mercado Pago al alias RESTO.SABORES o efectivo al llegar. ¿Cuál prefiere?",
+      "timestamp": "2025-01-18T12:02:10.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Por Mercado Pago. Me llamo Sofía.",
+      "timestamp": "2025-01-18T12:02:25.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Perfecto Sofía! Mesa para 4 a las 21hs confirmada. El alias de Mercado Pago es RESTO.SABORES. Cuando haga el pago, mándeme el comprobante y le confirmo la torta. ¿De qué sabor quieren la torta?",
+      "timestamp": "2025-01-18T12:03:00.000Z",
+      "sanitized": false
+    }
+  ]
+}

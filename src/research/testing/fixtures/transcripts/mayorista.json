@@ -1,0 +1,55 @@
+{
+  "sessionId": "ses_fixture_mayorista_01",
+  "verticalSlug": "mayorista",
+  "scriptLevel": "L2",
+  "targetPhone": "+5491112345010",
+  "probePhone": "+5491198760010",
+  "startedAt": "2025-01-24T08:30:00.000Z",
+  "completedAt": "2025-01-24T08:45:00.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Buen día. Soy revendedor. Tienen precios mayoristas en herramientas eléctricas?",
+      "timestamp": "2025-01-24T08:30:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Buen día! Sí, trabajamos con revendedores. Para acceder a precios mayoristas necesita registrarse con CUIT y constancia de inscripción en AFIP. ¿Tiene estos documentos? Con eso le abro la cuenta y tiene acceso a la lista de precios de mayorista.",
+      "timestamp": "2025-01-24T08:30:35.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí los tengo. Cuáles son los descuentos por volumen?",
+      "timestamp": "2025-01-24T08:31:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Los descuentos son escalonados: 10-20 unidades → 15% off precio público; 21-50 unidades → 22% off; 51+ unidades → 30% off. En herramientas eléctricas (Bosch, Stanley, Dewalt) el descuento base ya tiene 20% sobre precio de lista. ¿Qué línea le interesa?",
+      "timestamp": "2025-01-24T08:31:50.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Taladros y amoladoras. Tienen stock disponible para entrega inmediata?",
+      "timestamp": "2025-01-24T08:32:10.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "En taladros tenemos: Bosch GSB 18V-45 (stock 38 unidades), Dewalt DCD777 (stock 22 unidades), Stanley FatMax (stock 15 unidades). En amoladoras: Bosch GWS 850 (stock 41 unidades), Dewalt DWE4011 (stock 17 unidades). Entrega en CABA en 24hs, interior 48-72hs. ¿Qué cantidad estaría tomando?",
+      "timestamp": "2025-01-24T08:33:30.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Quiero 25 taladros Bosch y 10 amoladoras Bosch. Cuánto me sale?",
+      "timestamp": "2025-01-24T08:33:50.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Para 25 taladros GSB 18V-45 a precio mayorista 22% off: $1.890.000. Para 10 amoladoras GWS 850 con 15% off: $485.000. Total: $2.375.000. El pago puede ser 30% adelanto + saldo contra entrega, o descuento adicional 3% por pago total contado. ¿Le armo el presupuesto formal?",
+      "timestamp": "2025-01-24T08:35:00.000Z",
+      "sanitized": false
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "sessionId": "ses_fixture_educacion_01",
+  "verticalSlug": "educacion",
+  "scriptLevel": "L1",
+  "targetPhone": "+5491112345007",
+  "probePhone": "+5491198760007",
+  "startedAt": "2025-01-21T11:00:00.000Z",
+  "completedAt": "2025-01-21T11:10:30.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Hola! Me interesa el curso de marketing digital. Cuándo empieza?",
+      "timestamp": "2025-01-21T11:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Hola! El próximo curso de Marketing Digital comienza el 3 de marzo. Son 3 meses, clases martes y jueves de 19 a 21hs, modalidad online en vivo. El arancel es $45.000/mes. ¿Tiene experiencia previa en marketing?",
+      "timestamp": "2025-01-21T11:00:30.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Soy principiante. El curso incluye certificado?",
+      "timestamp": "2025-01-21T11:01:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Perfecto para principiantes — el programa empieza desde cero. Sí, al finalizar se emite certificado con validez nacional, aval de la Universidad ORT. Incluye: módulo de redes sociales, SEO/SEM, email marketing, analítica y proyecto final. ¿Le envío el programa completo?",
+      "timestamp": "2025-01-19T11:02:00.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí, mandámelo. También hay becas?",
+      "timestamp": "2025-01-21T11:02:20.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Tenemos 3 tipos de beca: beca mérito (requiere promedio mínimo en secundario), beca socioeconómica (documentación de ingresos) y beca empresa (si la paga tu empleador, 15% off). Para cualquiera hay que completar el formulario de postulación. ¿Le mando el link?",
+      "timestamp": "2025-01-21T11:03:15.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí. Y cómo es la inscripción?",
+      "timestamp": "2025-01-21T11:03:30.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "La inscripción es online, toma 5 minutos. Necesita: nombre completo, DNI, mail y la matrícula de $15.000 para reservar el lugar. Cupos limitados a 25 alumnos. ¿Quiere empezar la inscripción ahora?",
+      "timestamp": "2025-01-21T11:04:20.000Z",
+      "sanitized": false
+    }
+  ]
+}

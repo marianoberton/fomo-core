@@ -1,0 +1,55 @@
+{
+  "sessionId": "ses_fixture_inmobiliaria_01",
+  "verticalSlug": "inmobiliaria",
+  "scriptLevel": "L1",
+  "targetPhone": "+5491112345002",
+  "probePhone": "+5491198760002",
+  "startedAt": "2025-01-16T14:00:00.000Z",
+  "completedAt": "2025-01-16T14:09:30.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Buenas! Vi su publicación de un departamento en Palermo. Sigue disponible?",
+      "timestamp": "2025-01-16T14:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Hola! Sí, el departamento en Palermo Soho sigue disponible. Es un 2 ambientes de 45m², piso 3, con balcón y amenities. Precio de alquiler $350.000 + expensas. ¿Está buscando para alquilar o comprar?",
+      "timestamp": "2025-01-16T14:00:45.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Alquilar. Qué documentación piden?",
+      "timestamp": "2025-01-16T14:01:10.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Pedimos: garantía propietaria en CABA o GBA, últimos 3 recibos de sueldo, DNI y 2 meses de depósito. Si no tiene garantía, aceptamos seguro de caución con Fianzas Rápidas. ¿Trabaja en relación de dependencia?",
+      "timestamp": "2025-01-16T14:02:15.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí, soy empleado. Puedo ver el departamento esta semana?",
+      "timestamp": "2025-01-16T14:02:40.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Claro! Tenemos visitas el miércoles de 15 a 17hs y el jueves de 10 a 12hs. ¿Cuál le viene mejor? Para coordinar le voy a pedir nombre y número de contacto.",
+      "timestamp": "2025-01-16T14:03:30.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "El miércoles a las 16hs. Me llamo Martín.",
+      "timestamp": "2025-01-16T14:03:50.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Perfecto Martín. Queda anotado para el miércoles 22 a las 16hs. Le mando la dirección exacta: Gurruchaga 1450, piso 3 dpto B. ¿Tiene alguna consulta más por ahora?",
+      "timestamp": "2025-01-16T14:04:45.000Z",
+      "sanitized": false
+    }
+  ]
+}

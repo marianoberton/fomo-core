@@ -1,0 +1,55 @@
+{
+  "sessionId": "ses_fixture_gimnasio_01",
+  "verticalSlug": "gimnasio",
+  "scriptLevel": "L1",
+  "targetPhone": "+5491112345008",
+  "probePhone": "+5491198760008",
+  "startedAt": "2025-01-22T09:00:00.000Z",
+  "completedAt": "2025-01-22T09:07:00.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Hola! Cuánto cuesta la membresía mensual?",
+      "timestamp": "2025-01-22T09:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Hola! Tenemos 3 planes: Básico $18.000/mes (acceso lunes a viernes), Completo $25.000/mes (7 días + clases grupales) y Premium $32.000/mes (todo incluido + personal trainer 2 veces/semana). ¿Cuál le interesa?",
+      "timestamp": "2025-01-22T09:00:22.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "El completo. Qué clases grupales tienen?",
+      "timestamp": "2025-01-22T09:00:40.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "El plan Completo incluye: Crossfit, Spinning, Yoga, Pilates, Zumba y Boxing. Hay 4 turnos por día. También tenemos sala de musculación equipada con todo Technogym. ¿Quiere pasar a conocer las instalaciones?",
+      "timestamp": "2025-01-22T09:01:15.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí quiero conocerlo. Puedo ir esta tarde?",
+      "timestamp": "2025-01-22T09:01:30.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Por supuesto! Abrimos de 6 a 23hs. Esta tarde puede venir a partir de las 14hs. Le puedo coordinar una visita guiada de 20 minutos con nuestro asesor. ¿A qué hora le vendría bien?",
+      "timestamp": "2025-01-22T09:02:00.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "A las 17hs. Necesito traer algo?",
+      "timestamp": "2025-01-22T09:02:15.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Solo su DNI para registrarse. Si decide inscribirse ese día, tiene 20% de descuento en la primera cuota. ¿Me puede dejar su nombre para anotarle la visita?",
+      "timestamp": "2025-01-22T09:03:00.000Z",
+      "sanitized": false
+    }
+  ]
+}
