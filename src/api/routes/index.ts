@@ -62,6 +62,8 @@ import { memberRoutes } from './members.js';
 import { researchScriptsRoutes } from './research-scripts.js';
 import { researchVerticalsRoutes } from './research-verticals.js';
 import { researchTargetsRoutes } from './research-targets.js';
+import { researchPhonesRoutes } from './research-phones.js';
+import { researchWebhookRoutes } from './research-webhook.js';
 import { requireSuperAdmin } from '@/research/compliance/super-admin-guard.js';
 
 /** Register all API routes on the Fastify instance. */
@@ -185,4 +187,10 @@ export async function registerRoutes(
     f.addHook('preHandler', requireSuperAdmin({ logger: deps.logger }));
     researchScriptsRoutes(f, deps);
   });
+
+  // Research module — Phase 0: WAHA + Phone Manager
+  // Phones routes: super_admin guard applied inside plugin scope (no hook bleed).
+  await fastify.register(async (f: FastifyInstance) => { researchPhonesRoutes(f, deps); });
+  // Webhook: registered at /webhooks/research/waha — exempt from Bearer auth by existing exemption.
+  researchWebhookRoutes(fastify, deps);
 }
