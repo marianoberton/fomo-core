@@ -29,7 +29,7 @@ ALTER TABLE "api_keys" DROP CONSTRAINT "api_keys_project_id_fkey";
 ALTER TABLE "agent_templates" ALTER COLUMN "updated_at" DROP DEFAULT;
 
 -- AlterTable
-ALTER TABLE "messages" ADD COLUMN IF NOT EXISTS "media_urls" TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "messages" ADD COLUMN     "media_urls" TEXT[] DEFAULT ARRAY[]::TEXT[];
 
 -- CreateTable
 CREATE TABLE "campaign_replies" (
