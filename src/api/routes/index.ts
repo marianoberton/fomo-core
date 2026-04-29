@@ -59,6 +59,8 @@ import { adminAuditRoutes } from './admin-audit.js';
 import { adminInvokeRoutes } from './admin-invoke.js';
 import { adminChatwootRoutes } from './admin-chatwoot.js';
 import { memberRoutes } from './members.js';
+import { researchScriptsRoutes } from './research-scripts.js';
+import { requireSuperAdmin } from '@/research/compliance/super-admin-guard.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -165,5 +167,12 @@ export async function registerRoutes(
     projectRepository: deps.projectRepository,
     agentRepository: deps.agentRepository,
     logger: deps.logger,
+  });
+
+  // Research module — super_admin only, feature-flagged
+  // Wrapped in register() so the preHandler hook scopes only to /research/* routes.
+  await fastify.register(async (f: FastifyInstance) => {
+    f.addHook('preHandler', requireSuperAdmin({ logger: deps.logger }));
+    researchScriptsRoutes(f, deps);
   });
 }
