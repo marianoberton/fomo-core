@@ -59,6 +59,8 @@ import { adminAuditRoutes } from './admin-audit.js';
 import { adminInvokeRoutes } from './admin-invoke.js';
 import { adminChatwootRoutes } from './admin-chatwoot.js';
 import { memberRoutes } from './members.js';
+import { researchPhonesRoutes } from './research-phones.js';
+import { researchWebhookRoutes } from './research-webhook.js';
 
 /** Register all API routes on the Fastify instance. */
 export async function registerRoutes(
@@ -166,4 +168,10 @@ export async function registerRoutes(
     agentRepository: deps.agentRepository,
     logger: deps.logger,
   });
+
+  // Research module — Phase 0: WAHA + Phone Manager
+  // Phones routes: super_admin guard applied inside plugin scope (no hook bleed).
+  await fastify.register(async (f: FastifyInstance) => { researchPhonesRoutes(f, deps); });
+  // Webhook: registered at /webhooks/research/waha — exempt from Bearer auth by existing exemption.
+  researchWebhookRoutes(fastify, deps);
 }
