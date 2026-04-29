@@ -1,5 +1,8 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { nanoid } from 'nanoid';
+import { seedResearchVerticals } from './seed/research-verticals.js';
+import { seedResearchScripts } from './seed/research-scripts.js';
+import { seedResearchPhones } from './seed/research-phones.js';
 
 const prisma = new PrismaClient();
 
@@ -372,6 +375,13 @@ async function main(): Promise<void> {
 
   // Global catalogs first (no project dependencies)
   await seedAgentTemplates();
+
+  // Research module catalogs (gated behind RESEARCH_MODULE_ENABLED at the
+  // route level, but seed always runs so dev DBs are consistent).
+  // Order matters: verticals → scripts (FK), phones independently.
+  await seedResearchVerticals(prisma);
+  await seedResearchScripts(prisma);
+  await seedResearchPhones(prisma);
 
   // ═══════════════════════════════════════════════════════════════
   // 1. DEMO PROJECT (basic — calculator, date-time, json-transform)

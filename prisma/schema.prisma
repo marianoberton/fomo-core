@@ -914,3 +914,510 @@ model AgentRunStep {
   @@index([runId, status])
   @@map("agent_run_steps")
 }
+
+// ════════════════════════════════════════════════════════════════════
+// RESEARCH MODULE — Agent Observatory
+// ════════════════════════════════════════════════════════════════════
+//
+// See NEXUS_INTELLIGENCE_PLAN.md (in fomo-core-docs) for the design.
+// All tables are gated behind RESEARCH_MODULE_ENABLED feature flag at
+// the route level. Access restricted to super_admin (see super-admin-guard).
+//
+// Two unique partial indexes are added in the migration's manual SQL
+// step (not expressible in Prisma DSL) to enforce: 1 active session
+// per (target | phone). Look for them in:
+//   prisma/migrations/<timestamp>_add_research_module/migration.sql
+//
+// ────────────────────────────────────────────────────────────────────
+
+// ─── Research Verticals ─────────────────────────────────────────────
+
+model ResearchVertical {
+  id                   String   @id @default(cuid())
+  slug                 String   @unique
+  name                 String
+  description          String?
+  isActive             Boolean  @default(true) @map("is_active")
+  scoringRubric        Json     @map("scoring_rubric")
+  analysisInstructions String   @db.Text @map("analysis_instructions")
+  minCooldownHours     Int      @default(24) @map("min_cooldown_hours")
+  activeHoursStart     Int      @default(9) @map("active_hours_start")
+  activeHoursEnd       Int      @default(21) @map("active_hours_end")
+  createdBy            String?  @map("created_by")
+  updatedBy            String?  @map("updated_by")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  probeScripts ProbeScript[]
+  targets      ResearchTarget[]
+  insights     IntelligenceInsight[]
+  patterns     PromptPattern[]
+
+  @@index([isActive])
+  @@map("research_verticals")
+}
+
+// ─── Phone Inventory ────────────────────────────────────────────────
+
+model ResearchPhone {
+  id              String              @id @default(cuid())
+  label           String              @unique
+  wahaSession     String              @unique @map("waha_session")
+  phoneNumber     String?             @map("phone_number")
+  status          ResearchPhoneStatus @default(pending)
+  identityName    String?             @map("identity_name")
+  identityAvatar  String?             @map("identity_avatar")
+  identityBio     String?             @map("identity_bio")
+  notes           String?
+  lastSeenAt      DateTime?           @map("last_seen_at")
+  bannedAt        DateTime?           @map("banned_at")
+  banReason       String?             @map("ban_reason")
+  totalSessions   Int                 @default(0) @map("total_sessions")
+  totalTurnsToday Int                 @default(0) @map("total_turns_today")
+  createdBy       String?             @map("created_by")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  sessions  ResearchSession[]
+  schedules ResearchSessionSchedule[]
+
+  @@index([status])
+  @@map("research_phones")
+}
+
+enum ResearchPhoneStatus {
+  pending
+  active
+  disconnected
+  banned
+  quarantined
+}
+
+// ─── Research Targets ───────────────────────────────────────────────
+
+model ResearchTarget {
+  id             String           @id @default(cuid())
+  name           String
+  company        String?
+  phoneNumber    String           @unique @map("phone_number")
+  verticalSlug   String           @map("vertical_slug")
+  country        String           @default("AR")
+  sourceType     TargetSourceType @map("source_type")
+  sourceValue    String           @db.Text @map("source_value")
+  notes          String?          @db.Text
+  status         TargetStatus     @default(pending)
+  priority       Int              @default(1)
+  tags           String[]
+  optedOutAt     DateTime?        @map("opted_out_at")
+  optedOutReason String?          @map("opted_out_reason")
+  dsarDeletedAt  DateTime?        @map("dsar_deleted_at")
+  createdBy      String           @map("created_by")
+  updatedBy      String?          @map("updated_by")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  vertical  ResearchVertical          @relation(fields: [verticalSlug], references: [slug], onDelete: Restrict)
+  sessions  ResearchSession[]
+  schedules ResearchSessionSchedule[]
+
+  @@index([verticalSlug, status])
+  @@index([country])
+  @@index([optedOutAt])
+  @@map("research_targets")
+}
+
+enum TargetStatus {
+  pending
+  active
+  completed
+  paused
+  failed
+  banned
+}
+
+enum TargetSourceType {
+  url
+  screenshot
+  referral
+  other
+}
+
+// ─── Probe Scripts ──────────────────────────────────────────────────
+
+model ProbeScript {
+  id               String     @id @default(cuid())
+  name             String
+  verticalSlug     String     @map("vertical_slug")
+  level            ProbeLevel
+  objective        String
+  estimatedMinutes Int        @map("estimated_minutes")
+  turns            Json
+  waitMinMs        Int        @default(3000) @map("wait_min_ms")
+  waitMaxMs        Int        @default(8000) @map("wait_max_ms")
+  isOfficial       Boolean    @default(false) @map("is_official")
+  isActive         Boolean    @default(true) @map("is_active")
+  version          Int        @default(1)
+  createdBy        String?    @map("created_by")
+  updatedBy        String?    @map("updated_by")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  vertical  ResearchVertical          @relation(fields: [verticalSlug], references: [slug], onDelete: Restrict)
+  sessions  ResearchSession[]
+  schedules ResearchSessionSchedule[]
+
+  @@unique([verticalSlug, name])
+  @@index([level, isActive])
+  @@map("probe_scripts")
+}
+
+enum ProbeLevel {
+  L1_SURFACE
+  L2_CAPABILITIES
+  L3_ARCHITECTURE
+  L4_ADVERSARIAL
+  L5_LONGITUDINAL
+}
+
+// ─── Research Sessions ──────────────────────────────────────────────
+
+model ResearchSession {
+  id                  String                @id @default(cuid())
+  targetId            String                @map("target_id")
+  phoneId             String                @map("phone_id")
+  scriptId            String                @map("script_id")
+  status              ResearchSessionStatus @default(queued)
+  currentTurn         Int                   @default(0) @map("current_turn")
+  startedAt           DateTime?             @map("started_at")
+  completedAt         DateTime?             @map("completed_at")
+  failedAt            DateTime?             @map("failed_at")
+  failReason          String?               @map("fail_reason")
+  failCode            String?               @map("fail_code")
+  retryCount          Int                   @default(0) @map("retry_count")
+  notes               String?
+  scheduleId          String?               @map("schedule_id")
+  retentionEligibleAt DateTime?             @map("retention_eligible_at")
+  triggeredBy         String?               @map("triggered_by")
+  createdAt           DateTime              @default(now()) @map("created_at")
+
+  target   ResearchTarget           @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  phone    ResearchPhone            @relation(fields: [phoneId], references: [id], onDelete: Restrict)
+  script   ProbeScript              @relation(fields: [scriptId], references: [id], onDelete: Restrict)
+  schedule ResearchSessionSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  turns    ResearchTurn[]
+  analysis ResearchAnalysis?
+
+  @@index([status])
+  @@index([targetId, completedAt])
+  @@index([phoneId, status])
+  @@index([scheduleId])
+  @@index([retentionEligibleAt])
+  @@map("research_sessions")
+}
+
+enum ResearchSessionStatus {
+  queued
+  running
+  waiting_response
+  paused
+  completed
+  failed
+  aborted
+}
+
+// ─── Research Turns ─────────────────────────────────────────────────
+
+model ResearchTurn {
+  id              String        @id @default(cuid())
+  sessionId       String        @map("session_id")
+  turnOrder       Int           @map("turn_order")
+  direction       TurnDirection
+  message         String        @db.Text
+  rawMessage      String?       @db.Text @map("raw_message")
+  sanitized       Boolean       @default(false)
+  redactionsCount Int           @default(0) @map("redactions_count")
+  timestamp       DateTime      @default(now())
+  latencyMs       Int?          @map("latency_ms")
+  wahaMessageId   String?       @unique @map("waha_message_id")
+  isTimeout       Boolean       @default(false) @map("is_timeout")
+  notes           String?
+
+  session ResearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, turnOrder, direction])
+  @@index([sessionId])
+  @@map("research_turns")
+}
+
+enum TurnDirection {
+  outbound
+  inbound
+}
+
+// ─── Research Analysis ──────────────────────────────────────────────
+
+model ResearchAnalysis {
+  id                String  @id @default(cuid())
+  sessionId         String  @unique @map("session_id")
+  version           Int     @default(1)
+  previousVersionId String? @map("previous_version_id")
+
+  // Nivel 1 — Superficie
+  agentName            String?  @map("agent_name")
+  hasPresentationMenu  Boolean? @map("has_presentation_menu")
+  menuType             String?  @map("menu_type")
+  toneProfile          String?  @map("tone_profile")
+  toneNotes            String?  @db.Text @map("tone_notes")
+  usesEmoji            Boolean? @map("uses_emoji")
+  responseTimeP50Ms    Int?     @map("response_time_p50_ms")
+  responseTimeP95Ms    Int?     @map("response_time_p95_ms")
+  hasProactiveReengage Boolean? @map("has_proactive_reengage")
+  reengageTimeMs       Int?     @map("reengage_time_ms")
+  languagesDetected    String[] @map("languages_detected")
+
+  // Nivel 2 — Capabilities
+  capabilityMap     Json?    @map("capability_map")
+  canTakeActions    Boolean? @map("can_take_actions")
+  hasRealtimeLookup Boolean? @map("has_realtime_lookup")
+  dataFreshness     String?  @map("data_freshness")
+  capabilityNotes   String?  @db.Text @map("capability_notes")
+
+  // Nivel 3 — Arquitectura
+  estimatedLlm          String?  @map("estimated_llm")
+  llmConfidence         Int?     @map("llm_confidence")
+  llmEvidenceNotes      String?  @db.Text @map("llm_evidence_notes")
+  hasRag                Boolean? @map("has_rag")
+  ragDomainScope        String?  @map("rag_domain_scope")
+  hasFunctionCalling    Boolean? @map("has_function_calling")
+  detectedTools         String[] @map("detected_tools")
+  hasCrossSessionMemory Boolean? @map("has_cross_session_memory")
+  systemPromptHints     String?  @db.Text @map("system_prompt_hints")
+  promptStructureNotes  String?  @db.Text @map("prompt_structure_notes")
+
+  // Nivel 4 — Adversarial
+  promptInjectionResistance Int?    @map("prompt_injection_resistance")
+  handlesOffensiveInput     String? @map("handles_offensive_input")
+  competitorMentionPolicy   String? @map("competitor_mention_policy")
+  consistencyScore          Int?    @map("consistency_score")
+  hallucinationRate         String? @map("hallucination_rate")
+  adversarialNotes          String? @db.Text @map("adversarial_notes")
+
+  // Nivel 5 — Longitudinal
+  changesFromPrevious String?  @db.Text @map("changes_from_previous")
+  significantChanges  Boolean  @default(false) @map("significant_changes")
+  regressions         String[]
+  improvements        String[]
+
+  // Scores
+  scores     Json?
+  scoreTotal Float? @map("score_total")
+
+  // Best/worst
+  bestTurnOrder          Int?    @map("best_turn_order")
+  bestTurnText           String? @db.Text @map("best_turn_text")
+  bestTurnJustification  String? @db.Text @map("best_turn_justification")
+  worstTurnOrder         Int?    @map("worst_turn_order")
+  worstTurnText          String? @db.Text @map("worst_turn_text")
+  worstTurnJustification String? @db.Text @map("worst_turn_justification")
+
+  // Synthesis
+  keyStrengths       String[] @map("key_strengths")
+  keyWeaknesses      String[] @map("key_weaknesses")
+  uniqueCapabilities String[] @map("unique_capabilities")
+  thingsToReplicate  String[] @map("things_to_replicate")
+  thingsToAvoid      String[] @map("things_to_avoid")
+  executiveSummary   String?  @db.Text @map("executive_summary")
+
+  // LLM call metadata
+  rawJson           Json
+  llmModel          String   @map("llm_model")
+  llmInputTokens    Int?     @map("llm_input_tokens")
+  llmOutputTokens   Int?     @map("llm_output_tokens")
+  llmCostUsd        Decimal? @db.Decimal(10, 6) @map("llm_cost_usd")
+  llmReasoningTrace String?  @db.Text @map("llm_reasoning_trace")
+  degraded          Boolean  @default(false)
+  analyzedAt        DateTime @default(now()) @map("analyzed_at")
+
+  session  ResearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  insights InsightSource[]
+  patterns PatternSource[]
+
+  @@index([analyzedAt])
+  @@index([scoreTotal])
+  @@map("research_analyses")
+}
+
+// ─── Longitudinal Schedules ─────────────────────────────────────────
+
+model ResearchSessionSchedule {
+  id         String    @id @default(cuid())
+  targetId   String    @map("target_id")
+  scriptId   String    @map("script_id")
+  phoneId    String    @map("phone_id")
+  cronExpr   String?   @map("cron_expr")
+  intervalMs BigInt?   @map("interval_ms")
+  jitterMs   Int       @default(7200000) @map("jitter_ms")
+  isActive   Boolean   @default(true) @map("is_active")
+  lastRunAt  DateTime? @map("last_run_at")
+  nextRunAt  DateTime  @map("next_run_at")
+  runCount   Int       @default(0) @map("run_count")
+  failCount  Int       @default(0) @map("fail_count")
+  createdBy  String?   @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  target   ResearchTarget    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  script   ProbeScript       @relation(fields: [scriptId], references: [id], onDelete: Restrict)
+  phone    ResearchPhone     @relation(fields: [phoneId], references: [id], onDelete: Restrict)
+  sessions ResearchSession[]
+
+  @@index([isActive, nextRunAt])
+  @@index([targetId])
+  @@map("research_session_schedules")
+}
+
+// ─── Intelligence Insights ──────────────────────────────────────────
+
+model IntelligenceInsight {
+  id             String        @id @default(cuid())
+  verticalSlug   String        @map("vertical_slug")
+  category       String
+  title          String
+  content        String        @db.Text
+  evidence       String?       @db.Text
+  seenInCount    Int           @default(1) @map("seen_in_count")
+  status         InsightStatus @default(pending)
+  rejectedReason String?       @map("rejected_reason")
+  approvedBy     String?       @map("approved_by")
+  approvedAt     DateTime?     @map("approved_at")
+  rejectedBy     String?       @map("rejected_by")
+  rejectedAt     DateTime?     @map("rejected_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  vertical ResearchVertical @relation(fields: [verticalSlug], references: [slug], onDelete: Restrict)
+  sources  InsightSource[]
+
+  @@index([verticalSlug, status])
+  @@index([category])
+  @@map("intelligence_insights")
+}
+
+enum InsightStatus {
+  pending
+  approved
+  rejected
+  superseded
+}
+
+model InsightSource {
+  insightId  String @map("insight_id")
+  analysisId String @map("analysis_id")
+
+  insight  IntelligenceInsight @relation(fields: [insightId], references: [id], onDelete: Cascade)
+  analysis ResearchAnalysis    @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@id([insightId, analysisId])
+  @@index([analysisId])
+  @@map("insight_sources")
+}
+
+// ─── Prompt Patterns ────────────────────────────────────────────────
+
+model PromptPattern {
+  id             String        @id @default(cuid())
+  verticalSlug   String        @map("vertical_slug")
+  category       String
+  status         PatternStatus @default(pending)
+  rejectedReason String?       @map("rejected_reason")
+  approvedBy     String?       @map("approved_by")
+  approvedAt     DateTime?     @map("approved_at")
+  rejectedBy     String?       @map("rejected_by")
+  rejectedAt     DateTime?     @map("rejected_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  vertical ResearchVertical       @relation(fields: [verticalSlug], references: [slug], onDelete: Restrict)
+  versions PromptPatternVersion[]
+  sources  PatternSource[]
+  uses     PromptPatternUse[]
+
+  @@index([verticalSlug, status])
+  @@index([category])
+  @@map("prompt_patterns")
+}
+
+enum PatternStatus {
+  pending
+  approved
+  rejected
+  superseded
+}
+
+model PromptPatternVersion {
+  id               String   @id @default(cuid())
+  patternId        String   @map("pattern_id")
+  versionNumber    Int      @map("version_number")
+  patternText      String   @db.Text @map("pattern_text")
+  patternVariables String[] @map("pattern_variables")
+  seenInCount      Int      @default(1) @map("seen_in_count")
+  avgScoreWhen     Float?   @map("avg_score_when")
+  notes            String?
+  isCurrent        Boolean  @default(false) @map("is_current")
+  editedBy         String?  @map("edited_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  pattern PromptPattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+
+  @@unique([patternId, versionNumber])
+  @@index([patternId, isCurrent])
+  @@map("prompt_pattern_versions")
+}
+
+model PatternSource {
+  patternId  String @map("pattern_id")
+  analysisId String @map("analysis_id")
+
+  pattern  PromptPattern    @relation(fields: [patternId], references: [id], onDelete: Cascade)
+  analysis ResearchAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@id([patternId, analysisId])
+  @@index([analysisId])
+  @@map("pattern_sources")
+}
+
+model PromptPatternUse {
+  id                String   @id @default(cuid())
+  patternId         String   @map("pattern_id")
+  patternVersionId  String   @map("pattern_version_id")
+  agentTemplateSlug String   @map("agent_template_slug")
+  insertedAt        DateTime @default(now()) @map("inserted_at")
+  insertedBy        String?  @map("inserted_by")
+  scoreAtInsertion  Float?   @map("score_at_insertion")
+  scoreAfter        Float?   @map("score_after")
+  outcome           String?
+
+  pattern PromptPattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+
+  @@index([patternId])
+  @@index([agentTemplateSlug])
+  @@map("prompt_pattern_uses")
+}
+
+// ─── Audit Log ──────────────────────────────────────────────────────
+
+model ResearchAuditLog {
+  id         String   @id @default(cuid())
+  actorEmail String   @map("actor_email")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  payload    Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  at         DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorEmail, at])
+  @@index([action, at])
+  @@map("research_audit_log")
+}
