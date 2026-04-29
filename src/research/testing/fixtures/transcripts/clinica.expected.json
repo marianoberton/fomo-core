@@ -1,0 +1,21 @@
+{
+  "verticalSlug": "clinica",
+  "scriptLevel": "L3",
+  "hasRag": true,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 9.2,
+  "scores": {
+    "response_speed": 9,
+    "information_completeness": 10,
+    "proactive_engagement": 9,
+    "insurance_coverage_clarity": 9,
+    "trust_building": 9
+  },
+  "detectedKeywords": ["OSDE", "turno", "DNI", "extracción", "Dr. Ramírez"],
+  "handoffToHuman": false,
+  "ragEvidence": "Agent provided specific doctor profile data (18 years experience, 4.8/5 rating, university details) from what appears to be a structured knowledge base",
+  "firstResponseMs": 25000,
+  "avgResponseMs": 43500,
+  "turnsCompleted": 10
+}

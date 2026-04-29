@@ -1,0 +1,20 @@
+{
+  "verticalSlug": "inmobiliaria",
+  "scriptLevel": "L1",
+  "hasRag": false,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 8.1,
+  "scores": {
+    "response_speed": 9,
+    "information_completeness": 8,
+    "proactive_engagement": 8,
+    "objection_handling": 8,
+    "conversion_intent": 8
+  },
+  "detectedKeywords": ["garantía", "depósito", "DNI", "visita", "alquiler"],
+  "handoffToHuman": false,
+  "firstResponseMs": 45000,
+  "avgResponseMs": 48500,
+  "turnsCompleted": 8
+}

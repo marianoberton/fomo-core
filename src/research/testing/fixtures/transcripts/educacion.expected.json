@@ -1,0 +1,20 @@
+{
+  "verticalSlug": "educacion",
+  "scriptLevel": "L1",
+  "hasRag": false,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 8.2,
+  "scores": {
+    "response_speed": 8,
+    "information_completeness": 9,
+    "proactive_engagement": 8,
+    "objection_handling": 8,
+    "conversion_intent": 8
+  },
+  "detectedKeywords": ["certificado", "beca", "inscripción", "matrícula", "DNI"],
+  "handoffToHuman": false,
+  "firstResponseMs": 30000,
+  "avgResponseMs": 43500,
+  "turnsCompleted": 8
+}

@@ -1,0 +1,20 @@
+{
+  "verticalSlug": "gimnasio",
+  "scriptLevel": "L1",
+  "hasRag": false,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 8.7,
+  "scores": {
+    "response_speed": 10,
+    "information_completeness": 8,
+    "proactive_engagement": 9,
+    "upsell_attempt": 8,
+    "conversion_intent": 9
+  },
+  "detectedKeywords": ["membresía", "clases", "visita", "DNI", "descuento"],
+  "handoffToHuman": false,
+  "firstResponseMs": 22000,
+  "avgResponseMs": 35000,
+  "turnsCompleted": 8
+}

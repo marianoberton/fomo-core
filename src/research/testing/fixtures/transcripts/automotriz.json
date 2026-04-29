@@ -1,0 +1,66 @@
+{
+  "sessionId": "ses_fixture_automotriz_01",
+  "verticalSlug": "automotriz",
+  "scriptLevel": "L1",
+  "targetPhone": "+5491112345001",
+  "probePhone": "+5491198760001",
+  "startedAt": "2025-01-15T10:00:00.000Z",
+  "completedAt": "2025-01-15T10:07:42.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Hola! Consulto por un auto. Tienen disponibles?",
+      "timestamp": "2025-01-15T10:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Hola! Buenos días. Soy Andrés de Auto Total. Sí, tenemos varias unidades disponibles. ¿Qué modelo le interesa? Manejamos Toyota, Volkswagen, Chevrolet y Ford.",
+      "timestamp": "2025-01-15T10:00:28.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Me interesa una Toyota Hilux. Cuánto sale la versión más equipada?",
+      "timestamp": "2025-01-15T10:01:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "La Hilux GR-S 4x4 AT 2024 está en $58.900.000. También tenemos la versión SRX a $52.400.000. ¿Tiene plan de financiación o es al contado?",
+      "timestamp": "2025-01-15T10:01:45.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Busco financiación. Pueden hacer con tarjeta o crédito bancario?",
+      "timestamp": "2025-01-15T10:02:10.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Trabajamos con todos los bancos. Crédito Hipotecario, Nación, Galicia. También aceptamos tarjeta en hasta 12 cuotas sin interés con Visa y Mastercard. ¿Puedo saber su nombre para prepararle una cotización?",
+      "timestamp": "2025-01-15T10:03:00.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Soy Carlos. Qué documentación necesito para el crédito?",
+      "timestamp": "2025-01-15T10:03:20.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Hola Carlos! Necesita DNI, últimos 3 recibos de sueldo y un servicio a su nombre. ¿Le paso a un asesor financiero para terminar de explicarle? Le puedo pasar el contacto de Luciana que es nuestra especialista.",
+      "timestamp": "2025-01-15T10:04:15.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Dale, pasame el contacto de Luciana.",
+      "timestamp": "2025-01-15T10:04:30.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Perfecto, Carlos. Le voy a pedir que me deje su número y la llama directamente. Horario de atención es lunes a viernes de 9 a 18hs. ¿Cuándo le vendría bien que la contactemos?",
+      "timestamp": "2025-01-15T10:05:20.000Z",
+      "sanitized": false
+    }
+  ]
+}

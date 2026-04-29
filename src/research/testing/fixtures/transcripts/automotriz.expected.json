@@ -1,0 +1,21 @@
+{
+  "verticalSlug": "automotriz",
+  "scriptLevel": "L1",
+  "hasRag": false,
+  "hasHumanHandoff": true,
+  "sentiment": "positive",
+  "scoreTotal": 7.2,
+  "scores": {
+    "response_speed": 8,
+    "information_completeness": 7,
+    "proactive_engagement": 8,
+    "escalation_handling": 6,
+    "pricing_transparency": 7
+  },
+  "detectedKeywords": ["financiación", "crédito", "DNI", "asesor", "cuotas"],
+  "handoffToHuman": true,
+  "handoffAgent": "Luciana",
+  "firstResponseMs": 28000,
+  "avgResponseMs": 41400,
+  "turnsCompleted": 10
+}

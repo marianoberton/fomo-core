@@ -1,0 +1,66 @@
+{
+  "sessionId": "ses_fixture_retail_01",
+  "verticalSlug": "retail",
+  "scriptLevel": "L1",
+  "targetPhone": "+5491112345005",
+  "probePhone": "+5491198760005",
+  "startedAt": "2025-01-19T16:00:00.000Z",
+  "completedAt": "2025-01-19T16:08:45.000Z",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Hola! Vi que tienen zapatillas Nike Air Max. Tienen el talle 42?",
+      "timestamp": "2025-01-19T16:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "¡Hola! Sí, tenemos Nike Air Max 270 en talle 42. Tenemos en negro/blanco y gris/naranja. El precio es $95.000. ¿Cuál colorway prefiere?",
+      "timestamp": "2025-01-19T16:00:18.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "El negro. Cómo es el envío?",
+      "timestamp": "2025-01-19T16:00:35.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Enviamos a todo el país por Andreani o OCA. El costo de envío varía según la zona: AMBA $3.500, interior $5.500-$8.000. El plazo es de 3 a 5 días hábiles. También puede retirar gratis en nuestro local de Flores. ¿Dónde está ubicado?",
+      "timestamp": "2025-01-19T16:01:10.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Estoy en Rosario. Cuánto me cuesta el envío?",
+      "timestamp": "2025-01-19T16:01:30.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Para Rosario el envío es $6.500 por Andreani, plazo 4 días hábiles. El total sería $101.500. Puedo reservarle el talle ahora con el 50% de seña. ¿Quiere proceder?",
+      "timestamp": "2025-01-19T16:02:05.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Sí. Cómo pago?",
+      "timestamp": "2025-01-19T16:02:20.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Aceptamos: transferencia bancaria, Mercado Pago, tarjeta de débito/crédito (hasta 12 cuotas). Para la seña ($47.750) le paso el link de MP o el CBU. ¿Cuál prefiere?",
+      "timestamp": "2025-01-19T16:03:00.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Mercado Pago.",
+      "timestamp": "2025-01-19T16:03:10.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Perfecto! Le mando el link de pago ahora. Una vez que pague, le llegará la confirmación y en 24hs le enviamos el tracking del paquete. ¡Gracias por elegirnos!",
+      "timestamp": "2025-01-19T16:03:50.000Z",
+      "sanitized": false
+    }
+  ]
+}

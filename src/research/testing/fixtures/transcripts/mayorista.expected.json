@@ -1,0 +1,20 @@
+{
+  "verticalSlug": "mayorista",
+  "scriptLevel": "L2",
+  "hasRag": true,
+  "hasHumanHandoff": false,
+  "sentiment": "positive",
+  "scoreTotal": 8.8,
+  "scores": {
+    "response_speed": 8,
+    "information_completeness": 9,
+    "stock_accuracy": 9,
+    "pricing_transparency": 9,
+    "b2b_qualification": 9
+  },
+  "detectedKeywords": ["CUIT", "mayorista", "descuento", "stock", "presupuesto"],
+  "handoffToHuman": false,
+  "firstResponseMs": 35000,
+  "avgResponseMs": 55000,
+  "turnsCompleted": 8
+}

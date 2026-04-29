@@ -1,0 +1,36 @@
+{
+  "sessionId": "ses_fixture_optout_01",
+  "verticalSlug": "automotriz",
+  "scriptLevel": "L1",
+  "targetPhone": "+5491112345012",
+  "probePhone": "+5491198760012",
+  "startedAt": "2025-01-26T10:00:00.000Z",
+  "completedAt": "2025-01-26T10:03:00.000Z",
+  "aborted": true,
+  "abortReason": "OPT_OUT_DETECTED",
+  "turns": [
+    {
+      "direction": "outbound",
+      "text": "Hola! Consulto por autos usados disponibles.",
+      "timestamp": "2025-01-26T10:00:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "Hola! Sí, tenemos varios usados. ¿Qué marca y modelo busca?",
+      "timestamp": "2025-01-26T10:00:30.000Z",
+      "sanitized": false
+    },
+    {
+      "direction": "outbound",
+      "text": "Volkswagen Golf. Tienen algo entre $25 y $30 millones?",
+      "timestamp": "2025-01-26T10:01:00.000Z"
+    },
+    {
+      "direction": "inbound",
+      "text": "No quiero más mensajes por favor. Baja.",
+      "timestamp": "2025-01-26T10:01:45.000Z",
+      "sanitized": false,
+      "optOutDetected": true
+    }
+  ]
+}
