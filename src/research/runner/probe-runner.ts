@@ -88,6 +88,8 @@ export interface ProbeRunnerDeps {
   turnRepo: ResearchTurnRepository;
   /** Queue used to enqueue timeout jobs + cancel them when response arrives. */
   probeQueue: Queue;
+  /** Queue to enqueue analysis jobs after session completes. Optional — skipped if null. */
+  analysisQueue?: Queue | null;
   logger: Logger;
 }
 
@@ -104,7 +106,7 @@ function channelKey(sessionId: string, turnOrder: number): string {
 // ─── Factory ─────────────────────────────────────────────────────
 
 export function createResearchProbeRunner(deps: ProbeRunnerDeps): ResearchProbeRunner {
-  const { prisma, redis, wahaClient, sessionRepo, turnRepo, probeQueue, logger } = deps;
+  const { prisma, redis, wahaClient, sessionRepo, turnRepo, probeQueue, analysisQueue, logger } = deps;
 
   // ── Private: Redis buffer + subscribe wait ──────────────────────
 
@@ -382,8 +384,13 @@ export function createResearchProbeRunner(deps: ProbeRunnerDeps): ResearchProbeR
       totalTurns: turns.length,
     });
 
-    // TODO(integration-3): enqueue research-analyze-session job
-    // await analysisQueue.add('research-analyze-session', { sessionId })
+    if (analysisQueue) {
+      await analysisQueue.add(
+        'research-analyze-session',
+        { sessionId },
+        { attempts: 2, backoff: { type: 'exponential', delay: 10_000 } },
+      );
+    }
   }
 
   // ── Public: handleInbound ────────────────────────────────────────

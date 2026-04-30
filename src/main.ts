@@ -187,6 +187,14 @@ import type { ResearchProbeRunPayload } from '@/research/jobs/research-probe-run
 import { createResearchSessionRepository } from '@/research/repositories/session-repository.js';
 import { createResearchTurnRepository } from '@/research/repositories/turn-repository.js';
 import { createWahaResearchClient } from '@/research/waha-research-client.js';
+import { createResearchAnalyzer } from '@/research/analysis/analyzer.js';
+import type { ResearchAnalyzer } from '@/research/analysis/analyzer.js';
+import {
+  createResearchAnalyzeWorker,
+  createResearchAnalysisQueue,
+  RESEARCH_ANALYSIS_QUEUE,
+} from '@/research/jobs/research-analyze-session.js';
+import type { ResearchAnalyzeSessionPayload } from '@/research/jobs/research-analyze-session.js';
 
 const logger = createLogger();
 
@@ -844,8 +852,11 @@ async function start(): Promise<void> {
     let campaignRunner: CampaignRunner | null = null;
     let webhookQueue: WebhookQueue | null = null;
     let researchRunner: ResearchProbeRunner | null = null;
+    let researchAnalyzer: ResearchAnalyzer | null = null;
     let researchProbesQueue: Queue<ResearchProbeRunPayload> | null = null;
+    let researchAnalysisQueue: Queue<ResearchAnalyzeSessionPayload> | null = null;
     let researchProbeWorker: ReturnType<typeof createResearchProbeRunWorker> | null = null;
+    let researchAnalyzeWorker: ReturnType<typeof createResearchAnalyzeWorker> | null = null;
     let researchRedis: Redis | null = null;
     if (redisUrl) {
       const parsedRedis = new URL(redisUrl);
@@ -919,6 +930,8 @@ async function start(): Promise<void> {
         RESEARCH_PROBES_QUEUE,
         { connection: redisConnection },
       );
+      researchAnalysisQueue = createResearchAnalysisQueue(redisConnection);
+
       researchRunner = createResearchProbeRunner({
         prisma,
         redis: researchRedis,
@@ -930,6 +943,7 @@ async function start(): Promise<void> {
         sessionRepo: createResearchSessionRepository(prisma),
         turnRepo: createResearchTurnRepository(prisma),
         probeQueue: researchProbesQueue,
+        analysisQueue: researchAnalysisQueue,
         logger,
       });
       researchProbeWorker = createResearchProbeRunWorker({
@@ -937,7 +951,16 @@ async function start(): Promise<void> {
         logger,
         redisConnection,
       });
-      logger.info('Research probe runner + worker started (Redis connected)', {
+
+      // Research analyzer + worker (queue already created above)
+      researchAnalyzer = createResearchAnalyzer({ prisma, logger });
+      researchAnalyzeWorker = createResearchAnalyzeWorker({
+        analyzer: researchAnalyzer,
+        logger,
+        redisConnection,
+      });
+
+      logger.info('Research probe runner + analyzer + workers started (Redis connected)', {
         component: 'main',
       });
     }
@@ -990,7 +1013,9 @@ async function start(): Promise<void> {
       taskRegistry: openclawTaskRegistry,
       eventBus,
       researchRunner,
+      researchAnalyzer,
       researchProbesQueue,
+      researchAnalysisQueue,
       logger,
     };
 
@@ -1101,8 +1126,14 @@ async function start(): Promise<void> {
       if (researchProbeWorker) {
         await researchProbeWorker.close();
       }
+      if (researchAnalyzeWorker) {
+        await researchAnalyzeWorker.close();
+      }
       if (researchProbesQueue) {
         await researchProbesQueue.close();
+      }
+      if (researchAnalysisQueue) {
+        await researchAnalysisQueue.close();
       }
       if (researchRedis) {
         await researchRedis.quit();
