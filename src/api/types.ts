@@ -35,8 +35,10 @@ import type { MemberRepository } from '@/infrastructure/repositories/member-repo
 import type { TaskRegistry } from '@/channels/openclaw-task-registry.js';
 import type { ProjectEventBus } from '@/api/events/event-bus.js';
 import type { ResearchProbeRunner } from '@/research/runner/probe-runner.js';
+import type { ResearchAnalyzer } from '@/research/analysis/analyzer.js';
 import type { Queue } from 'bullmq';
 import type { ResearchProbeRunPayload } from '@/research/jobs/research-probe-run.js';
+import type { ResearchAnalyzeSessionPayload } from '@/research/jobs/research-analyze-session.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -161,7 +163,11 @@ export interface RouteDependencies {
   eventBus: ProjectEventBus;
   /** Research probe runner (null if Redis not configured). */
   researchRunner: ResearchProbeRunner | null;
+  /** Research analyzer orchestrator (null if Redis not configured). */
+  researchAnalyzer: ResearchAnalyzer | null;
   /** BullMQ queue for dispatching probe-run jobs (null if Redis not configured). */
   researchProbesQueue: Queue<ResearchProbeRunPayload> | null;
+  /** BullMQ queue for dispatching analysis jobs (null if Redis not configured). */
+  researchAnalysisQueue: Queue<ResearchAnalyzeSessionPayload> | null;
   logger: Logger;
 }

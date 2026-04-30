@@ -204,7 +204,9 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     taskRegistry: createTaskRegistry(),
     eventBus: createProjectEventBus(),
     researchRunner: null,
+    researchAnalyzer: null,
     researchProbesQueue: null,
+    researchAnalysisQueue: null,
     logger,
   };
 
