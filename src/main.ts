@@ -195,6 +195,12 @@ import {
   RESEARCH_ANALYSIS_QUEUE,
 } from '@/research/jobs/research-analyze-session.js';
 import type { ResearchAnalyzeSessionPayload } from '@/research/jobs/research-analyze-session.js';
+import {
+  createResearchScheduleTickQueue,
+  createResearchScheduleTickWorker,
+  startResearchScheduleTickRepeatable,
+} from '@/research/jobs/research-schedule-tick.js';
+import { createScheduleManager } from '@/research/scheduling/schedule-manager.js';
 
 const logger = createLogger();
 
@@ -854,6 +860,7 @@ async function start(): Promise<void> {
     let researchRunner: ResearchProbeRunner | null = null;
     let researchAnalyzer: ResearchAnalyzer | null = null;
     let researchProbesQueue: Queue<ResearchProbeRunPayload> | null = null;
+    let researchScheduleTickWorker: ReturnType<typeof createResearchScheduleTickWorker> | null = null;
     let researchAnalysisQueue: Queue<ResearchAnalyzeSessionPayload> | null = null;
     let researchProbeWorker: ReturnType<typeof createResearchProbeRunWorker> | null = null;
     let researchAnalyzeWorker: ReturnType<typeof createResearchAnalyzeWorker> | null = null;
@@ -959,6 +966,16 @@ async function start(): Promise<void> {
         logger,
         redisConnection,
       });
+
+      // Research longitudinal scheduler (Phase 5) — hourly repeatable tick
+      const scheduleManager = createScheduleManager({ prisma, logger });
+      const scheduleTickQueue = createResearchScheduleTickQueue(redisConnection);
+      researchScheduleTickWorker = createResearchScheduleTickWorker({
+        scheduleManager,
+        logger,
+        redisConnection,
+      });
+      await startResearchScheduleTickRepeatable(scheduleTickQueue, logger);
 
       logger.info('Research probe runner + analyzer + workers started (Redis connected)', {
         component: 'main',
@@ -1128,6 +1145,9 @@ async function start(): Promise<void> {
       }
       if (researchAnalyzeWorker) {
         await researchAnalyzeWorker.close();
+      }
+      if (researchScheduleTickWorker) {
+        await researchScheduleTickWorker.close();
       }
       if (researchProbesQueue) {
         await researchProbesQueue.close();
