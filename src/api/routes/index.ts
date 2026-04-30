@@ -66,6 +66,8 @@ import { researchPhonesRoutes } from './research-phones.js';
 import { researchWebhookRoutes } from './research-webhook.js';
 import { researchSessionsRoutes } from './research-sessions.js';
 import { researchAnalysesRoutes } from './research-analyses.js';
+import { researchInsightsRoutes } from './research-insights.js';
+import { researchPatternsRoutes } from './research-patterns.js';
 import { requireSuperAdmin } from '@/research/compliance/super-admin-guard.js';
 
 /** Register all API routes on the Fastify instance. */
@@ -191,6 +193,10 @@ export async function registerRoutes(
     researchSessionsRoutes(f, deps);
     researchAnalysesRoutes(f, deps);
   });
+
+  // Research Phase 6 — Insights + Patterns (super_admin guard applied inside each route fn)
+  await fastify.register(async (f: FastifyInstance) => { researchInsightsRoutes(f, deps); });
+  await fastify.register(async (f: FastifyInstance) => { researchPatternsRoutes(f, deps); });
 
   // Research module — Phase 0: WAHA + Phone Manager
   // Phones routes: super_admin guard applied inside plugin scope (no hook bleed).

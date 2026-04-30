@@ -20,6 +20,9 @@ import type {
   AgentTemplateFilters,
   AgentTemplateType,
 } from '@/infrastructure/repositories/agent-template-repository.js';
+import { createPatternRepository } from '@/research/repositories/pattern-repository.js';
+import { createPatternVersionRepository } from '@/research/repositories/pattern-version-repository.js';
+import type { PromptPatternId } from '@/research/types.js';
 
 // ─── Schemas ────────────────────────────────────────────────────
 
@@ -32,6 +35,11 @@ const listQuerySchema = z.object({
   isOfficial: z.coerce.boolean().optional(),
 });
 
+const suggestionsQuerySchema = z.object({
+  verticalSlug: z.string().min(1),
+  category: z.string().optional(),
+});
+
 // ─── Routes ─────────────────────────────────────────────────────
 
 /** Register agent-template routes on a Fastify instance. */
@@ -41,6 +49,8 @@ export function agentTemplateRoutes(
 ): void {
   const { prisma, logger } = opts;
   const repo = createAgentTemplateRepository(prisma);
+  const patternRepo = createPatternRepository(prisma);
+  const versionRepo = createPatternVersionRepository(prisma);
 
   // GET /agent-templates
   fastify.get(
@@ -82,6 +92,35 @@ export function agentTemplateRoutes(
         return;
       }
       await sendSuccess(reply, template);
+    },
+  );
+
+  // GET /agent-templates/suggestions — approved patterns by vertical (for editor)
+  fastify.get(
+    '/agent-templates/suggestions',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parsed = suggestionsQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        await sendError(reply, 'VALIDATION_ERROR', parsed.error.message, 400);
+        return;
+      }
+
+      const { verticalSlug, category } = parsed.data;
+
+      const patterns = await patternRepo.listByVertical(verticalSlug, {
+        ...(category !== undefined && { category }),
+        status: 'approved',
+      });
+
+      // Attach current version text to each pattern
+      const enriched = await Promise.all(
+        patterns.map(async (p) => {
+          const currentVersion = await versionRepo.findCurrent(p.id as PromptPatternId);
+          return { ...p, currentVersion };
+        }),
+      );
+
+      await sendSuccess(reply, { items: enriched, total: enriched.length });
     },
   );
 

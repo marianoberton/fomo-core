@@ -17,6 +17,9 @@ import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError, sendNotFound } from '../error-handler.js';
 import { requireSuperAdmin } from '@/research/compliance/super-admin-guard.js';
 import { createResearchVerticalRepository } from '@/research/repositories/vertical-repository.js';
+import { createSynthesizer } from '@/research/synthesis/synthesizer.js';
+import type { ResearchSynthesizeVerticalPayload } from '@/research/jobs/research-synthesize-vertical.js';
+import type { Queue } from 'bullmq';
 
 // ─── Schemas ─────────────────────────────────────────────────────
 
@@ -66,9 +69,11 @@ const updateVerticalSchema = z.object({
 export function researchVerticalsRoutes(
   fastify: FastifyInstance,
   opts: RouteDependencies,
+  extra?: { synthesisQueue?: Queue<ResearchSynthesizeVerticalPayload> },
 ): void {
   const { prisma, logger } = opts;
   const repo = createResearchVerticalRepository(prisma);
+  const synthesisQueue = extra?.synthesisQueue ?? null;
 
   // Apply super_admin guard to all routes in this scope
   fastify.addHook('preHandler', requireSuperAdmin({ logger }));
@@ -208,6 +213,65 @@ export function researchVerticalsRoutes(
       });
 
       await sendSuccess(reply, { vertical });
+    },
+  );
+
+  // POST /research/verticals/:slug/synthesize
+  fastify.post(
+    '/research/verticals/:slug/synthesize',
+    async (
+      request: FastifyRequest<{ Params: { slug: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const { slug } = request.params;
+      const actor = request.superAdminEmail ?? 'api-key';
+
+      const existing = await repo.findBySlug(slug);
+      if (!existing) {
+        await sendNotFound(reply, 'ResearchVertical', slug);
+        return;
+      }
+
+      // If a BullMQ queue is wired up, enqueue the job (async)
+      if (synthesisQueue) {
+        await synthesisQueue.add('research-synthesize-vertical', {
+          verticalSlug: slug,
+          triggeredBy: actor,
+        });
+
+        logger.info('research: synthesis job enqueued', {
+          component: 'research-synthesizer',
+          slug,
+          actor,
+        });
+
+        await sendSuccess(reply, { queued: true, verticalSlug: slug }, 202);
+        return;
+      }
+
+      // Fallback: run inline (no Redis)
+      const synthesizer = createSynthesizer({ prisma, logger });
+      const result = await synthesizer.synthesizeVertical(slug);
+
+      if (!result.ok) {
+        await sendError(reply, result.error.researchCode, result.error.message, result.error.statusCode ?? 500);
+        return;
+      }
+
+      logger.info('research: synthesis completed inline', {
+        component: 'research-synthesizer',
+        slug,
+        actor,
+        insightCount: result.value.insightIds.length,
+        patternCount: result.value.patternIds.length,
+      });
+
+      await sendSuccess(reply, {
+        queued: false,
+        verticalSlug: slug,
+        insightIds: result.value.insightIds,
+        patternIds: result.value.patternIds,
+      });
     },
   );
 }
