@@ -125,6 +125,7 @@ function buildMockPrisma(sessionOverrides?: Record<string, unknown>) {
     researchAnalysis: {
       findFirst: vi.fn().mockResolvedValue(null),
     },
+    $executeRaw: vi.fn().mockResolvedValue(0),
   };
 }
 

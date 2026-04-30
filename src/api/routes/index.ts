@@ -66,6 +66,8 @@ import { researchPhonesRoutes } from './research-phones.js';
 import { researchWebhookRoutes } from './research-webhook.js';
 import { researchSessionsRoutes } from './research-sessions.js';
 import { researchAnalysesRoutes } from './research-analyses.js';
+import { researchOverviewRoutes } from './research-overview.js';
+import { researchCompareRoutes } from './research-compare.js';
 import { requireSuperAdmin } from '@/research/compliance/super-admin-guard.js';
 
 /** Register all API routes on the Fastify instance. */
@@ -190,6 +192,8 @@ export async function registerRoutes(
     researchScriptsRoutes(f, deps);
     researchSessionsRoutes(f, deps);
     researchAnalysesRoutes(f, deps);
+    researchOverviewRoutes(f, deps);
+    researchCompareRoutes(f, deps);
   });
 
   // Research module — Phase 0: WAHA + Phone Manager

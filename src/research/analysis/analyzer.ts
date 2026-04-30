@@ -377,6 +377,17 @@ export function createResearchAnalyzer(deps: ResearchAnalyzerDeps): ResearchAnal
         scoreTotal: analysis.scoreTotal,
       });
 
+      // Refresh the intelligence dashboard materialized view (best-effort).
+      prisma
+        .$executeRaw`REFRESH MATERIALIZED VIEW CONCURRENTLY research_vertical_stats`
+        .catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          logger.warn('research analyzer: failed to refresh materialized view', {
+            component: 'research-analyzer',
+            error: msg,
+          });
+        });
+
       return ok(analysis);
     },
   };
