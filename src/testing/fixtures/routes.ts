@@ -542,6 +542,8 @@ export function createMockDeps(): RouteDependencies & {
       subscribeAll: vi.fn().mockReturnValue(() => { /* noop */ }),
       listenerCount: vi.fn().mockReturnValue(0),
     },
+    researchRunner: null,
+    researchProbesQueue: null,
     logger: createMockLogger(),
   };
 }

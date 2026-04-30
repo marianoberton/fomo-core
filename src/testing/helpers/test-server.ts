@@ -203,6 +203,8 @@ export async function createTestServer(options: TestServerOptions): Promise<Fast
     memberRepository: createMemberRepository(prisma),
     taskRegistry: createTaskRegistry(),
     eventBus: createProjectEventBus(),
+    researchRunner: null,
+    researchProbesQueue: null,
     logger,
   };
 

@@ -176,6 +176,17 @@ import { createNotifySlackTool } from '@/tools/definitions/notify-slack.js';
 import type { CampaignRunner } from '@/campaigns/campaign-runner.js';
 import { createProjectEventBus } from '@/api/events/event-bus.js';
 import { createReplyTracker } from '@/campaigns/reply-tracker.js';
+import { Redis } from 'ioredis';
+import { createResearchProbeRunner } from '@/research/runner/probe-runner.js';
+import type { ResearchProbeRunner } from '@/research/runner/probe-runner.js';
+import {
+  createResearchProbeRunWorker,
+  RESEARCH_PROBES_QUEUE,
+} from '@/research/jobs/research-probe-run.js';
+import type { ResearchProbeRunPayload } from '@/research/jobs/research-probe-run.js';
+import { createResearchSessionRepository } from '@/research/repositories/session-repository.js';
+import { createResearchTurnRepository } from '@/research/repositories/turn-repository.js';
+import { createWahaResearchClient } from '@/research/waha-research-client.js';
 
 const logger = createLogger();
 
@@ -832,6 +843,10 @@ async function start(): Promise<void> {
     let proactiveMessenger: ProactiveMessenger | null = null;
     let campaignRunner: CampaignRunner | null = null;
     let webhookQueue: WebhookQueue | null = null;
+    let researchRunner: ResearchProbeRunner | null = null;
+    let researchProbesQueue: Queue<ResearchProbeRunPayload> | null = null;
+    let researchProbeWorker: ReturnType<typeof createResearchProbeRunWorker> | null = null;
+    let researchRedis: Redis | null = null;
     if (redisUrl) {
       const parsedRedis = new URL(redisUrl);
       const redisConnection = {
@@ -897,6 +912,34 @@ async function start(): Promise<void> {
       });
       await webhookQueue.start();
       logger.info('Webhook queue started (Redis connected)', { component: 'main' });
+
+      // Research probe runner + BullMQ worker
+      researchRedis = new Redis(redisUrl);
+      researchProbesQueue = new Queue<ResearchProbeRunPayload>(
+        RESEARCH_PROBES_QUEUE,
+        { connection: redisConnection },
+      );
+      researchRunner = createResearchProbeRunner({
+        prisma,
+        redis: researchRedis,
+        wahaClient: createWahaResearchClient({
+          baseUrl: process.env['WAHA_BASE_URL'] ?? 'http://localhost:3000',
+          apiKey: process.env['WAHA_API_KEY'] ?? '',
+          logger,
+        }),
+        sessionRepo: createResearchSessionRepository(prisma),
+        turnRepo: createResearchTurnRepository(prisma),
+        probeQueue: researchProbesQueue,
+        logger,
+      });
+      researchProbeWorker = createResearchProbeRunWorker({
+        runner: researchRunner,
+        logger,
+        redisConnection,
+      });
+      logger.info('Research probe runner + worker started (Redis connected)', {
+        component: 'main',
+      });
     }
 
     // OpenClaw task registry — in-memory task lifecycle tracking (always created)
@@ -946,6 +989,8 @@ async function start(): Promise<void> {
       memberRepository,
       taskRegistry: openclawTaskRegistry,
       eventBus,
+      researchRunner,
+      researchProbesQueue,
       logger,
     };
 
@@ -1052,6 +1097,15 @@ async function start(): Promise<void> {
       }
       if (webhookQueue) {
         await webhookQueue.stop();
+      }
+      if (researchProbeWorker) {
+        await researchProbeWorker.close();
+      }
+      if (researchProbesQueue) {
+        await researchProbesQueue.close();
+      }
+      if (researchRedis) {
+        await researchRedis.quit();
       }
 
       // 4. Close external connections
