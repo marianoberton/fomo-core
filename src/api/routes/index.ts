@@ -69,6 +69,8 @@ import { researchAnalysesRoutes } from './research-analyses.js';
 import { researchSchedulesRoutes } from './research-schedules.js';
 import { researchInsightsRoutes } from './research-insights.js';
 import { researchPatternsRoutes } from './research-patterns.js';
+import { researchOverviewRoutes } from './research-overview.js';
+import { researchCompareRoutes } from './research-compare.js';
 import { requireSuperAdmin } from '@/research/compliance/super-admin-guard.js';
 
 /** Register all API routes on the Fastify instance. */
@@ -194,6 +196,8 @@ export async function registerRoutes(
     researchSessionsRoutes(f, deps);
     researchAnalysesRoutes(f, deps);
     researchSchedulesRoutes(f, deps);
+    researchOverviewRoutes(f, deps);
+    researchCompareRoutes(f, deps);
   });
 
   // Research Phase 6 — Insights + Patterns (super_admin guard applied inside each route fn)
