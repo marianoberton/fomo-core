@@ -114,15 +114,12 @@ function buildMockPrisma(
         id: 'tgt-1',
         phoneNumber: '5491100001111@c.us',
       }),
+      update: vi.fn().mockResolvedValue({}),
     },
     researchTurn: {
       findFirst: vi.fn().mockResolvedValue(existingOutbound),
     },
     researchSession: {
-      update: vi.fn().mockResolvedValue({}),
-    },
-    researchTarget: {
-      findUnique: vi.fn().mockResolvedValue({ id: 'tgt-1', phoneNumber: '5491100001111@c.us' }),
       update: vi.fn().mockResolvedValue({}),
     },
     $transaction: vi.fn().mockImplementation(
