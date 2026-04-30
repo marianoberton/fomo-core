@@ -172,8 +172,13 @@ export function researchSessionsRoutes(
         actorEmail,
       });
 
-      // TODO(integration-2): enqueue research-probe-run job
-      // await researchProbesQueue.add('research-probe-run', { sessionId: session.id })
+      if (deps.researchProbesQueue) {
+        await deps.researchProbesQueue.add(
+          'research-probe-run',
+          { sessionId: session.id },
+          { attempts: 3, backoff: { type: 'exponential', delay: 5_000 } },
+        );
+      }
 
       await sendSuccess(reply, session, 201);
     },
@@ -247,8 +252,17 @@ export function researchSessionsRoutes(
         actorEmail,
       });
 
-      // TODO(integration-2): enqueue research-probe-run job for each session
-      // for (const s of created) { await researchProbesQueue.add(...) }
+      if (deps.researchProbesQueue) {
+        await Promise.all(
+          created.map((s) =>
+            deps.researchProbesQueue!.add(
+              'research-probe-run',
+              { sessionId: s.id },
+              { attempts: 3, backoff: { type: 'exponential', delay: 5_000 } },
+            ),
+          ),
+        );
+      }
 
       await sendSuccess(reply, { sessions: created, count: created.length }, 201);
     },
@@ -504,7 +518,13 @@ export function researchSessionsRoutes(
         actorEmail,
       });
 
-      // TODO(integration-2): enqueue research-probe-run job for newSession.id
+      if (deps.researchProbesQueue) {
+        await deps.researchProbesQueue.add(
+          'research-probe-run',
+          { sessionId: newSession.id },
+          { attempts: 3, backoff: { type: 'exponential', delay: 5_000 } },
+        );
+      }
 
       await sendSuccess(reply, { original: { id, status: session.status }, retry: newSession }, 201);
     },

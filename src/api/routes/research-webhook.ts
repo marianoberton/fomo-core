@@ -9,13 +9,18 @@
  * from WAHA cause a Prisma unique-constraint error which we catch and ignore
  * (return 200 OK). No explicit dedup table needed.
  *
- * Redis wake (runner signal) is a TODO stub until research-runner merges.
+ * When a ResearchProbeRunner is wired in (via deps.researchRunner), all inbound
+ * processing (opt-out, PII scrub, DB persist, Redis signal) is delegated to it.
+ * When no runner is present (Redis unavailable), the webhook falls back to the
+ * inline opt-out + persist path.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from '../types.js';
 import { createResearchPhoneRepository } from '@/research/repositories/phone-repository.js';
+import { isOptOutMessage } from '@/research/compliance/opt-out-detector.js';
+import type { ResearchSessionId } from '@/research/types.js';
 
 // ─── Payload schema ───────────────────────────────────────────────────
 
@@ -35,20 +40,6 @@ const WahaMessagePayloadSchema = z.object({
 });
 
 type WahaMessagePayload = z.infer<typeof WahaMessagePayloadSchema>;
-
-// ─── Simple opt-out detector (placeholder until Claude #2 merges) ─────
-
-const OPT_OUT_PATTERNS = [
-  /\bbaja\b/i,
-  /no quiero m[aá]s mensajes/i,
-  /stop\b/i,
-  /unsubscribe/i,
-  /no me contactes/i,
-];
-
-function isOptOutMessage(text: string): boolean {
-  return OPT_OUT_PATTERNS.some((re) => re.test(text));
-}
 
 // ─── HMAC verification ────────────────────────────────────────────────
 
@@ -157,24 +148,59 @@ export function researchWebhookRoutes(fastify: FastifyInstance, deps: RouteDepen
       }
 
       const messageText = payload.body;
+      const turnOrder = activeSession.currentTurn + 1;
 
-      // ── 6. Opt-out detection ──────────────────────────────────────
+      // ── 6. Delegate to runner (when available) ────────────────────
+      if (deps.researchRunner) {
+        try {
+          await deps.researchRunner.handleInbound({
+            sessionId: activeSession.id as ResearchSessionId,
+            turnOrder,
+            wahaMessageId: payload.id,
+            text: messageText,
+            timestamp: payload.timestamp,
+            targetId: activeSession.targetId,
+          });
+        } catch (e) {
+          const isUniqueViolation =
+            e instanceof Error && e.message.includes('Unique constraint');
+          if (isUniqueViolation) {
+            await reply.code(200).send({ ok: true, status: 'already_processed' });
+            return;
+          }
+          throw e;
+        }
+
+        await phoneRepo.updateLastSeen(phone.id as import('@/research/types.js').ResearchPhoneId);
+        await reply.code(200).send({ ok: true, status: 'processed' });
+        return;
+      }
+
+      // ── 6b. Fallback (no runner — Redis unavailable) ──────────────
       if (isOptOutMessage(messageText)) {
-        logger.info('research webhook: opt-out detected', {
+        logger.info('research webhook: opt-out detected (no-runner fallback)', {
           component: 'research-webhook',
           sessionId: activeSession.id,
           targetId: activeSession.targetId,
         });
 
-        // Mark session aborted and target opted-out
         await prisma.$transaction([
           prisma.researchSession.update({
             where: { id: activeSession.id },
-            data: { status: 'aborted', failedAt: new Date(), failCode: 'OPT_OUT_DETECTED', failReason: 'Opt-out keyword detected' },
+            data: {
+              status: 'aborted',
+              failedAt: new Date(),
+              failCode: 'OPT_OUT_DETECTED',
+              failReason: 'Opt-out keyword detected',
+            },
           }),
           prisma.researchTarget.update({
             where: { id: activeSession.targetId },
-            data: { optedOutAt: new Date(), optedOutReason: messageText.slice(0, 500), status: 'banned' },
+            data: {
+              optedOutAt: new Date(),
+              optedOutReason: messageText.slice(0, 500),
+              status: 'banned',
+            },
           }),
         ]);
 
@@ -182,8 +208,6 @@ export function researchWebhookRoutes(fastify: FastifyInstance, deps: RouteDepen
         return;
       }
 
-      // ── 7. Persist inbound turn ───────────────────────────────────
-      const turnOrder = activeSession.currentTurn + 1;
       try {
         await prisma.researchTurn.create({
           data: {
@@ -195,8 +219,8 @@ export function researchWebhookRoutes(fastify: FastifyInstance, deps: RouteDepen
           },
         });
       } catch (e) {
-        // Unique constraint on wahaMessageId → already processed (race condition)
-        const isUniqueViolation = e instanceof Error && e.message.includes('Unique constraint');
+        const isUniqueViolation =
+          e instanceof Error && e.message.includes('Unique constraint');
         if (isUniqueViolation) {
           await reply.code(200).send({ ok: true, status: 'already_processed' });
           return;
@@ -204,13 +228,9 @@ export function researchWebhookRoutes(fastify: FastifyInstance, deps: RouteDepen
         throw e;
       }
 
-      // Update phone lastSeen
       await phoneRepo.updateLastSeen(phone.id as import('@/research/types.js').ResearchPhoneId);
 
-      // ── 8. Wake runner (TODO: Redis pub/sub when runner merges) ───
-      // await redis.set(`research:inbox:${activeSession.id}:${turnOrder}`, payload.id, { EX: 300 })
-      // await redis.publish(`research:response:${activeSession.id}:${turnOrder}`, payload.id)
-      logger.info('research webhook: turn persisted', {
+      logger.info('research webhook: turn persisted (no-runner fallback)', {
         component: 'research-webhook',
         sessionId: activeSession.id,
         turnOrder,

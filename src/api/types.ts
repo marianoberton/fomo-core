@@ -34,6 +34,9 @@ import type { ApprovalNotifierConfigRepository } from '@/infrastructure/reposito
 import type { MemberRepository } from '@/infrastructure/repositories/member-repository.js';
 import type { TaskRegistry } from '@/channels/openclaw-task-registry.js';
 import type { ProjectEventBus } from '@/api/events/event-bus.js';
+import type { ResearchProbeRunner } from '@/research/runner/probe-runner.js';
+import type { Queue } from 'bullmq';
+import type { ResearchProbeRunPayload } from '@/research/jobs/research-probe-run.js';
 
 // ─── API Response Envelope ───────────────────────────────────────
 
@@ -156,5 +159,9 @@ export interface RouteDependencies {
   taskRegistry: TaskRegistry;
   /** In-process project event bus for live push (WS + SSE). */
   eventBus: ProjectEventBus;
+  /** Research probe runner (null if Redis not configured). */
+  researchRunner: ResearchProbeRunner | null;
+  /** BullMQ queue for dispatching probe-run jobs (null if Redis not configured). */
+  researchProbesQueue: Queue<ResearchProbeRunPayload> | null;
   logger: Logger;
 }
