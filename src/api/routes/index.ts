@@ -40,6 +40,7 @@ import { performanceRoutes } from './performance.js';
 import { verticalRoutes } from './verticals.js';
 import { workforceMetricsRoutes } from './workforce-metrics.js';
 import { costRoutes } from './cost.js';
+import { metricsRoutes } from './metrics.js';
 import { operatorMessageRoutes } from './operator-message.js';
 import { modelRoutes } from './models.js';
 import { webchatAdminRoutes } from './webchat.js';
@@ -114,6 +115,7 @@ export async function registerRoutes(
   agentTemplateRoutes(fastify, deps);
   performanceRoutes(fastify, deps);
   workforceMetricsRoutes(fastify, deps);
+  metricsRoutes(fastify, deps);
   operationsSummaryRoutes(fastify, deps);
   verticalRoutes(fastify, deps);
   mcpServerRoutes(fastify, { mcpServerRepository: deps.mcpServerRepository, logger: deps.logger, memberRepository: deps.memberRepository });
