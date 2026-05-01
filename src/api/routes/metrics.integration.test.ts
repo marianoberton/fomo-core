@@ -196,6 +196,137 @@ describe('metrics integration', () => {
     expect(body.data.points[0]?.totalCostUsd).toBeCloseTo(0.03, 5);
   });
 
+  // ── Overview ───────────────────────────────────────────────────
+
+  it('GET /metrics/overview returns LAG-based avgResponseTimeMs for user→assistant pairs', async () => {
+    const c1 = await testDb.prisma.contact.create({
+      data: { id: nanoid(), projectId, name: 'Contact A', phone: '+5491111111111' },
+    });
+
+    // Two sessions: one today (counts toward conversationsToday) + one in range
+    const sToday = await seedSession({ daysAgo: 0, channel: 'whatsapp', contactId: c1.id });
+    const sInRange = await seedSession({ daysAgo: 1, channel: 'whatsapp', contactId: c1.id });
+
+    // Insert messages on the in-range session: user @ t0, assistant @ t0+1500ms.
+    const baseTs = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const userTs = new Date(baseTs.getTime());
+    const assistantTs = new Date(baseTs.getTime() + 1500);
+    await testDb.prisma.message.create({
+      data: {
+        id: nanoid(),
+        sessionId: sInRange,
+        role: 'user',
+        content: 'hola',
+        createdAt: userTs,
+      },
+    });
+    await testDb.prisma.message.create({
+      data: {
+        id: nanoid(),
+        sessionId: sInRange,
+        role: 'assistant',
+        content: 'hola, ¿en qué te ayudo?',
+        createdAt: assistantTs,
+      },
+    });
+    // Stand-alone assistant message (no preceding user) — must not count.
+    await testDb.prisma.message.create({
+      data: {
+        id: nanoid(),
+        sessionId: sToday,
+        role: 'assistant',
+        content: 'system note',
+        createdAt: new Date(),
+      },
+    });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/v1/projects/${projectId}/metrics/overview`,
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as SuccessBody<{
+      conversationsToday: number;
+      activeClients: number;
+      messagesProcessed: number;
+      avgResponseTimeMs: number | null;
+    }>;
+    expect(body.data.conversationsToday).toBeGreaterThanOrEqual(1);
+    expect(body.data.activeClients).toBe(1);
+    expect(body.data.messagesProcessed).toBeGreaterThanOrEqual(2);
+    // Allow ±50ms tolerance for clock drift / Postgres precision
+    expect(body.data.avgResponseTimeMs).not.toBeNull();
+    expect(Math.abs((body.data.avgResponseTimeMs ?? 0) - 1500)).toBeLessThan(50);
+  });
+
+  it('GET /metrics/overview returns null avgResponseTimeMs with no qualifying pairs', async () => {
+    await seedSession({ daysAgo: 1, channel: 'whatsapp' });
+    // No messages inserted — LAG produces no rows.
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/v1/projects/${projectId}/metrics/overview`,
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as SuccessBody<{ avgResponseTimeMs: number | null }>;
+    expect(body.data.avgResponseTimeMs).toBeNull();
+  });
+
+  // ── Top Clients ────────────────────────────────────────────────
+
+  it('GET /metrics/top-clients groups by Contact (no Client↔Session link in schema)', async () => {
+    const a = await testDb.prisma.contact.create({
+      data: { id: nanoid(), projectId, name: 'Cartones del Sur', phone: '+5491111111111' },
+    });
+    const b = await testDb.prisma.contact.create({
+      data: { id: nanoid(), projectId, name: 'TechFlow', phone: '+5492222222222' },
+    });
+
+    // Contact A: 3 sessions, 4 messages
+    const sa1 = await seedSession({ daysAgo: 1, channel: 'whatsapp', contactId: a.id });
+    const sa2 = await seedSession({ daysAgo: 2, channel: 'whatsapp', contactId: a.id });
+    const sa3 = await seedSession({ daysAgo: 3, channel: 'whatsapp', contactId: a.id });
+    for (const s of [sa1, sa2, sa3, sa1]) {
+      await testDb.prisma.message.create({
+        data: { id: nanoid(), sessionId: s, role: 'user', content: 'x' },
+      });
+    }
+
+    // Contact B: 1 session, 1 message
+    const sb1 = await seedSession({ daysAgo: 1, channel: 'whatsapp', contactId: b.id });
+    await testDb.prisma.message.create({
+      data: { id: nanoid(), sessionId: sb1, role: 'user', content: 'y' },
+    });
+
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/v1/projects/${projectId}/metrics/top-clients?limit=5`,
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as SuccessBody<{
+      clients: { clientId: string; clientName: string; conversations: number; messages: number }[];
+    }>;
+    expect(body.data.clients).toHaveLength(2);
+    expect(body.data.clients[0]).toMatchObject({
+      clientId: a.id,
+      clientName: 'Cartones del Sur',
+      conversations: 3,
+      messages: 4,
+    });
+    expect(body.data.clients[1]).toMatchObject({
+      clientId: b.id,
+      clientName: 'TechFlow',
+      conversations: 1,
+      messages: 1,
+    });
+  });
+
   it('GET /metrics/usage?groupBy=agent sums per agentId with agentName', async () => {
     const s = await seedSession({ daysAgo: 1, channel: 'whatsapp' });
     await seedUsage({ daysAgo: 1, sessionId: s, agentId, inputTokens: 1000, outputTokens: 500, costUsd: 0.05 });

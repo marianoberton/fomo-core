@@ -5,12 +5,22 @@
  *   GET /metrics/conversations  → sessions per day (count + uniqueContacts)
  *   GET /metrics/channels       → session distribution by channel
  *   GET /metrics/usage          → token + cost aggregation by day or by agent
+ *   GET /metrics/overview       → KPI snapshot (conversationsToday, activeClients, …)
+ *   GET /metrics/top-clients    → top contacts by conversation count
  *
  * Aggregations are pushed down to SQL via `$queryRaw` to avoid N+1.
- * Results are memoized in-process for 60 s per (projectId, endpoint, range, groupBy).
+ * Results are memoized in-process for 60 s per (projectId, endpoint, range, …).
  *
  * Project-access enforcement is handled globally by the `requireProjectAccess`
  * onRequest hook (matches `request.params.projectId`).
+ *
+ * Notes:
+ *  - "activeClients" is computed from distinct `Contact` ids in the range —
+ *    there is no Client ↔ Session link in the schema, only `UsageRecord.clientId`.
+ *  - top-clients groups by `Contact` for the same reason; the Zod field names
+ *    (`clientId`, `clientName`) are kept to match the dashboard contract.
+ *  - `avgResponseTimeMs` uses a LAG window over `messages` measuring the gap
+ *    between consecutive `user` → `assistant` messages within a session.
  */
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -28,6 +38,10 @@ const rangeQuerySchema = z.object({
 
 const usageQuerySchema = rangeQuerySchema.extend({
   groupBy: z.enum(['day', 'agent']).default('day'),
+});
+
+const topClientsQuerySchema = rangeQuerySchema.extend({
+  limit: z.coerce.number().int().positive().max(100).default(10),
 });
 
 const conversationPointSchema = z.object({
@@ -62,11 +76,31 @@ const usageResponseSchema = z.object({
   points: z.array(usagePointSchema),
 });
 
+const overviewResponseSchema = z.object({
+  conversationsToday: z.number(),
+  activeClients: z.number(),
+  messagesProcessed: z.number(),
+  avgResponseTimeMs: z.number().nullable(),
+});
+
+const topClientSchema = z.object({
+  clientId: z.string(),
+  clientName: z.string(),
+  conversations: z.number(),
+  messages: z.number(),
+});
+
+const topClientsResponseSchema = z.object({
+  clients: z.array(topClientSchema),
+});
+
 // ─── Types ──────────────────────────────────────────────────────
 
 type ConversationsResponse = z.infer<typeof conversationsResponseSchema>;
 type ChannelsResponse = z.infer<typeof channelsResponseSchema>;
 type UsageResponse = z.infer<typeof usageResponseSchema>;
+type OverviewResponse = z.infer<typeof overviewResponseSchema>;
+type TopClientsResponse = z.infer<typeof topClientsResponseSchema>;
 
 interface ResolvedRange {
   from: Date;
@@ -284,6 +318,149 @@ export function metricsRoutes(
           })),
         };
       }
+
+      cache.set(cacheKey, response);
+      return sendSuccess(reply, response);
+    },
+  );
+
+  // ── GET /projects/:projectId/metrics/overview ───────────────────
+  fastify.get<{ Params: { projectId: string } }>(
+    '/projects/:projectId/metrics/overview',
+    async (request, reply) => {
+      const parsed = rangeQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        return sendError(reply, 'INVALID_QUERY', parsed.error.message, 400);
+      }
+      const { projectId } = request.params;
+      const range = resolveRange(parsed.data.from, parsed.data.to);
+      const cacheKey = `overview|${projectId}|${range.fromIso}|${range.toIso}`;
+
+      const cached = cache.get<OverviewResponse>(cacheKey);
+      if (cached) return sendSuccess(reply, cached);
+
+      const startOfToday = new Date();
+      startOfToday.setUTCHours(0, 0, 0, 0);
+
+      // Parallel queries — independent. Pushdown to SQL.
+      const [conversationsTodayRaw, activeClientsRaw, messagesRaw, avgRespRaw] =
+        await Promise.all([
+          prisma.$queryRaw<{ count: bigint }[]>`
+            SELECT COUNT(*)::bigint AS count
+            FROM sessions s
+            WHERE s.project_id = ${projectId as ProjectId}
+              AND s.created_at >= ${startOfToday}
+          `,
+          prisma.$queryRaw<{ count: bigint }[]>`
+            SELECT COUNT(DISTINCT s.contact_id)::bigint AS count
+            FROM sessions s
+            WHERE s.project_id = ${projectId as ProjectId}
+              AND s.contact_id IS NOT NULL
+              AND s.created_at >= ${range.from}
+              AND s.created_at <= ${range.to}
+          `,
+          prisma.$queryRaw<{ count: bigint }[]>`
+            SELECT COUNT(*)::bigint AS count
+            FROM messages m
+            JOIN sessions s ON s.id = m.session_id
+            WHERE s.project_id = ${projectId as ProjectId}
+              AND m.created_at >= ${range.from}
+              AND m.created_at <= ${range.to}
+          `,
+          // LAG window over messages: avg gap between consecutive user → assistant
+          // messages within the same session, measured in ms. Filtered to the range
+          // on the *assistant* row's createdAt. NULL when no qualifying pairs exist.
+          prisma.$queryRaw<{ avg_ms: number | null }[]>`
+            WITH paired AS (
+              SELECT
+                m.session_id,
+                m.role,
+                m.created_at,
+                LAG(m.role) OVER w AS prev_role,
+                LAG(m.created_at) OVER w AS prev_at
+              FROM messages m
+              JOIN sessions s ON s.id = m.session_id
+              WHERE s.project_id = ${projectId as ProjectId}
+                AND m.created_at >= ${range.from}
+                AND m.created_at <= ${range.to}
+              WINDOW w AS (PARTITION BY m.session_id ORDER BY m.created_at ASC)
+            )
+            SELECT AVG(EXTRACT(EPOCH FROM (created_at - prev_at)) * 1000)::float8 AS avg_ms
+            FROM paired
+            WHERE prev_role = 'user' AND role = 'assistant'
+          `,
+        ]);
+
+      const avgMsRaw = avgRespRaw[0]?.avg_ms;
+      const response: OverviewResponse = {
+        conversationsToday: Number(conversationsTodayRaw[0]?.count ?? 0n),
+        activeClients: Number(activeClientsRaw[0]?.count ?? 0n),
+        messagesProcessed: Number(messagesRaw[0]?.count ?? 0n),
+        avgResponseTimeMs:
+          typeof avgMsRaw === 'number' && Number.isFinite(avgMsRaw)
+            ? Math.round(avgMsRaw)
+            : null,
+      };
+
+      cache.set(cacheKey, response);
+      return sendSuccess(reply, response);
+    },
+  );
+
+  // ── GET /projects/:projectId/metrics/top-clients ────────────────
+  // Groups by Contact (no Client ↔ Session link in schema); the response
+  // field names are kept as `clientId`/`clientName` to match the dashboard
+  // contract — they hold contactId / contact.name.
+  fastify.get<{ Params: { projectId: string } }>(
+    '/projects/:projectId/metrics/top-clients',
+    async (request, reply) => {
+      const parsed = topClientsQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        return sendError(reply, 'INVALID_QUERY', parsed.error.message, 400);
+      }
+      const { projectId } = request.params;
+      const { limit } = parsed.data;
+      const range = resolveRange(parsed.data.from, parsed.data.to);
+      const cacheKey = `topclients|${projectId}|${range.fromIso}|${range.toIso}|${limit}`;
+
+      const cached = cache.get<TopClientsResponse>(cacheKey);
+      if (cached) return sendSuccess(reply, cached);
+
+      const rows = await prisma.$queryRaw<
+        {
+          contact_id: string;
+          contact_name: string | null;
+          conversations: bigint;
+          messages: bigint;
+        }[]
+      >`
+        SELECT
+          s.contact_id AS contact_id,
+          c.name AS contact_name,
+          COUNT(DISTINCT s.id)::bigint AS conversations,
+          COUNT(m.id)::bigint AS messages
+        FROM sessions s
+        LEFT JOIN contacts c ON c.id = s.contact_id
+        LEFT JOIN messages m ON m.session_id = s.id
+          AND m.created_at >= ${range.from}
+          AND m.created_at <= ${range.to}
+        WHERE s.project_id = ${projectId as ProjectId}
+          AND s.contact_id IS NOT NULL
+          AND s.created_at >= ${range.from}
+          AND s.created_at <= ${range.to}
+        GROUP BY s.contact_id, c.name
+        ORDER BY conversations DESC, messages DESC
+        LIMIT ${limit}
+      `;
+
+      const response: TopClientsResponse = {
+        clients: rows.map((r) => ({
+          clientId: r.contact_id,
+          clientName: r.contact_name ?? 'Unknown',
+          conversations: Number(r.conversations),
+          messages: Number(r.messages),
+        })),
+      };
 
       cache.set(cacheKey, response);
       return sendSuccess(reply, response);

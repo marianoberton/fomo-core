@@ -218,4 +218,110 @@ describe('metricsRoutes', () => {
       expect(body.error.code).toBe('INVALID_QUERY');
     });
   });
+
+  describe('GET /projects/:projectId/metrics/overview', () => {
+    it('returns KPI snapshot from 4 parallel aggregation queries', async () => {
+      const { app, queryRaw } = createApp();
+      // Order matches Promise.all in the route:
+      //   conversationsToday, activeClients, messagesProcessed, avgResponseTimeMs
+      queryRaw
+        .mockResolvedValueOnce([{ count: 12n }])
+        .mockResolvedValueOnce([{ count: 7n }])
+        .mockResolvedValueOnce([{ count: 348n }])
+        .mockResolvedValueOnce([{ avg_ms: 1450.6 }]);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/projects/proj-overview/metrics/overview',
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<
+        SuccessBody<{
+          conversationsToday: number;
+          activeClients: number;
+          messagesProcessed: number;
+          avgResponseTimeMs: number | null;
+        }>
+      >();
+      expect(body.data).toEqual({
+        conversationsToday: 12,
+        activeClients: 7,
+        messagesProcessed: 348,
+        avgResponseTimeMs: 1451, // rounded
+      });
+      expect(queryRaw).toHaveBeenCalledTimes(4);
+    });
+
+    it('returns null avgResponseTimeMs when no user→assistant pairs exist', async () => {
+      const { app, queryRaw } = createApp();
+      queryRaw
+        .mockResolvedValueOnce([{ count: 0n }])
+        .mockResolvedValueOnce([{ count: 0n }])
+        .mockResolvedValueOnce([{ count: 0n }])
+        .mockResolvedValueOnce([{ avg_ms: null }]);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/projects/proj-empty/metrics/overview',
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<SuccessBody<{ avgResponseTimeMs: number | null }>>();
+      expect(body.data.avgResponseTimeMs).toBeNull();
+    });
+  });
+
+  describe('GET /projects/:projectId/metrics/top-clients', () => {
+    it('returns top contacts ordered by conversation count', async () => {
+      const { app, queryRaw } = createApp();
+      queryRaw.mockResolvedValueOnce([
+        { contact_id: 'c-1', contact_name: 'Cartones del Sur', conversations: 87n, messages: 542n },
+        { contact_id: 'c-2', contact_name: 'TechFlow', conversations: 63n, messages: 418n },
+      ]);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/projects/proj-top/metrics/top-clients',
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<
+        SuccessBody<{
+          clients: { clientId: string; clientName: string; conversations: number; messages: number }[];
+        }>
+      >();
+      expect(body.data.clients).toEqual([
+        { clientId: 'c-1', clientName: 'Cartones del Sur', conversations: 87, messages: 542 },
+        { clientId: 'c-2', clientName: 'TechFlow', conversations: 63, messages: 418 },
+      ]);
+    });
+
+    it('uses "Unknown" when contact has no name (orphaned join)', async () => {
+      const { app, queryRaw } = createApp();
+      queryRaw.mockResolvedValueOnce([
+        { contact_id: 'c-orphan', contact_name: null, conversations: 5n, messages: 12n },
+      ]);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/projects/proj-x/metrics/top-clients?limit=5',
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<SuccessBody<{ clients: { clientName: string }[] }>>();
+      expect(body.data.clients[0]?.clientName).toBe('Unknown');
+    });
+
+    it('rejects negative limit', async () => {
+      const { app } = createApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/projects/proj-x/metrics/top-clients?limit=-3',
+      });
+      expect(res.statusCode).toBe(400);
+      const body = res.json<ErrorBody>();
+      expect(body.error.code).toBe('INVALID_QUERY');
+    });
+  });
 });
