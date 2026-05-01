@@ -13,6 +13,7 @@ import type { ProjectId, SessionId } from '@/core/types.js';
 function createMockSessionRepo(): { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } {
   return {
     create: vi.fn(),
+    ensureWithId: vi.fn(),
     findById: vi.fn().mockResolvedValue(null),
     findByContactId: vi.fn(),
     findByCallId: vi.fn(),

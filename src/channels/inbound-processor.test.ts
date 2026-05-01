@@ -85,6 +85,7 @@ function createDeps(overrides: Partial<InboundProcessorDeps> = {}): InboundProce
 
   const sessionRepository: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
     create: vi.fn().mockResolvedValue(mockSession),
+    ensureWithId: vi.fn().mockResolvedValue(mockSession),
     findById: vi.fn(),
     findByContactId: vi.fn().mockResolvedValue(mockSession),
     findByCallId: vi.fn(),
@@ -224,6 +225,7 @@ describe('InboundProcessor', () => {
       };
       const sessionRepo: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
         create: vi.fn(),
+        ensureWithId: vi.fn(),
         findById: vi.fn(),
         findByContactId: vi.fn().mockResolvedValue(pausedSession),
         findByCallId: vi.fn(),
@@ -256,6 +258,7 @@ describe('InboundProcessor', () => {
       };
       const sessionRepo: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
         create: vi.fn(),
+        ensureWithId: vi.fn(),
         findById: vi.fn(),
         findByContactId: vi.fn().mockResolvedValue(pausedSession),
         findByCallId: vi.fn(),
@@ -378,6 +381,7 @@ describe('InboundProcessor', () => {
 
       const sessionRepo: { [K in keyof SessionRepository]: ReturnType<typeof vi.fn> } = {
         create: vi.fn().mockResolvedValue(mockSession),
+        ensureWithId: vi.fn().mockResolvedValue(mockSession),
         findById: vi.fn(),
         findByContactId: vi.fn().mockResolvedValue(null), // No existing session
         findByCallId: vi.fn(),

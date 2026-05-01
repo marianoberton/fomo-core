@@ -40,6 +40,13 @@ export interface StoredMessage {
 
 export interface SessionRepository {
   create(input: SessionCreateInput): Promise<Session>;
+  /**
+   * Ensure a session with the given deterministic id exists.
+   * Used by inbound channel flows (chatwoot `cw-<convId>`, telegram, etc.)
+   * where the session id is derived from the external conversation id.
+   * If it already exists, returns it untouched. Otherwise creates it.
+   */
+  ensureWithId(id: SessionId, projectId: ProjectId, metadata?: Record<string, unknown>): Promise<Session>;
   findById(id: SessionId): Promise<Session | null>;
   findByContactId(projectId: ProjectId, contactId: string): Promise<Session | null>;
   /** Find an active session by VAPI call ID stored in metadata.callId. */
@@ -87,6 +94,24 @@ export function createSessionRepository(prisma: PrismaClient): SessionRepository
           status: 'active',
           metadata: input.metadata as Prisma.InputJsonValue,
           expiresAt: input.expiresAt ?? null,
+        },
+      });
+      return toSessionModel(record);
+    },
+
+    async ensureWithId(
+      id: SessionId,
+      projectId: ProjectId,
+      metadata?: Record<string, unknown>,
+    ): Promise<Session> {
+      const record = await prisma.session.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id,
+          projectId,
+          status: 'active',
+          metadata: (metadata ?? {}) as Prisma.InputJsonValue,
         },
       });
       return toSessionModel(record);

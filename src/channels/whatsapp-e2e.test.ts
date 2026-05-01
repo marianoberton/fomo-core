@@ -91,6 +91,20 @@ function createMockSessionRepository(): SessionRepository {
       sessions.set(session.id, session);
       return Promise.resolve(session);
     }),
+    ensureWithId: vi.fn((id: SessionId, projectId, metadata?: Record<string, unknown>): Promise<Session> => {
+      const existing = sessions.get(id);
+      if (existing) return Promise.resolve(existing);
+      const session: Session = {
+        id,
+        projectId,
+        status: 'active',
+        metadata: metadata ?? {},
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      sessions.set(id, session);
+      return Promise.resolve(session);
+    }),
     findById: vi.fn((id: string): Promise<Session | null> => Promise.resolve(sessions.get(id) ?? null)),
     findByContactId: vi.fn((): Promise<Session | null> => Promise.resolve(null)),
     findByCallId: vi.fn((): Promise<Session | null> => Promise.resolve(null)),

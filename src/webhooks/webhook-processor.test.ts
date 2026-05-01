@@ -51,6 +51,13 @@ function createMockSessionRepository(): SessionRepository {
       createdAt: new Date(),
       updatedAt: new Date(),
     }),
+    ensureWithId: vi.fn().mockResolvedValue({
+      id: 'session_123',
+      projectId: PROJECT_ID,
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }),
     findById: vi.fn(),
     findByContactId: vi.fn(),
     findByCallId: vi.fn(),

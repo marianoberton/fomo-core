@@ -448,6 +448,14 @@ async function start(): Promise<void> {
       userMessage: string;
       mediaUrls?: string[];
     }): Promise<{ response: string }> => {
+      // Inbound channels carry deterministic session ids (e.g. `cw-<convId>`)
+      // that don't exist on first contact. Upsert before prepareChatRun's lookup.
+      await sessionRepository.ensureWithId(
+        params.sessionId as import('@/core/types.js').SessionId,
+        params.projectId,
+        params.sourceChannel ? { channel: params.sourceChannel } : undefined,
+      );
+
       const setupResult = await prepareChatRun(
         {
           projectId: params.projectId,
