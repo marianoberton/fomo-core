@@ -221,7 +221,7 @@ ANTHROPIC_API_KEY=<encriptado>
 GROQ_API_KEY=<encriptado>
 
 # === INTEGRACIONES FOMO-CORE ===
-FOMO_CORE_API_URL=https://api.fomo.com.ar
+FOMO_CORE_API_URL=https://core.fomo.com.ar
 FOMO_CORE_API_KEY=<encriptado>
 FOMO_CLIENT_ID=<uuid>
 

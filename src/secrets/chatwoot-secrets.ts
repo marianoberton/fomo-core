@@ -10,7 +10,7 @@ import type { SecretService } from './types.js';
 
 /** Stable descriptions written to secret metadata so operators can tell them apart in the UI. */
 const API_TOKEN_DESCRIPTION = 'Chatwoot API access token (api_access_token header)';
-const WEBHOOK_SECRET_DESCRIPTION = 'Chatwoot webhook HMAC signing secret (X-Chatwoot-Api-Signature)';
+const WEBHOOK_SECRET_DESCRIPTION = 'Chatwoot Agent Bot signing secret (X-Chatwoot-Signature, sha256({ts}.{body}))';
 
 /** Result of storing both Chatwoot secrets for a project. */
 export interface StoreChatwootSecretsResult {

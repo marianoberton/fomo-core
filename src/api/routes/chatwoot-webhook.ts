@@ -26,6 +26,96 @@ import type { Logger } from '@/observability/logger.js';
 import type { SecretService } from '@/secrets/types.js';
 import type { ChannelIntegrationRepository } from '@/channels/types.js';
 
+// Chatwoot v4.12.1 signs `${timestamp}.${rawBody}` and prefixes the header
+// with "sha256=". Reject anything older than 5 minutes to bound replay
+// windows.
+const CHATWOOT_TIMESTAMP_DRIFT_SECONDS = 300;
+
+// `request.rawBody` is populated by the encapsulated content-type parser
+// registered alongside this plugin (see registerChatwootRawBodyParser). The
+// declaration below makes that field visible on FastifyRequest.
+declare module 'fastify' {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+  interface FastifyRequest {
+    rawBody?: string;
+  }
+}
+
+// ─── HMAC verification ──────────────────────────────────────────
+
+interface VerifyHmacInput {
+  rawBody: string;
+  signatureHeader: string | undefined;
+  timestampHeader: string | undefined;
+  secret: string;
+  /** Override for testing. Defaults to Math.floor(Date.now() / 1000). */
+  nowSeconds?: number;
+}
+
+type VerifyHmacResult =
+  | { ok: true }
+  | { ok: false; reason: 'missing_signature' | 'missing_timestamp' | 'timestamp_drift' | 'mismatch' };
+
+/**
+ * Verify a Chatwoot webhook HMAC per v4.12.1 spec:
+ *   header   = X-Chatwoot-Signature: "sha256=" + hex(HMAC-SHA256(secret, `${ts}.${rawBody}`))
+ *   freshness= |now - ts| <= 300s
+ *   compare  = constant-time over the hex digest after stripping "sha256="
+ */
+export function verifyChatwootHmac(input: VerifyHmacInput): VerifyHmacResult {
+  if (!input.signatureHeader) return { ok: false, reason: 'missing_signature' };
+  if (!input.timestampHeader) return { ok: false, reason: 'missing_timestamp' };
+
+  const ts = Number.parseInt(input.timestampHeader, 10);
+  if (!Number.isFinite(ts)) return { ok: false, reason: 'missing_timestamp' };
+  const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  if (Math.abs(now - ts) > CHATWOOT_TIMESTAMP_DRIFT_SECONDS) {
+    return { ok: false, reason: 'timestamp_drift' };
+  }
+
+  const signedInput = `${input.timestampHeader}.${input.rawBody}`;
+  const expectedHex = crypto.createHmac('sha256', input.secret).update(signedInput).digest('hex');
+
+  // Strip the "sha256=" prefix if present, then constant-time compare hex digests.
+  const receivedHex = input.signatureHeader.startsWith('sha256=')
+    ? input.signatureHeader.slice('sha256='.length)
+    : input.signatureHeader;
+
+  const expectedBuf = Buffer.from(expectedHex, 'utf8');
+  const receivedBuf = Buffer.from(receivedHex, 'utf8');
+  if (expectedBuf.length !== receivedBuf.length) return { ok: false, reason: 'mismatch' };
+  return crypto.timingSafeEqual(expectedBuf, receivedBuf)
+    ? { ok: true }
+    : { ok: false, reason: 'mismatch' };
+}
+
+/**
+ * Register a JSON content-type parser scoped to the chatwoot plugin context
+ * that stashes the raw UTF-8 body string on `request.rawBody` before parsing.
+ * Must be called inside an encapsulated `register()` so it does not leak to
+ * sibling routes (which expect default JSON parsing without the rawBody side
+ * effect).
+ */
+export function registerChatwootRawBodyParser(fastify: FastifyInstance): void {
+  fastify.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (request, body, done) => {
+      const text = typeof body === 'string' ? body : (body as Buffer).toString('utf8');
+      request.rawBody = text;
+      if (text.length === 0) {
+        done(null, undefined);
+        return;
+      }
+      try {
+        done(null, JSON.parse(text));
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
+}
+
 // ─── Extended Dependencies ──────────────────────────────────────
 
 export interface ChatwootWebhookDeps extends RouteDependencies {
@@ -104,24 +194,21 @@ export function chatwootWebhookRoutes(
 
   /**
    * POST /webhooks/chatwoot — receives Agent Bot webhook events from Chatwoot.
+   *
+   * Auth: HMAC-SHA256 over `${X-Chatwoot-Timestamp}.${rawBody}` keyed with the
+   * Agent Bot signing secret. Header is `X-Chatwoot-Signature: sha256=<hex>`.
+   * Replays older than 5 minutes are rejected.
    */
   fastify.post('/webhooks/chatwoot', async (request: FastifyRequest, reply: FastifyReply) => {
-    // ─── HMAC Signature Validation ─────────────────────────────────
-    const signature = request.headers['x-chatwoot-api-signature'] as string | undefined;
+    const signatureHeader = request.headers['x-chatwoot-signature'] as string | undefined;
+    const timestampHeader = request.headers['x-chatwoot-timestamp'] as string | undefined;
+    const deliveryId = request.headers['x-chatwoot-delivery'] as string | undefined;
 
-    if (!signature) {
-      logger.warn('Chatwoot webhook missing signature', {
-        component: 'chatwoot-webhook',
-        ip: request.ip,
-      });
-      return reply.status(401).send({ error: 'Missing signature' });
-    }
-
-    // Peek at the payload to find the account, so we can resolve the
+    // Peek at the parsed payload to find the account, so we can resolve the
     // per-project webhook secret before validating the HMAC.
-    const earlyEvent = request.body as ChatwootWebhookEvent;
+    const earlyEvent = request.body as ChatwootWebhookEvent | undefined;
     const secret = await resolveChatwootWebhookSecret({
-      accountId: earlyEvent.account?.id,
+      accountId: earlyEvent?.account?.id,
       channelResolver,
       channelIntegrationRepository,
       secretService,
@@ -129,30 +216,42 @@ export function chatwootWebhookRoutes(
     });
 
     if (!secret) {
-      logger.error('No Chatwoot webhook secret configured (project or env)', {
+      logger.error('Chatwoot webhook rejected — no signing secret configured', {
         component: 'chatwoot-webhook',
-        accountId: earlyEvent.account?.id,
+        accountId: earlyEvent?.account?.id,
+        deliveryId,
       });
-      return reply.status(500).send({ error: 'Server misconfigured' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(JSON.stringify(request.body))
-      .digest('hex');
+    const verification = verifyChatwootHmac({
+      rawBody: request.rawBody ?? '',
+      signatureHeader,
+      timestampHeader,
+      secret,
+    });
 
-    if (signature !== expectedSignature) {
-      logger.warn('Chatwoot webhook invalid signature', {
+    if (!verification.ok) {
+      logger.warn('Chatwoot webhook rejected', {
         component: 'chatwoot-webhook',
         ip: request.ip,
-        received: signature.slice(0, 10) + '...',
-        expected: expectedSignature.slice(0, 10) + '...',
+        accountId: earlyEvent?.account?.id,
+        deliveryId,
+        reason: verification.reason,
       });
-      return reply.status(401).send({ error: 'Invalid signature' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     // ─── Process Webhook ───────────────────────────────────────────
     const event = request.body as ChatwootWebhookEvent;
+    if (deliveryId) {
+      logger.debug('Chatwoot webhook delivery accepted', {
+        component: 'chatwoot-webhook',
+        deliveryId,
+        accountId: event.account?.id,
+        eventType: event.event,
+      });
+    }
 
     logger.debug('Received Chatwoot webhook', {
       component: 'chatwoot-webhook',
@@ -306,20 +405,13 @@ export function chatwootWebhookRoutes(
    * This re-enables the bot for the next message.
    */
   fastify.post('/webhooks/chatwoot/status', async (request: FastifyRequest, reply: FastifyReply) => {
-    // ─── HMAC Signature Validation ─────────────────────────────────
-    const signature = request.headers['x-chatwoot-api-signature'] as string | undefined;
+    const signatureHeader = request.headers['x-chatwoot-signature'] as string | undefined;
+    const timestampHeader = request.headers['x-chatwoot-timestamp'] as string | undefined;
+    const deliveryId = request.headers['x-chatwoot-delivery'] as string | undefined;
 
-    if (!signature) {
-      logger.warn('Chatwoot webhook missing signature (status endpoint)', {
-        component: 'chatwoot-webhook',
-        ip: request.ip,
-      });
-      return reply.status(401).send({ error: 'Missing signature' });
-    }
-
-    const earlyEvent = request.body as ChatwootWebhookEvent;
+    const earlyEvent = request.body as ChatwootWebhookEvent | undefined;
     const secret = await resolveChatwootWebhookSecret({
-      accountId: earlyEvent.account?.id,
+      accountId: earlyEvent?.account?.id,
       channelResolver,
       channelIntegrationRepository,
       secretService,
@@ -327,26 +419,30 @@ export function chatwootWebhookRoutes(
     });
 
     if (!secret) {
-      logger.error('No Chatwoot webhook secret configured (status endpoint)', {
+      logger.error('Chatwoot webhook rejected — no signing secret (status endpoint)', {
         component: 'chatwoot-webhook',
-        accountId: earlyEvent.account?.id,
+        accountId: earlyEvent?.account?.id,
+        deliveryId,
       });
-      return reply.status(500).send({ error: 'Server misconfigured' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(JSON.stringify(request.body))
-      .digest('hex');
+    const verification = verifyChatwootHmac({
+      rawBody: request.rawBody ?? '',
+      signatureHeader,
+      timestampHeader,
+      secret,
+    });
 
-    if (signature !== expectedSignature) {
-      logger.warn('Chatwoot webhook invalid signature (status endpoint)', {
+    if (!verification.ok) {
+      logger.warn('Chatwoot webhook rejected (status endpoint)', {
         component: 'chatwoot-webhook',
         ip: request.ip,
-        received: signature.slice(0, 10) + '...',
-        expected: expectedSignature.slice(0, 10) + '...',
+        accountId: earlyEvent?.account?.id,
+        deliveryId,
+        reason: verification.reason,
       });
-      return reply.status(401).send({ error: 'Invalid signature' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     // ─── Process Status Change ─────────────────────────────────────

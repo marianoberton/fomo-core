@@ -207,7 +207,7 @@ export function createDockerSocketService(deps: DockerSocketServiceDeps): Docker
             channels_list: req.channels.map((ch) => `- ${ch}`).join('\n'),
             channels_config: req.channels.map((ch) => `${ch}:\n    enabled: true`).join('\n  '),
             health_check_port: '8080',
-            fomo_core_api_url: process.env['FOMO_CORE_API_URL'] ?? 'https://api.fomo.com.ar',
+            fomo_core_api_url: process.env['FOMO_CORE_API_URL'] ?? 'https://core.fomo.com.ar',
           };
 
           workspaceDir = await templateEngine.prepareClientWorkspace(

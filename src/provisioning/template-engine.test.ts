@@ -116,7 +116,7 @@ describe('TemplateVarsSchema', () => {
       channels_list: '- whatsapp\n- telegram',
       channels_config: 'whatsapp:\n  enabled: true',
       health_check_port: '8080',
-      fomo_core_api_url: 'https://api.fomo.com.ar',
+      fomo_core_api_url: 'https://core.fomo.com.ar',
     });
     expect(result.success).toBe(true);
   });
@@ -278,7 +278,7 @@ describe('createTemplateEngine', () => {
     channels_list: '- whatsapp\n- telegram',
     channels_config: 'whatsapp:\n    enabled: true\n  telegram:\n    enabled: true',
     health_check_port: '8080',
-    fomo_core_api_url: 'https://api.fomo.com.ar',
+    fomo_core_api_url: 'https://core.fomo.com.ar',
   };
 
   it('creates workspace directory with rendered SOUL.md for ventas vertical', async () => {

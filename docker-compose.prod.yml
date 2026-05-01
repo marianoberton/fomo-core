@@ -80,7 +80,7 @@ services:
       # Provisioning
       DOCKER_SOCKET_PATH: /var/run/docker.sock
       DOCKER_API_VERSION: "1.43"
-      FOMO_CORE_API_URL: ${FOMO_CORE_API_URL:-https://api.fomo.com.ar}
+      FOMO_CORE_API_URL: ${FOMO_CORE_API_URL:-https://core.fomo.com.ar}
       PROVISIONING_PORT_RANGE_START: "19000"
       PROVISIONING_PORT_RANGE_END: "19999"
       CLIENT_TEMPLATES_PATH: /app/templates
