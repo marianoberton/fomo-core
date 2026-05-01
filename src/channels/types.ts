@@ -108,6 +108,13 @@ export interface ChatwootIntegrationConfig {
   inboxId: number;
   agentBotId: number;
   /**
+   * Nexus agent that handles inbound messages on this Chatwoot inbox.
+   * Required for routing — without it, runAgent has no agent to invoke.
+   * Optional in the type only so older JSON rows still parse; webhook
+   * dispatch logs and rejects the delivery when missing.
+   */
+  agentId?: string;
+  /**
    * High-entropy random token (32–128 hex chars) generated server-side at
    * creation time. Embedded in the public webhook URL
    * (`/webhooks/chatwoot/{pathToken}`) and used to identify the integration
@@ -219,6 +226,7 @@ export const ChatwootIntegrationConfigSchema = z
     accountId: z.number().int().positive(),
     inboxId: z.number().int().positive(),
     agentBotId: z.number().int().positive(),
+    agentId: z.string().min(1).optional(),
     pathToken: ChatwootPathTokenSchema,
     apiTokenSecretKey: z.string().min(1).max(128).optional(),
     apiTokenEnvVar: z.string().min(1).optional(),
@@ -241,6 +249,7 @@ export const ChatwootIntegrationConfigCreateInputSchema = z
     accountId: z.number().int().positive(),
     inboxId: z.number().int().positive(),
     agentBotId: z.number().int().positive(),
+    agentId: z.string().min(1).optional(),
     apiTokenSecretKey: z.string().min(1).max(128).optional(),
     apiTokenEnvVar: z.string().min(1).optional(),
   })

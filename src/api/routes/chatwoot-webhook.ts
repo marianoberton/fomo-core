@@ -69,6 +69,8 @@ export interface ChatwootWebhookDeps extends RouteDependencies {
     projectId: ProjectId;
     sessionId: string;
     userMessage: string;
+    agentId?: string;
+    sourceChannel?: string;
   }) => Promise<{ response: string }>;
 }
 
@@ -101,6 +103,17 @@ export function chatwootWebhookRoutes(
       const { event, integration, projectId } = result;
       const accountId = event.account?.id;
       const conversationId = event.conversation?.id;
+      const agentId = (integration.config as ChatwootIntegrationConfig).agentId;
+
+      if (!agentId) {
+        logger.error('Chatwoot integration is missing agentId — cannot route inbound', {
+          component: 'chatwoot-webhook',
+          projectId,
+          integrationId: integration.id,
+          inboxId: (integration.config as ChatwootIntegrationConfig).inboxId,
+        });
+        return reply.status(200).send({ ok: true, ignored: true, reason: 'no-agent-configured' });
+      }
 
       logger.debug('Chatwoot webhook accepted', {
         component: 'chatwoot-webhook',
@@ -144,6 +157,7 @@ export function chatwootWebhookRoutes(
           event,
           receivedAt: new Date().toISOString(),
           conversationId,
+          agentId,
         });
         logger.debug('Webhook enqueued for async processing', {
           component: 'chatwoot-webhook',
@@ -195,6 +209,8 @@ export function chatwootWebhookRoutes(
               projectId,
               sessionId: `cw-${String(conversationId)}`,
               userMessage: message.content,
+              agentId,
+              sourceChannel: 'chatwoot',
             });
 
             let responseText = runResult.response;

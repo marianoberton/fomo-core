@@ -33,6 +33,8 @@ export interface WebhookQueueOptions {
     projectId: ProjectId | string;
     sessionId: string;
     userMessage: string;
+    agentId?: string;
+    sourceChannel?: string;
   }) => Promise<{ response: string }>;
 }
 
@@ -112,7 +114,7 @@ export function createWebhookQueue(options: WebhookQueueOptions): WebhookQueue {
         QUEUE_NAME,
         async (job) => {
           const startTime = Date.now();
-          const { projectId, event, conversationId, webhookId } = job.data;
+          const { projectId, event, conversationId, webhookId, agentId } = job.data;
 
           logger.info('Processing webhook job', {
             component: 'webhook-queue',
@@ -177,6 +179,8 @@ export function createWebhookQueue(options: WebhookQueueOptions): WebhookQueue {
               projectId,
               sessionId: `cw-${String(conversationId ?? 'unknown')}`,
               userMessage: message.content,
+              agentId,
+              sourceChannel: 'chatwoot',
             });
 
             let responseText = result.response;

@@ -21,6 +21,8 @@ export interface WebhookJobData {
   receivedAt: string;
   /** Optional conversation ID for tracking. */
   conversationId?: number;
+  /** Nexus agent to route this delivery to (from integration config). */
+  agentId?: string;
 }
 
 // ─── Job Result ─────────────────────────────────────────────────────

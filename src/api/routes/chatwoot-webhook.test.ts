@@ -64,6 +64,7 @@ async function buildApp(opts?: { knownToken?: string | null }): Promise<Fixture>
             accountId: ACCOUNT_ID,
             inboxId: 1,
             agentBotId: 1,
+            agentId: 'agent_test_123',
             pathToken: knownToken,
             apiTokenSecretKey: 'CW_API',
           },
