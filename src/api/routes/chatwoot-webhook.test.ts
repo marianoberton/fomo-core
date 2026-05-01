@@ -206,15 +206,30 @@ describe('POST /webhooks/chatwoot/:pathToken', () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
-  it('returns 200 without enqueueing when sender.type is "user" (human takeover)', async () => {
+  it('returns 200 without enqueueing when message_type is "outgoing" (human takeover)', async () => {
     const { app, enqueue } = await buildApp();
     const res = await app.inject({
       method: 'POST',
       url: `/webhooks/chatwoot/${VALID_TOKEN}`,
       headers: { 'content-type': 'application/json' },
-      payload: makeMessageCreatedPayload({ senderType: 'user' }),
+      payload: makeMessageCreatedPayload({ messageType: 'outgoing' }),
     });
     expect(res.statusCode).toBe(200);
     expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it('enqueues incoming messages even when sender.type is missing (Chatwoot v4.12.1)', async () => {
+    const { app, enqueue } = await buildApp();
+    const payload = makeMessageCreatedPayload();
+    // Chatwoot v4.12.1 omits sender.type at root of AgentBot deliveries
+    delete (payload as { sender?: { type?: unknown } }).sender?.type;
+    const res = await app.inject({
+      method: 'POST',
+      url: `/webhooks/chatwoot/${VALID_TOKEN}`,
+      headers: { 'content-type': 'application/json' },
+      payload,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(enqueue).toHaveBeenCalledTimes(1);
   });
 });

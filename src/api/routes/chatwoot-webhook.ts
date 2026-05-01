@@ -114,7 +114,17 @@ export function chatwootWebhookRoutes(
       if (event.event !== 'message_created') {
         return reply.status(200).send({ ok: true });
       }
-      if (event.message_type !== 'incoming' || !event.content || event.sender?.type !== 'contact') {
+      // Chatwoot v4.12.1 omits `sender.type` at the root of the AgentBot
+      // payload (only present inside conversation.messages[*].sender), so we
+      // rely on `message_type === 'incoming'` to confirm the sender is a Contact.
+      if (event.message_type !== 'incoming' || !event.content) {
+        logger.debug('Chatwoot webhook ignored — not an incoming message with content', {
+          component: 'chatwoot-webhook',
+          projectId,
+          deliveryId: result.deliveryId,
+          messageType: event.message_type,
+          hasContent: Boolean(event.content),
+        });
         return reply.status(200).send({ ok: true });
       }
       if (accountId === undefined || conversationId === undefined) {
