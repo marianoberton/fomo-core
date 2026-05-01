@@ -217,11 +217,13 @@ export function chatwootWebhookRoutes(
               return;
             }
 
-            await adapter.send({
-              channel: 'chatwoot',
-              recipientIdentifier: String(conversationId),
-              content: responseText,
-            });
+            if (responseText.trim()) {
+              await adapter.send({
+                channel: 'chatwoot',
+                recipientIdentifier: String(conversationId),
+                content: responseText,
+              });
+            }
           } catch (error) {
             logger.error('Failed to process Chatwoot message', {
               component: 'chatwoot-webhook',

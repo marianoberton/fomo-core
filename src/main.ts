@@ -474,7 +474,9 @@ async function start(): Promise<void> {
           projectId: params.projectId,
           sessionId: params.sessionId,
         });
-        return { response: `Setup error: ${setupResult.error.message}` };
+        // Return empty so callers skip sending — internal errors must never
+        // surface as bot replies to customers.
+        return { response: '' };
       }
 
       const setup = setupResult.value;
@@ -512,7 +514,9 @@ async function start(): Promise<void> {
             error: result.error.message,
             code: result.error.code,
           });
-          return { response: `Agent error: ${result.error.message}` };
+          // Return empty so callers skip sending — internal errors must never
+          // surface as bot replies to customers.
+          return { response: '' };
         }
 
         const trace = result.value;

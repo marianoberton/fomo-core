@@ -223,8 +223,10 @@ export function createWebhookQueue(options: WebhookQueueOptions): WebhookQueue {
               };
             }
 
-            // Send response
-            if (conversationId !== undefined) {
+            // Send response — empty string means runAgent had an internal
+            // error (already logged) and we should not surface anything to
+            // the customer.
+            if (conversationId !== undefined && responseText.trim()) {
               await adapter.send({
                 channel: 'chatwoot',
                 recipientIdentifier: String(conversationId),
