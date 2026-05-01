@@ -1,15 +1,16 @@
 /**
- * Agent Template routes — read-only access to the global catalog of agent archetypes.
+ * Agent Template routes — global catalog of agent archetypes.
  *
  * GET    /agent-templates         — list templates (filters: type, tag, q, isOfficial)
  * GET    /agent-templates/:slug   — get template by slug (404 if missing)
- *
- * POST   /agent-templates         — 501 (TODO v2: create custom non-official)
- * PUT    /agent-templates/:slug   — 501 (TODO v2: update non-official)
- * DELETE /agent-templates/:slug   — 501 (TODO v2: delete non-official)
+ * PUT    /agent-templates/:slug   — update mutable fields (slug + type are immutable)
+ * DELETE /agent-templates/:slug   — hard-delete a template
  *
  * Templates are global (no projectId). Materialization into a project's agent
  * is handled by `POST /projects/:projectId/agents/from-template` (see agents.ts).
+ *
+ * Authoring (POST) flows through `POST /projects/:projectId/agents/:agentId/export-as-template`
+ * — there is no general-purpose "create blank template" endpoint by design.
  */
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
@@ -19,6 +20,7 @@ import { createAgentTemplateRepository } from '@/infrastructure/repositories/age
 import type {
   AgentTemplateFilters,
   AgentTemplateType,
+  UpdateAgentTemplateInput,
 } from '@/infrastructure/repositories/agent-template-repository.js';
 import { createPatternRepository } from '@/research/repositories/pattern-repository.js';
 import { createPatternVersionRepository } from '@/research/repositories/pattern-version-repository.js';
@@ -39,6 +41,40 @@ const suggestionsQuerySchema = z.object({
   verticalSlug: z.string().min(1),
   category: z.string().optional(),
 });
+
+const promptConfigSchema = z.object({
+  identity: z.string().min(1),
+  instructions: z.string(),
+  safety: z.string(),
+});
+
+const llmConfigSchema = z.object({
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  temperature: z.number().min(0).max(2).optional(),
+}).nullable();
+
+const updateTemplateSchema = z.object({
+  // Identity-shaping fields
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().min(1).max(2000).optional(),
+  icon: z.string().max(100).nullable().optional(),
+  tags: z.array(z.string().min(1).max(50)).max(20).optional(),
+  isOfficial: z.boolean().optional(),
+  // Prompt + suggestions
+  promptConfig: promptConfigSchema.optional(),
+  suggestedTools: z.array(z.string().min(1)).optional(),
+  suggestedLlm: llmConfigSchema.optional(),
+  suggestedModes: z.array(z.unknown()).nullable().optional(),
+  suggestedChannels: z.array(z.string().min(1)).optional(),
+  suggestedMcps: z.array(z.unknown()).nullable().optional(),
+  suggestedSkillSlugs: z.array(z.string().min(1)).optional(),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  // Limits
+  maxTurns: z.number().int().min(1).max(100).optional(),
+  maxTokensPerTurn: z.number().int().min(100).max(32000).optional(),
+  budgetPerDayUsd: z.number().min(0).max(1000).optional(),
+}).strict();
 
 // ─── Routes ─────────────────────────────────────────────────────
 
@@ -124,23 +160,113 @@ export function agentTemplateRoutes(
     },
   );
 
-  // ─── v2 stubs ───────────────────────────────────────────────
+  // ─── POST stub — authoring goes through export-as-template ──
 
-  const notImplemented = async (
-    _request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<void> => {
-    await sendError(
-      reply,
-      'NOT_IMPLEMENTED',
-      'Custom (non-official) AgentTemplate CRUD is planned for v2',
-      501,
-    );
-  };
+  fastify.post(
+    '/agent-templates',
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      await sendError(
+        reply,
+        'NOT_IMPLEMENTED',
+        'Use POST /projects/:projectId/agents/:agentId/export-as-template to author a template from an existing agent',
+        501,
+      );
+    },
+  );
 
-  fastify.post('/agent-templates', notImplemented);
-  fastify.put('/agent-templates/:slug', notImplemented);
-  fastify.delete('/agent-templates/:slug', notImplemented);
+  // PUT /agent-templates/:slug — update mutable fields
+  fastify.put(
+    '/agent-templates/:slug',
+    async (
+      request: FastifyRequest<{ Params: { slug: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const { slug } = request.params;
+      const parsed = updateTemplateSchema.safeParse(request.body ?? {});
+      if (!parsed.success) {
+        await sendError(reply, 'VALIDATION_ERROR', parsed.error.message, 400);
+        return;
+      }
+      const body = parsed.data;
+
+      const existing = await repo.findBySlug(slug);
+      if (!existing) {
+        await sendNotFound(reply, 'AgentTemplate', slug);
+        return;
+      }
+
+      // isOfficial is admin-only (master-key). Project-scoped keys silently lose
+      // the flag from their payload — we never elevate without proof of admin.
+      const isMaster = request.apiKeyProjectId === null;
+      const patch: UpdateAgentTemplateInput = { ...body };
+      if (patch.isOfficial !== undefined && !isMaster) {
+        await sendError(
+          reply,
+          'FORBIDDEN',
+          'Only master keys can flip isOfficial on an AgentTemplate',
+          403,
+        );
+        return;
+      }
+
+      const updated = await repo.update(slug, patch);
+      if (!updated) {
+        await sendNotFound(reply, 'AgentTemplate', slug);
+        return;
+      }
+
+      logger.info('AgentTemplate updated', {
+        component: 'agent-template-routes',
+        slug,
+        isMaster,
+      });
+
+      await sendSuccess(reply, updated);
+    },
+  );
+
+  // DELETE /agent-templates/:slug — hard delete
+  fastify.delete(
+    '/agent-templates/:slug',
+    async (
+      request: FastifyRequest<{ Params: { slug: string } }>,
+      reply: FastifyReply,
+    ) => {
+      const { slug } = request.params;
+      const existing = await repo.findBySlug(slug);
+      if (!existing) {
+        await sendNotFound(reply, 'AgentTemplate', slug);
+        return;
+      }
+
+      // Official templates can only be deleted by master keys — they're shared
+      // across the whole platform, not owned by any single project.
+      const isMaster = request.apiKeyProjectId === null;
+      if (existing.isOfficial && !isMaster) {
+        await sendError(
+          reply,
+          'FORBIDDEN',
+          `Official AgentTemplate "${slug}" can only be deleted by master keys`,
+          403,
+        );
+        return;
+      }
+
+      const ok = await repo.delete(slug);
+      if (!ok) {
+        await sendNotFound(reply, 'AgentTemplate', slug);
+        return;
+      }
+
+      logger.info('AgentTemplate deleted', {
+        component: 'agent-template-routes',
+        slug,
+        wasOfficial: existing.isOfficial,
+      });
+
+      await reply.status(204).send();
+    },
+  );
 
   logger.debug('Agent template routes registered', {
     component: 'agent-template-routes',

@@ -189,6 +189,34 @@ const sendMessageSchema = z.object({
   timeoutMs: z.number().int().positive().optional(),
 });
 
+/** Body schema for POST /projects/:projectId/agents/:agentId/export-as-template. */
+const exportAsTemplateSchema = z.object({
+  /** Optional override for the new template's slug. Defaults to kebab-case(name). */
+  slug: z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+    message: 'slug must be lowercase kebab-case (a-z0-9 separated by single hyphens)',
+  }).optional(),
+  /** Optional override for the template's name. Defaults to the agent's name. */
+  name: z.string().min(1).max(100).optional(),
+  /** Optional override for the template's description. Defaults to the agent's description. */
+  description: z.string().max(500).optional(),
+  /** Whether to mark the template as official. Only honored when caller is master-key. */
+  isOfficial: z.boolean().optional(),
+  /** Catalog tags. */
+  tags: z.array(z.string().min(1).max(50)).max(20).optional(),
+});
+
+/** Body schema for POST /projects/:projectId/agents/:agentId/clone. */
+const cloneAgentSchema = z.object({
+  /** Name for the new agent. Must not collide with another agent in the project. */
+  name: z.string().min(1).max(100),
+  /**
+   * If true (default), seed missing project-level PromptLayers from the source
+   * agent's promptConfig — same flow as `from-template` materialization.
+   * If false, only the per-agent promptConfig snapshot is copied.
+   */
+  includePromptLayers: z.boolean().optional().default(true),
+});
+
 // ─── Route Registration ─────────────────────────────────────────
 
 export function agentRoutes(
@@ -701,6 +729,274 @@ export function agentRoutes(
     },
   );
 
+  // ─── Export Agent → AgentTemplate ──────────────────────────────
+
+  fastify.post(
+    '/projects/:projectId/agents/:agentId/export-as-template',
+    { preHandler: rbacOperator },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, agentId } = request.params as {
+        projectId: string;
+        agentId: string;
+      };
+
+      const parsed = exportAsTemplateSchema.safeParse(request.body ?? {});
+      if (!parsed.success) {
+        await sendError(reply, 'VALIDATION_ERROR', parsed.error.message, 400);
+        return;
+      }
+      const body = parsed.data;
+
+      // 1. Project exists
+      const project = await deps.projectRepository.findById(projectId as ProjectId);
+      if (!project) {
+        await sendNotFound(reply, 'Project', projectId);
+        return;
+      }
+
+      // 2. Agent exists in this project
+      const agent = await agentRepository.findById(agentId as AgentId);
+      if (agent?.projectId !== projectId) {
+        await sendNotFound(reply, 'Agent', agentId);
+        return;
+      }
+
+      // 3. Resolve final name + slug
+      const templateName = body.name ?? agent.name;
+      const templateSlug = body.slug ?? toKebabSlug(templateName);
+      if (templateSlug.length === 0) {
+        await sendError(
+          reply,
+          'VALIDATION_ERROR',
+          'Could not derive a slug from name — provide an explicit slug',
+          400,
+        );
+        return;
+      }
+
+      // 4. isOfficial gating — only master keys can mint official templates
+      const isMaster = request.apiKeyProjectId === null;
+      const isOfficial = body.isOfficial === true && isMaster;
+
+      // 5. Slug collision (409)
+      const templateRepo = createAgentTemplateRepository(deps.prisma);
+      const existing = await templateRepo.findBySlug(templateSlug);
+      if (existing) {
+        await sendError(
+          reply,
+          'CONFLICT',
+          `AgentTemplate with slug "${templateSlug}" already exists`,
+          409,
+          { slug: templateSlug },
+        );
+        return;
+      }
+
+      // 6. PromptConfig — prefer the project's currently active layers, fall
+      //    back to the agent's own promptConfig snapshot if a layer is missing.
+      const layerTypes = ['identity', 'instructions', 'safety'] as const;
+      const activeLayers = await Promise.all(
+        layerTypes.map((lt) =>
+          deps.promptLayerRepository.getActiveLayer(projectId as ProjectId, lt),
+        ),
+      );
+      const promptConfig = {
+        identity: activeLayers[0]?.content ?? agent.promptConfig.identity,
+        instructions: activeLayers[1]?.content ?? agent.promptConfig.instructions,
+        safety: activeLayers[2]?.content ?? agent.promptConfig.safety,
+      };
+
+      // 7. suggestedSkillSlugs — best-effort resolve from the agent's skill instances
+      const suggestedSkillSlugs: string[] = [];
+      for (const skillId of agent.skillIds) {
+        const instance = await deps.skillService.getInstance(skillId);
+        if (!instance?.templateId) continue;
+        const tmpl = await deps.skillService.getTemplate(instance.templateId);
+        if (tmpl?.name) suggestedSkillSlugs.push(tmpl.name);
+      }
+
+      // 8. metadata — preserve archetype if present
+      const agentMeta: Record<string, unknown> = agent.metadata ?? {};
+      const rawArchetype = agentMeta['archetype'];
+      const archetype = typeof rawArchetype === 'string' ? rawArchetype : undefined;
+      const templateMetadata: Record<string, unknown> = {
+        ...(archetype !== undefined && { archetype }),
+        exportedFromAgent: { id: agent.id, projectId, name: agent.name },
+      };
+
+      // 9. Build llm config snapshot if both fields present
+      const suggestedLlm =
+        agent.llmConfig?.provider && agent.llmConfig.model
+          ? {
+              provider: agent.llmConfig.provider,
+              model: agent.llmConfig.model,
+              ...(agent.llmConfig.temperature !== undefined && {
+                temperature: agent.llmConfig.temperature,
+              }),
+            }
+          : null;
+
+      // 10. Create the template
+      try {
+        const template = await templateRepo.create({
+          slug: templateSlug,
+          name: templateName,
+          description: body.description ?? agent.description ?? agent.name,
+          type: agent.type,
+          tags: body.tags ?? [],
+          isOfficial,
+          promptConfig,
+          suggestedTools: agent.toolAllowlist,
+          suggestedLlm,
+          suggestedModes: agent.modes.length > 0 ? agent.modes : null,
+          suggestedChannels: agent.channelConfig.allowedChannels,
+          suggestedMcps: agent.mcpServers.length > 0 ? agent.mcpServers : null,
+          suggestedSkillSlugs,
+          metadata: templateMetadata,
+          maxTurns: agent.limits.maxTurns,
+          maxTokensPerTurn: agent.limits.maxTokensPerTurn,
+          budgetPerDayUsd: agent.limits.budgetPerDayUsd,
+        });
+
+        logger.info('Agent exported as template', {
+          component: 'agents',
+          projectId,
+          agentId,
+          templateSlug,
+          isOfficial,
+        });
+
+        await sendSuccess(reply, template, 201);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Unique constraint')) {
+          await sendError(
+            reply,
+            'CONFLICT',
+            `AgentTemplate with slug "${templateSlug}" already exists`,
+            409,
+            { slug: templateSlug },
+          );
+          return;
+        }
+        throw error;
+      }
+    },
+  );
+
+  // ─── Clone Agent (project-scoped duplicate) ───────────────────
+
+  fastify.post(
+    '/projects/:projectId/agents/:agentId/clone',
+    { preHandler: rbacOperator },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, agentId } = request.params as {
+        projectId: string;
+        agentId: string;
+      };
+
+      const parsed = cloneAgentSchema.safeParse(request.body ?? {});
+      if (!parsed.success) {
+        await sendError(reply, 'VALIDATION_ERROR', parsed.error.message, 400);
+        return;
+      }
+      const { name: newName, includePromptLayers } = parsed.data;
+
+      // 1. Source agent exists in this project
+      const source = await agentRepository.findById(agentId as AgentId);
+      if (source?.projectId !== projectId) {
+        await sendNotFound(reply, 'Agent', agentId);
+        return;
+      }
+
+      // 2. Name collision — surface a suggestion to ease retry
+      const conflict = await agentRepository.findByName(projectId, newName);
+      if (conflict) {
+        await sendError(
+          reply,
+          'CONFLICT',
+          `Agent "${newName}" already exists in this project`,
+          409,
+          { suggestedName: suggestUniqueName(newName) },
+        );
+        return;
+      }
+
+      // 3. Optionally seed missing project-level PromptLayers (mirror materializer)
+      if (includePromptLayers) {
+        const layerTypes = ['identity', 'instructions', 'safety'] as const;
+        for (const layerType of layerTypes) {
+          const existing = await deps.promptLayerRepository.getActiveLayer(
+            projectId as ProjectId,
+            layerType,
+          );
+          if (!existing) {
+            await deps.promptLayerRepository.create({
+              projectId: projectId as ProjectId,
+              layerType,
+              content: source.promptConfig[layerType],
+              createdBy: `clone:${source.id}`,
+              changeReason: `Seeded by clone of agent "${source.name}"`,
+            });
+          }
+        }
+      }
+
+      // 4. Build CreateAgentInput from source — drop modes (channel-bound, would
+      //    collide) and status (start active by default).
+      const cloneMetadata: Record<string, unknown> = {
+        ...(source.metadata ?? {}),
+        clonedFrom: { id: source.id, name: source.name },
+      };
+      // Strip any "createdFromTemplate" provenance — the clone is a copy of the
+      // source agent, not of the template the source was originally built from.
+      delete cloneMetadata['createdFromTemplate'];
+      delete cloneMetadata['templateVersion'];
+
+      try {
+        const cloned = await agentRepository.create({
+          projectId,
+          name: newName,
+          ...(source.description !== undefined && { description: source.description }),
+          promptConfig: { ...source.promptConfig },
+          ...(source.llmConfig !== undefined && { llmConfig: { ...source.llmConfig } }),
+          toolAllowlist: [...source.toolAllowlist],
+          mcpServers: source.mcpServers.map((m) => ({ ...m })),
+          channelConfig: { ...source.channelConfig },
+          type: source.type,
+          skillIds: [...source.skillIds],
+          limits: { ...source.limits },
+          ...(source.managerAgentId !== undefined &&
+            source.managerAgentId !== null && {
+              managerAgentId: source.managerAgentId,
+            }),
+          metadata: cloneMetadata,
+        });
+
+        logger.info('Agent cloned', {
+          component: 'agents',
+          projectId,
+          sourceAgentId: source.id,
+          clonedAgentId: cloned.id,
+          includePromptLayers,
+        });
+
+        await sendSuccess(reply, cloned, 201);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Unique constraint')) {
+          await sendError(
+            reply,
+            'CONFLICT',
+            `Agent "${newName}" already exists in this project`,
+            409,
+            { suggestedName: suggestUniqueName(newName) },
+          );
+          return;
+        }
+        throw error;
+      }
+    },
+  );
+
   // ─── Send Message to Agent ──────────────────────────────────────
 
   fastify.post(
@@ -1070,6 +1366,29 @@ export function agentRoutes(
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
+
+/**
+ * Convert an arbitrary string to a lowercase kebab-case slug.
+ * - normalizes accented chars to ASCII via NFD
+ * - replaces any run of non-alphanumeric chars with a single hyphen
+ * - trims leading/trailing hyphens
+ *
+ * Returns an empty string when the input has no alphanumeric content; the
+ * caller is responsible for surfacing a 400 in that case.
+ */
+function toKebabSlug(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Suggest a non-colliding name by appending " (copy)" or " (copy N)". */
+function suggestUniqueName(name: string): string {
+  return /\(copy(?: \d+)?\)$/.test(name) ? `${name} 2` : `${name} (copy)`;
+}
 
 /** Compose a structured message from an OpenClaw task packet. */
 function composeTaskMessage(
