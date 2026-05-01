@@ -22,6 +22,7 @@ interface ModelEntry {
 const EXPOSED_MODELS: { id: string; provider: string }[] = [
   // Anthropic
   { id: 'claude-opus-4-6', provider: 'Anthropic' },
+  { id: 'claude-sonnet-4-6', provider: 'Anthropic' },
   { id: 'claude-sonnet-4-5', provider: 'Anthropic' },
   { id: 'claude-haiku-4-5', provider: 'Anthropic' },
   // OpenAI
@@ -35,10 +36,22 @@ const EXPOSED_MODELS: { id: string; provider: string }[] = [
   { id: 'gemini-3-flash-preview', provider: 'Google' },
   { id: 'gemini-2.5-pro', provider: 'Google' },
   { id: 'gemini-2.5-flash', provider: 'Google' },
-  // OpenRouter
+  // OpenRouter — Meta Llama (open-source)
   { id: 'meta-llama/llama-3.3-70b-instruct', provider: 'Meta (OpenRouter)' },
+  { id: 'meta-llama/llama-3.1-8b-instruct', provider: 'Meta (OpenRouter)' },
+  // OpenRouter — DeepSeek
   { id: 'deepseek/deepseek-chat', provider: 'DeepSeek (OpenRouter)' },
+  { id: 'deepseek/deepseek-r1', provider: 'DeepSeek (OpenRouter)' },
+  // OpenRouter — Mistral
   { id: 'mistralai/mistral-large-2411', provider: 'Mistral (OpenRouter)' },
+  { id: 'mistralai/mistral-small-3.1-24b-instruct', provider: 'Mistral (OpenRouter)' },
+  // OpenRouter — Google
+  { id: 'google/gemini-2.5-pro-preview', provider: 'Google (OpenRouter)' },
+  { id: 'google/gemini-2.0-flash-lite', provider: 'Google (OpenRouter)' },
+  // OpenRouter — Anthropic
+  { id: 'anthropic/claude-sonnet-4-6', provider: 'Anthropic (OpenRouter)' },
+  // OpenRouter — Qwen
+  { id: 'qwen/qwen-2.5-72b-instruct', provider: 'Qwen (OpenRouter)' },
 ];
 
 /** Build the full model entry from the curated list. */
