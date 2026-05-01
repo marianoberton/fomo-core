@@ -13,9 +13,11 @@ import {
   WhatsAppWahaIntegrationConfigSchema,
   SlackIntegrationConfigSchema,
   ChatwootIntegrationConfigSchema,
+  ChatwootIntegrationConfigCreateInputSchema,
   VapiIntegrationConfigSchema,
 } from '@/channels/types.js';
-import type { IntegrationProvider, IntegrationConfigUnion, WhatsAppWahaIntegrationConfig } from '@/channels/types.js';
+import type { ChatwootIntegrationConfig, IntegrationProvider, IntegrationConfigUnion, WhatsAppWahaIntegrationConfig } from '@/channels/types.js';
+import { generateChatwootPathToken } from './chatwoot-webhook.js';
 
 // ─── Zod Schemas ────────────────────────────────────────────────
 
@@ -48,7 +50,9 @@ const CreateIntegrationSchema = z.discriminatedUnion('provider', [
   }),
   z.object({
     provider: z.literal('chatwoot'),
-    config: ChatwootIntegrationConfigSchema,
+    // The pathToken is generated server-side at create time, so the API
+    // accepts the input subset and we synthesize the full storage shape below.
+    config: ChatwootIntegrationConfigCreateInputSchema,
     status: z.enum(['active', 'paused']).optional(),
   }),
   z.object({
@@ -181,7 +185,6 @@ function getReferencedSecretKeys(provider: IntegrationProvider, config: Record<s
     case 'chatwoot': {
       const keys: string[] = [];
       if (config['apiTokenSecretKey']) keys.push(config['apiTokenSecretKey'] as string);
-      if (config['webhookSecretKey']) keys.push(config['webhookSecretKey'] as string);
       return keys;
     }
     case 'vapi': {
@@ -215,7 +218,7 @@ export function integrationRoutes(
       const items = integrations.map((i) => ({
         ...i,
         webhookUrl: i.provider === 'chatwoot'
-          ? '/api/v1/webhooks/chatwoot'
+          ? `/api/v1/webhooks/chatwoot/${(i.config as ChatwootIntegrationConfig).pathToken}`
           : `/api/v1/webhooks/${i.provider}/${i.id}`,
       }));
 
@@ -247,17 +250,27 @@ export function integrationRoutes(
       }
 
       try {
+        // Chatwoot needs a server-generated pathToken — Chatwoot v4.12.x
+        // Agent Bots don't sign their outgoing webhooks, so the URL token is
+        // the auth mechanism. Inject it into the stored config.
+        const configToStore: IntegrationConfigUnion = input.provider === 'chatwoot'
+          ? ({
+              ...input.config,
+              pathToken: generateChatwootPathToken(),
+            } as unknown as IntegrationConfigUnion)
+          : (input.config as IntegrationConfigUnion);
+
         const integration = await channelIntegrationRepository.create({
           projectId,
           provider: input.provider,
-          config: input.config,
+          config: configToStore,
           status: input.status,
         });
 
         channelResolver.invalidate(projectId);
 
         const webhookUrl = integration.provider === 'chatwoot'
-          ? '/api/v1/webhooks/chatwoot'
+          ? `/api/v1/webhooks/chatwoot/${(integration.config as ChatwootIntegrationConfig).pathToken}`
           : `/api/v1/webhooks/${integration.provider}/${integration.id}`;
 
         logger.info('Channel integration created', {
@@ -311,7 +324,7 @@ export function integrationRoutes(
       }
 
       const webhookUrl = integration.provider === 'chatwoot'
-        ? '/api/v1/webhooks/chatwoot'
+        ? `/api/v1/webhooks/chatwoot/${(integration.config as ChatwootIntegrationConfig).pathToken}`
         : `/api/v1/webhooks/${integration.provider}/${integration.id}`;
 
       return sendSuccess(reply, { ...integration, webhookUrl });

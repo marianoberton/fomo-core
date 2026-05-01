@@ -148,7 +148,7 @@ import { createHandoffManager, DEFAULT_HANDOFF_CONFIG } from '@/channels/handoff
 import { registerErrorHandler } from '@/api/error-handler.js';
 import { registerAuthMiddleware } from '@/api/auth-middleware.js';
 import { registerRoutes } from '@/api/routes/index.js';
-import { chatwootWebhookRoutes, registerChatwootRawBodyParser } from '@/api/routes/chatwoot-webhook.js';
+import { chatwootWebhookRoutes } from '@/api/routes/chatwoot-webhook.js';
 import { channelWebhookRoutes } from '@/api/routes/channel-webhooks.js';
 import { createWebhookQueue } from '@/channels/webhook-queue.js';
 import type { WebhookQueue } from '@/channels/webhook-queue.js';
@@ -1076,18 +1076,14 @@ async function start(): Promise<void> {
 
         await prefixed.register(registerRoutes, deps);
 
-        // Chatwoot webhook routes — encapsulated so the raw-body parser
-        // (needed for byte-exact HMAC verification per Chatwoot v4.12.1) only
-        // applies inside this scope and does not leak to sibling routes.
-        await prefixed.register(async (scope) => {
-          registerChatwootRawBodyParser(scope);
-          chatwootWebhookRoutes(scope, {
-            ...deps,
-            channelResolver,
-            handoffManager,
-            webhookQueue: webhookQueue ?? undefined,
-            runAgent,
-          });
+        // Chatwoot webhook routes (path-token auth — Agent Bot deliveries
+        // are unsigned in Chatwoot v4.12.x).
+        chatwootWebhookRoutes(prefixed, {
+          ...deps,
+          channelResolver,
+          handoffManager,
+          webhookQueue: webhookQueue ?? undefined,
+          runAgent,
         });
 
         // Dynamic channel webhook routes (Telegram, WhatsApp, Slack)

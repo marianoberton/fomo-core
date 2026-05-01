@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   storeChatwootSecrets,
   getChatwootApiToken,
-  getChatwootWebhookSecret,
 } from './chatwoot-secrets.js';
 import type { SecretService, SecretMetadata } from './types.js';
 import type { ProjectId } from '@/core/types.js';
@@ -49,31 +48,25 @@ describe('chatwoot-secrets', () => {
     svc = createMockSecretService();
   });
 
-  it('stores api token + webhook secret under default keys', async () => {
+  it('stores the api token under the default key', async () => {
     const result = await storeChatwootSecrets(svc, {
       projectId,
       apiToken: 'cw_token_abc',
-      webhookSecret: 'cw_whsec_xyz',
     });
 
     expect(result.apiTokenKey).toBe('CHATWOOT_API_TOKEN');
-    expect(result.webhookSecretKey).toBe('CHATWOOT_WEBHOOK_SECRET');
-    expect(svc.set).toHaveBeenCalledTimes(2);
+    expect(svc.set).toHaveBeenCalledTimes(1);
     await expect(getChatwootApiToken(svc, projectId)).resolves.toBe('cw_token_abc');
-    await expect(getChatwootWebhookSecret(svc, projectId)).resolves.toBe('cw_whsec_xyz');
   });
 
-  it('respects custom key names', async () => {
+  it('respects a custom api token key name', async () => {
     const result = await storeChatwootSecrets(svc, {
       projectId,
       apiToken: 'token',
-      webhookSecret: 'whsec',
       apiTokenKey: 'CHATWOOT_API_TOKEN_FOMO',
-      webhookSecretKey: 'CHATWOOT_WEBHOOK_SECRET_FOMO',
     });
 
     expect(result.apiTokenKey).toBe('CHATWOOT_API_TOKEN_FOMO');
-    expect(result.webhookSecretKey).toBe('CHATWOOT_WEBHOOK_SECRET_FOMO');
     await expect(getChatwootApiToken(svc, projectId, 'CHATWOOT_API_TOKEN_FOMO')).resolves.toBe('token');
   });
 
@@ -81,12 +74,9 @@ describe('chatwoot-secrets', () => {
     await storeChatwootSecrets(svc, {
       projectId,
       apiToken: 'rt_token',
-      webhookSecret: 'rt_whsec',
     });
 
     const token = await getChatwootApiToken(svc, projectId);
-    const whsec = await getChatwootWebhookSecret(svc, projectId);
     expect(token).toBe('rt_token');
-    expect(whsec).toBe('rt_whsec');
   });
 });

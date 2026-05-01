@@ -9,6 +9,7 @@ import type { AgentConfig, ProjectId } from '@/core/types.js';
 import type { RouteDependencies } from '../types.js';
 import { sendSuccess, sendError } from '../error-handler.js';
 import type { ChannelIntegrationRepository, ChatwootIntegrationConfig } from '@/channels/types.js';
+import { generateChatwootPathToken } from './chatwoot-webhook.js';
 
 // ─── Extended Dependencies ──────────────────────────────────────
 
@@ -173,11 +174,13 @@ export function onboardingRoutes(
       }
 
       // 3. Create channel integration (Chatwoot)
+      const pathToken = generateChatwootPathToken();
       const chatwootConfig: ChatwootIntegrationConfig = {
         baseUrl: input.chatwoot.baseUrl,
         accountId: input.chatwoot.accountId,
         inboxId: input.chatwoot.inboxId,
         agentBotId: input.chatwoot.agentBotId,
+        pathToken,
         apiTokenEnvVar: input.chatwoot.apiTokenEnvVar,
       };
 
@@ -221,7 +224,7 @@ export function onboardingRoutes(
         projectId,
         agentId: agent.id,
         channelIntegrationId: integration.id,
-        chatwootWebhookUrl: '/api/v1/webhooks/chatwoot',
+        chatwootWebhookUrl: `/api/v1/webhooks/chatwoot/${pathToken}`,
         status: 'provisioned',
       }, 201);
       return;

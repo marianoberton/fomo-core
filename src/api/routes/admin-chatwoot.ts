@@ -21,6 +21,7 @@ import type {
   ChannelIntegration,
   ChatwootIntegrationConfig,
 } from '@/channels/types.js';
+import { generateChatwootPathToken } from './chatwoot-webhook.js';
 import type { AgentConfig, ChannelConfig, AgentId } from '@/agents/types.js';
 import type { ProjectId } from '@/core/types.js';
 import type { Logger } from '@/observability/logger.js';
@@ -35,10 +36,8 @@ const AttachBodySchema = z.object({
   inboxId: z.number().int().positive(),
   agentBotId: z.number().int().positive(),
   apiToken: z.string().min(1),
-  webhookSecret: z.string().min(1),
-  /** Optional override for the SecretService key names (defaults: CHATWOOT_API_TOKEN / CHATWOOT_WEBHOOK_SECRET). */
+  /** Optional override for the SecretService key name (default: CHATWOOT_API_TOKEN). */
   apiTokenSecretKey: z.string().min(1).max(128).optional(),
-  webhookSecretKey: z.string().min(1).max(128).optional(),
 });
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -167,22 +166,31 @@ export function adminChatwootRoutes(
         return sendNotFound(reply, 'Agent', body.agentId);
       }
 
-      // Store secrets in SecretService (never log plaintext).
-      const { apiTokenKey, webhookSecretKey } = await storeChatwootSecrets(secretService, {
+      // Store the API token (Chatwoot has no webhook signing secret in
+      // v4.12.x — auth is via the path token in the URL).
+      const { apiTokenKey } = await storeChatwootSecrets(secretService, {
         projectId,
         apiToken: body.apiToken,
-        webhookSecret: body.webhookSecret,
         ...(body.apiTokenSecretKey !== undefined && { apiTokenKey: body.apiTokenSecretKey }),
-        ...(body.webhookSecretKey !== undefined && { webhookSecretKey: body.webhookSecretKey }),
       });
+
+      // Reuse the existing pathToken when re-attaching, so the URL the user
+      // pasted into Chatwoot keeps working. Only mint a new one on first
+      // attach.
+      const existing = await channelIntegrationRepository.findByProjectAndProvider(
+        projectId,
+        'chatwoot',
+      );
+      const existingConfig = existing?.config as ChatwootIntegrationConfig | undefined;
+      const pathToken = existingConfig?.pathToken ?? generateChatwootPathToken();
 
       const config: ChatwootIntegrationConfig = {
         baseUrl: body.baseUrl,
         accountId: body.accountId,
         inboxId: body.inboxId,
         agentBotId: body.agentBotId,
+        pathToken,
         apiTokenSecretKey: apiTokenKey,
-        webhookSecretKey,
       };
 
       const integration = await upsertChatwootIntegration(
@@ -195,6 +203,7 @@ export function adminChatwootRoutes(
       channelResolver.invalidate(projectId);
 
       const health = await checkChatwootHealth(body.baseUrl, body.accountId, body.apiToken, logger);
+      const webhookUrl = `/api/v1/webhooks/chatwoot/${pathToken}`;
 
       logger.info('Chatwoot integration attached', {
         component: 'admin-chatwoot',
@@ -204,7 +213,6 @@ export function adminChatwootRoutes(
         channelConfigUpdated,
         health,
         apiTokenSecretKey: apiTokenKey,
-        webhookSecretKey,
       });
 
       await sendSuccess(reply, {
@@ -214,7 +222,7 @@ export function adminChatwootRoutes(
         health,
         channelConfigUpdated,
         apiTokenSecretKey: apiTokenKey,
-        webhookSecretKey,
+        webhookUrl,
       }, 200);
     },
   );
@@ -237,9 +245,7 @@ export function adminChatwootRoutes(
       }
 
       const cwConfig = integration.config as ChatwootIntegrationConfig;
-      const webhookSecretConfigured = cwConfig.webhookSecretKey
-        ? await secretService.exists(projectId, cwConfig.webhookSecretKey)
-        : Boolean(process.env['CHATWOOT_WEBHOOK_SECRET']);
+      const pathTokenConfigured = Boolean(cwConfig.pathToken);
 
       // Resolve the adapter and ping health (best-effort).
       let chatwootReachable = false;
@@ -258,8 +264,10 @@ export function adminChatwootRoutes(
         inboxId: cwConfig.inboxId,
         agentBotId: cwConfig.agentBotId,
         apiTokenSecretKey: cwConfig.apiTokenSecretKey ?? null,
-        webhookSecretKey: cwConfig.webhookSecretKey ?? null,
-        webhookSecretConfigured,
+        pathTokenConfigured,
+        webhookUrl: pathTokenConfigured
+          ? `/api/v1/webhooks/chatwoot/${cwConfig.pathToken}`
+          : null,
         chatwootReachable,
         createdAt: integration.createdAt.toISOString(),
         updatedAt: integration.updatedAt.toISOString(),

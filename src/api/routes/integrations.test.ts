@@ -72,9 +72,21 @@ describe('integrationRoutes', () => {
       expect(body.data.items[0]?.['webhookUrl']).toBe('/api/v1/webhooks/telegram/int-1');
     });
 
-    it('returns Chatwoot webhook URL for chatwoot provider', async () => {
+    it('returns the path-token-scoped webhook URL for chatwoot integrations', async () => {
+      const pathToken = 'a'.repeat(64);
       deps.channelIntegrationRepository.findByProject.mockResolvedValue([
-        { ...sampleIntegration, provider: 'chatwoot' },
+        {
+          ...sampleIntegration,
+          provider: 'chatwoot',
+          config: {
+            baseUrl: 'https://chat.example',
+            accountId: 1,
+            inboxId: 1,
+            agentBotId: 1,
+            pathToken,
+            apiTokenSecretKey: 'CW_API',
+          },
+        },
       ]);
 
       const response = await app.inject({
@@ -83,7 +95,7 @@ describe('integrationRoutes', () => {
       });
 
       const body = response.json<{ data: { items: Record<string, unknown>[] } }>();
-      expect(body.data.items[0]?.['webhookUrl']).toBe('/api/v1/webhooks/chatwoot');
+      expect(body.data.items[0]?.['webhookUrl']).toBe(`/api/v1/webhooks/chatwoot/${pathToken}`);
     });
   });
 

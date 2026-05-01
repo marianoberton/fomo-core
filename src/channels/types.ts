@@ -108,21 +108,30 @@ export interface ChatwootIntegrationConfig {
   inboxId: number;
   agentBotId: number;
   /**
+   * High-entropy random token (32–128 hex chars) generated server-side at
+   * creation time. Embedded in the public webhook URL
+   * (`/webhooks/chatwoot/{pathToken}`) and used to identify the integration
+   * for inbound deliveries — Chatwoot v4.12.x Agent Bots do not sign their
+   * outgoing webhooks, so the token in the URL is the auth mechanism.
+   */
+  pathToken: string;
+  /**
    * Preferred: key in the secrets table for the Chatwoot API token.
    * When present, the adapter resolves the token from SecretService.
    */
   apiTokenSecretKey?: string;
-  /**
-   * Preferred: key in the secrets table for the Chatwoot webhook HMAC secret.
-   * When present, the webhook route validates signatures using this secret.
-   */
-  webhookSecretKey?: string;
   /**
    * Legacy: env var name holding the Chatwoot API token.
    * Kept for backward compatibility with instances seeded before SecretService
    * support. A deprecation warning is logged whenever this fallback is used.
    */
   apiTokenEnvVar?: string;
+  /**
+   * @deprecated No longer used — Chatwoot Agent Bots do not sign outbound
+   * webhooks in v4.12.x. Auth is via the path token. Kept optional in the
+   * type so deserialising older JSON rows does not error.
+   */
+  webhookSecretKey?: string;
 }
 
 /** Telegram integration config — references secret keys in the secrets table. */
@@ -199,14 +208,40 @@ export interface IntegrationConfigMap {
 
 // ─── Zod Schemas for Integration Configs ────────────────────────
 
+/** Path-token format: 32–128 lowercase hex chars (16–64 random bytes). */
+export const ChatwootPathTokenSchema = z.string().regex(/^[a-f0-9]{32,128}$/, {
+  message: 'pathToken must be 32–128 lowercase hex characters',
+});
+
 export const ChatwootIntegrationConfigSchema = z
   .object({
     baseUrl: z.string().url(),
     accountId: z.number().int().positive(),
     inboxId: z.number().int().positive(),
     agentBotId: z.number().int().positive(),
+    pathToken: ChatwootPathTokenSchema,
     apiTokenSecretKey: z.string().min(1).max(128).optional(),
+    apiTokenEnvVar: z.string().min(1).optional(),
+    /** @deprecated kept only so older JSON rows still parse; no longer used. */
     webhookSecretKey: z.string().min(1).max(128).optional(),
+  })
+  .refine(
+    (c) => c.apiTokenSecretKey !== undefined || c.apiTokenEnvVar !== undefined,
+    { message: 'Either apiTokenSecretKey (preferred) or apiTokenEnvVar must be set' },
+  );
+
+/**
+ * Subset of the chatwoot config accepted from API callers when *creating*
+ * an integration — the server generates the pathToken and adds it to the
+ * config before persisting.
+ */
+export const ChatwootIntegrationConfigCreateInputSchema = z
+  .object({
+    baseUrl: z.string().url(),
+    accountId: z.number().int().positive(),
+    inboxId: z.number().int().positive(),
+    agentBotId: z.number().int().positive(),
+    apiTokenSecretKey: z.string().min(1).max(128).optional(),
     apiTokenEnvVar: z.string().min(1).optional(),
   })
   .refine(
@@ -286,6 +321,11 @@ export interface ChannelIntegrationRepository {
   findByProject(projectId: ProjectId): Promise<ChannelIntegration[]>;
   findByProjectAndProvider(projectId: ProjectId, provider: IntegrationProvider): Promise<ChannelIntegration | null>;
   findByProviderAccount(provider: IntegrationProvider, accountId: number): Promise<ChannelIntegration | null>;
+  /**
+   * Look up an *active* Chatwoot integration by its `config.pathToken`. Used
+   * by the webhook handler to authenticate inbound deliveries without HMAC.
+   */
+  findActiveChatwootByPathToken(pathToken: string): Promise<ChannelIntegration | null>;
   update(id: ChannelIntegrationId, input: UpdateChannelIntegrationInput): Promise<ChannelIntegration>;
   delete(id: ChannelIntegrationId): Promise<void>;
   listActive(): Promise<ChannelIntegration[]>;

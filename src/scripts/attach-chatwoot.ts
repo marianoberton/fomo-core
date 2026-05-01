@@ -21,8 +21,11 @@
  *     --chatwoot-inbox-id 2 \
  *     --chatwoot-agent-bot-id 3 \
  *     --api-token-env-var CHATWOOT_API_TOKEN_FOMO \
- *     --webhook-secret-env-var CHATWOOT_WEBHOOK_SECRET_FOMO \
  *     [--dry-run]
+ *
+ * The pathToken used in the public webhook URL is generated at first attach
+ * and reused on subsequent attaches, so the URL pasted into Chatwoot's bot
+ * keeps working across re-runs.
  */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
@@ -32,6 +35,7 @@ import { createProjectRepository } from '@/infrastructure/repositories/project-r
 import { createAgentRepository } from '@/infrastructure/repositories/agent-repository.js';
 import { createChannelIntegrationRepository } from '@/infrastructure/repositories/channel-integration-repository.js';
 import { storeChatwootSecrets } from '@/secrets/chatwoot-secrets.js';
+import { generateChatwootPathToken } from '@/api/routes/chatwoot-webhook.js';
 import { createLogger } from '@/observability/logger.js';
 import type { ChatwootIntegrationConfig } from '@/channels/types.js';
 import type { ProjectId } from '@/core/types.js';
@@ -47,9 +51,7 @@ interface CliArgs {
   chatwootInboxId: number;
   chatwootAgentBotId: number;
   apiTokenEnvVar: string;
-  webhookSecretEnvVar: string;
   apiTokenSecretKey?: string;
-  webhookSecretKey?: string;
   dryRun: boolean;
 }
 
@@ -94,13 +96,10 @@ function parseArgs(argv: string[]): CliArgs {
     chatwootInboxId: requiredInt('chatwoot-inbox-id'),
     chatwootAgentBotId: requiredInt('chatwoot-agent-bot-id'),
     apiTokenEnvVar: required('api-token-env-var'),
-    webhookSecretEnvVar: required('webhook-secret-env-var'),
     dryRun,
   };
   const apiKey = flags.get('api-token-secret-key');
-  const whKey = flags.get('webhook-secret-key');
   if (apiKey !== undefined) args.apiTokenSecretKey = apiKey;
-  if (whKey !== undefined) args.webhookSecretKey = whKey;
   return args;
 }
 
@@ -142,7 +141,6 @@ async function main(): Promise<void> {
     const alreadyAttached = currentChannels.includes('chatwoot');
 
     const apiTokenSecretKey = args.apiTokenSecretKey ?? 'CHATWOOT_API_TOKEN';
-    const webhookSecretKey = args.webhookSecretKey ?? 'CHATWOOT_WEBHOOK_SECRET';
 
     // 2. Dry-run plan + exit.
     if (args.dryRun) {
@@ -155,49 +153,44 @@ async function main(): Promise<void> {
       console.log(
         `- Would ${alreadyAttached ? 'leave unchanged' : "add 'chatwoot' to"} Agent.channelConfig.allowedChannels`,
       );
-      console.log(
-        `- Would store secrets under keys: ${apiTokenSecretKey}, ${webhookSecretKey}`,
-      );
+      console.log(`- Would store API token under key: ${apiTokenSecretKey}`);
+      console.log('- Would mint a new pathToken (preserving existing one if re-attaching)');
       console.log('- Health check: SKIPPED (dry-run)');
       console.log('OK');
       return;
     }
 
-    // 3. Read plaintext secrets from env vars (never from argv).
+    // 3. Read plaintext API token from env var (never from argv).
     const apiToken = process.env[args.apiTokenEnvVar];
     if (!apiToken) {
       throw new Error(`Env var ${args.apiTokenEnvVar} is not set — cannot read API token`);
     }
-    const webhookSecret = process.env[args.webhookSecretEnvVar];
-    if (!webhookSecret) {
-      throw new Error(
-        `Env var ${args.webhookSecretEnvVar} is not set — cannot read webhook secret`,
-      );
-    }
 
-    // 4. Persist the secrets.
+    // 4. Persist the API token.
     await storeChatwootSecrets(secretService, {
       projectId,
       apiToken,
-      webhookSecret,
       apiTokenKey: apiTokenSecretKey,
-      webhookSecretKey,
     });
 
-    // 5. Upsert the ChannelIntegration.
+    // 5. Upsert the ChannelIntegration. Reuse the existing pathToken on
+    // re-attach so the URL the user pasted into Chatwoot keeps working.
+    const existing = await channelIntegrationRepository.findByProjectAndProvider(
+      projectId,
+      'chatwoot',
+    );
+    const existingConfig = existing?.config as ChatwootIntegrationConfig | undefined;
+    const pathToken = existingConfig?.pathToken ?? generateChatwootPathToken();
+
     const config: ChatwootIntegrationConfig = {
       baseUrl: args.chatwootBaseUrl,
       accountId: args.chatwootAccountId,
       inboxId: args.chatwootInboxId,
       agentBotId: args.chatwootAgentBotId,
+      pathToken,
       apiTokenSecretKey,
-      webhookSecretKey,
     };
 
-    const existing = await channelIntegrationRepository.findByProjectAndProvider(
-      projectId,
-      'chatwoot',
-    );
     const integration = existing
       ? await channelIntegrationRepository.update(existing.id, { config, status: 'active' })
       : await channelIntegrationRepository.create({
@@ -241,6 +234,7 @@ async function main(): Promise<void> {
     }
 
     // 8. Final summary.
+    const webhookUrl = `/api/v1/webhooks/chatwoot/${pathToken}`;
     _logAttachSummary({
       projectId,
       projectName: project.name,
@@ -248,7 +242,7 @@ async function main(): Promise<void> {
       agentName: agent.name,
       integrationId: integration.id,
       apiTokenSecretKey,
-      webhookSecretKey,
+      webhookUrl,
       channelConfigUpdated,
       healthStatus,
     });
@@ -264,7 +258,7 @@ function _logAttachSummary(summary: {
   agentName: string;
   integrationId: string;
   apiTokenSecretKey: string;
-  webhookSecretKey: string;
+  webhookUrl: string;
   channelConfigUpdated: boolean;
   healthStatus: 'ok' | 'unreachable';
 }): void {
@@ -273,7 +267,8 @@ function _logAttachSummary(summary: {
   console.log(`- project: ${summary.projectId} "${summary.projectName}"`);
   console.log(`- agent: ${summary.agentId} "${summary.agentName}"`);
   console.log(`- integrationId: ${summary.integrationId}`);
-  console.log(`- secrets: ${summary.apiTokenSecretKey}, ${summary.webhookSecretKey}`);
+  console.log(`- apiTokenSecretKey: ${summary.apiTokenSecretKey}`);
+  console.log(`- webhookUrl (paste into Chatwoot Agent Bot outgoing_url): ${summary.webhookUrl}`);
   console.log(`- channelConfigUpdated: ${String(summary.channelConfigUpdated)}`);
   console.log(`- health: ${summary.healthStatus}`);
 }

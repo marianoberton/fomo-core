@@ -53,6 +53,7 @@ function createMockIntegrationRepo(): {
     findByProject: vi.fn(),
     findByProjectAndProvider: vi.fn(),
     findByProviderAccount: vi.fn(),
+    findActiveChatwootByPathToken: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
     listActive: vi.fn(),

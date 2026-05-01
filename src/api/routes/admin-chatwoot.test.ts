@@ -61,8 +61,8 @@ function makeIntegration(overrides?: Record<string, unknown>): Record<string, un
       accountId: 1,
       inboxId: 2,
       agentBotId: 3,
+      pathToken: 'a'.repeat(64),
       apiTokenSecretKey: 'CHATWOOT_API_TOKEN',
-      webhookSecretKey: 'CHATWOOT_WEBHOOK_SECRET',
     },
     status: 'active',
     createdAt: new Date('2026-04-10'),
@@ -143,7 +143,6 @@ describe('POST /admin/chatwoot/attach', () => {
     inboxId: 2,
     agentBotId: 3,
     apiToken: 'cw_token_abc',
-    webhookSecret: 'cw_whsec_xyz',
   };
 
   it('attaches a fresh integration, stores secrets, and updates the agent', async () => {
@@ -177,23 +176,29 @@ describe('POST /admin/chatwoot/attach', () => {
     expect(body.data['channelConfigUpdated']).toBe(true);
     expect(body.data['health']).toBe('ok');
 
-    // Secrets were persisted under the default keys.
+    // API token persisted under the default key (no webhook secret in
+    // the new model — Agent Bot deliveries are unsigned).
     expect(deps.secretService.set).toHaveBeenCalledWith(
       'proj_fomo',
       'CHATWOOT_API_TOKEN',
       'cw_token_abc',
       expect.any(String),
     );
-    expect(deps.secretService.set).toHaveBeenCalledWith(
-      'proj_fomo',
-      'CHATWOOT_WEBHOOK_SECRET',
-      'cw_whsec_xyz',
-      expect.any(String),
-    );
+    expect(deps.secretService.set).toHaveBeenCalledTimes(1);
+
+    // Response carries a pathToken-based webhook URL the operator pastes
+    // into Chatwoot.
+    expect(body.data['webhookUrl']).toMatch(/^\/api\/v1\/webhooks\/chatwoot\/[a-f0-9]{32,128}$/);
 
     // Integration was created, not updated.
     expect(deps.channelIntegrationRepository.create).toHaveBeenCalledOnce();
     expect(deps.channelIntegrationRepository.update).not.toHaveBeenCalled();
+
+    // The persisted config carries a freshly generated pathToken.
+    const createCall = deps.channelIntegrationRepository.create.mock.calls[0]?.[0] as
+      | { config: { pathToken?: unknown } }
+      | undefined;
+    expect(createCall?.config.pathToken).toMatch(/^[a-f0-9]{64}$/);
 
     // Agent's allowedChannels was extended with 'chatwoot'.
     const updateCall = deps.agentRepository.update.mock.calls[0];
@@ -312,7 +317,8 @@ describe('GET /admin/chatwoot/health/:projectId', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json<{ data: Record<string, unknown> }>();
     expect(body.data['integrationId']).toBe('int_cw_1');
-    expect(body.data['webhookSecretConfigured']).toBe(true);
+    expect(body.data['pathTokenConfigured']).toBe(true);
+    expect(body.data['webhookUrl']).toMatch(/^\/api\/v1\/webhooks\/chatwoot\/[a-f0-9]{32,128}$/);
     expect(body.data['chatwootReachable']).toBe(true);
   });
 

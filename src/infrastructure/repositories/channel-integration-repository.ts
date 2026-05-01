@@ -100,6 +100,21 @@ export function createChannelIntegrationRepository(prisma: PrismaClient): Channe
       return null;
     },
 
+    async findActiveChatwootByPathToken(pathToken: string): Promise<ChannelIntegration | null> {
+      // Reject obviously malformed tokens before hitting the DB. Anything that
+      // doesn't match the hex format can't possibly be in our table.
+      if (!/^[a-f0-9]{32,128}$/.test(pathToken)) return null;
+
+      const records = await prisma.channelIntegration.findMany({
+        where: { provider: 'chatwoot', status: 'active' },
+      });
+      for (const record of records) {
+        const config = record.config as unknown as ChatwootIntegrationConfig;
+        if (config.pathToken === pathToken) return toModel(record);
+      }
+      return null;
+    },
+
     async update(
       id: ChannelIntegrationId,
       input: UpdateChannelIntegrationInput,
