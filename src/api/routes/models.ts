@@ -51,7 +51,14 @@ const EXPOSED_MODELS: { id: string; provider: string }[] = [
   // OpenRouter — Anthropic
   { id: 'anthropic/claude-sonnet-4-6', provider: 'Anthropic (OpenRouter)' },
   // OpenRouter — Qwen
+  { id: 'qwen/qwen3-235b-a22b', provider: 'Qwen (OpenRouter)' },
+  { id: 'qwen/qwen3-30b-a3b', provider: 'Qwen (OpenRouter)' },
   { id: 'qwen/qwen-2.5-72b-instruct', provider: 'Qwen (OpenRouter)' },
+  { id: 'qwen/qwen-2.5-coder-32b-instruct', provider: 'Qwen (OpenRouter)' },
+  // OpenRouter — DeepSeek (extended)
+  { id: 'deepseek/deepseek-r1-distill-qwen-32b', provider: 'DeepSeek (OpenRouter)' },
+  // OpenRouter — Moonshot Kimi
+  { id: 'moonshotai/kimi-k2.5', provider: 'Moonshot (OpenRouter)' },
 ];
 
 /** Build the full model entry from the curated list. */

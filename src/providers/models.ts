@@ -425,6 +425,36 @@ const MODEL_REGISTRY: Record<string, ModelMeta> = {
     inputPricePer1M: 0.35,
     outputPricePer1M: 0.4,
   },
+  // Qwen 3 (MoE, May 2026)
+  'qwen/qwen3-235b-a22b': {
+    contextWindow: 131_072,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.14,
+    outputPricePer1M: 0.6,
+  },
+  'qwen/qwen3-30b-a3b': {
+    contextWindow: 131_072,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.1,
+    outputPricePer1M: 0.3,
+  },
+  'qwen/qwen-2.5-coder-32b-instruct': {
+    contextWindow: 131_072,
+    maxOutputTokens: 8_192,
+    supportsTools: true,
+    inputPricePer1M: 0.07,
+    outputPricePer1M: 0.16,
+  },
+  // DeepSeek R1 distilled (smaller, fast)
+  'deepseek/deepseek-r1-distill-qwen-32b': {
+    contextWindow: 64_000,
+    maxOutputTokens: 8_192,
+    supportsTools: false,
+    inputPricePer1M: 0.14,
+    outputPricePer1M: 0.28,
+  },
 };
 
 /** Conservative defaults for models not in the registry. */
