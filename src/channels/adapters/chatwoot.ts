@@ -148,11 +148,12 @@ export function createChatwootAdapter(config: ChatwootAdapterConfig): ChatwootAd
     parseInbound(payload: unknown): Promise<InboundMessage | null> {
       const event = payload as ChatwootWebhookEvent;
 
-      // Only process incoming text messages from contacts
+      // Only process incoming text messages from contacts.
+      // Note: Chatwoot v4.12.1 omits sender.type at the payload root —
+      // message_type === 'incoming' already implies the sender is a contact.
       if (event.event !== 'message_created') return Promise.resolve(null);
       if (event.message_type !== 'incoming') return Promise.resolve(null);
       if (!event.content) return Promise.resolve(null);
-      if (event.sender?.type !== 'contact') return Promise.resolve(null);
 
       const conversationId = event.conversation?.id;
       if (conversationId === undefined) return Promise.resolve(null);
@@ -163,7 +164,7 @@ export function createChatwootAdapter(config: ChatwootAdapterConfig): ChatwootAd
         channelMessageId: event.id ?? String(Date.now()),
         projectId,
         senderIdentifier: String(conversationId),
-        senderName: event.sender.name,
+        senderName: event.sender?.name ?? 'Unknown',
         content: event.content,
         rawPayload: payload,
         receivedAt: new Date(),

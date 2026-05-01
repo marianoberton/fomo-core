@@ -154,16 +154,18 @@ describe('ChatwootAdapter', () => {
       expect(result).toBeNull();
     });
 
-    it('ignores messages from users (agents)', async () => {
+    it('ignores outgoing messages (sent by agents/bot)', async () => {
+      // Chatwoot v4.12.1 distinguishes contact vs agent messages via message_type
+      // ('incoming' vs 'outgoing'), not sender.type which is omitted at payload root.
       const adapter = createChatwootAdapter(config);
       const payload = {
         event: 'message_created',
         id: 'msg-125',
-        message_type: 'incoming',
+        message_type: 'outgoing',
         content: 'Agent message',
         account: { id: 1 },
         conversation: { id: 42 },
-        sender: { id: 5, name: 'Agent Smith', type: 'user' },
+        sender: { id: 5, name: 'Agent Smith' },
       };
 
       const result = await adapter.parseInbound(payload);
