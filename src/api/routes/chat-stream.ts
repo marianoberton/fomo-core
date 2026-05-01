@@ -16,6 +16,7 @@ import type { FastifyInstance } from 'fastify';
 import { createAgentRunner } from '@/core/agent-runner.js';
 import type { AgentStreamEvent } from '@/core/stream-events.js';
 import type { RouteDependencies } from '../types.js';
+import type { ProjectId, SessionId } from '@/core/types.js';
 import {
   chatRequestSchema,
   prepareChatRun,
@@ -64,6 +65,7 @@ export async function handleChatStreamMessage(
   const result = await agentRunner.run({
     message: setup.sanitizedMessage,
     agentConfig: setup.agentConfig,
+    agentId: body.agentId,
     sessionId: setup.sessionId,
     systemPrompt: setup.systemPrompt,
     promptSnapshot: setup.promptSnapshot,
@@ -92,6 +94,16 @@ export async function handleChatStreamMessage(
     trace.id,
   );
 
+  deps.eventBus.emit({
+    kind: 'message.inbound',
+    projectId: setup.agentConfig.projectId as ProjectId,
+    sessionId: setup.sessionId as SessionId,
+    ...(body.agentId && { agentId: body.agentId }),
+    text: setup.sanitizedMessage,
+    channel: 'webchat',
+    ts: Date.now(),
+  });
+
   const assistantText = extractAssistantResponse(trace.events);
 
   await deps.sessionRepository.addMessage(
@@ -99,6 +111,16 @@ export async function handleChatStreamMessage(
     { role: 'assistant', content: assistantText },
     trace.id,
   );
+
+  deps.eventBus.emit({
+    kind: 'message.outbound',
+    projectId: setup.agentConfig.projectId as ProjectId,
+    sessionId: setup.sessionId as SessionId,
+    ...(body.agentId && { agentId: body.agentId }),
+    text: assistantText,
+    channel: 'webchat',
+    ts: Date.now(),
+  });
 }
 
 // ─── Socket Interface ───────────────────────────────────────────

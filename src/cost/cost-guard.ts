@@ -21,6 +21,7 @@ export interface UsageStore {
   /** Record a usage entry. */
   recordUsage(entry: {
     projectId: ProjectId;
+    agentId?: string;
     provider: string;
     model: string;
     inputTokens: number;
@@ -73,6 +74,7 @@ export interface CostGuard {
     provider: string,
     model: string,
     usage: TokenUsage,
+    agentId?: string,
   ): Promise<void>;
 
   /** Get current budget status for a project. */
@@ -202,11 +204,13 @@ export function createCostGuard(options: CostGuardOptions): CostGuard {
       provider: string,
       model: string,
       usage: TokenUsage,
+      agentId?: string,
     ): Promise<void> {
       const costUSD = calculateCost(model, usage.inputTokens, usage.outputTokens);
 
       await usageStore.recordUsage({
         projectId,
+        agentId,
         provider,
         model,
         inputTokens: usage.inputTokens,

@@ -66,6 +66,8 @@ export interface AgentRunner {
   run(params: {
     message?: string;
     agentConfig: AgentConfig;
+    /** Agent DB id — recorded in UsageRecord for cost attribution. */
+    agentId?: string;
     sessionId: SessionId;
     /** Pre-built system prompt string (assembled by chat-setup from prompt layers). */
     systemPrompt: string;
@@ -105,6 +107,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
         message,
         mediaUrls,
         agentConfig: agentConfigParam,
+        agentId: runAgentId,
         sessionId,
         systemPrompt: preBuiltSystemPrompt,
         promptSnapshot,
@@ -397,6 +400,7 @@ export function createAgentRunner(options: AgentRunnerOptions): AgentRunner {
             provider.id,
             agentConfig.provider.model,
             usage,
+            runAgentId,
           );
 
           // Update trace with usage

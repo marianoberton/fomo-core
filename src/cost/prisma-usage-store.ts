@@ -63,6 +63,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
 
     async recordUsage(entry: {
       projectId: ProjectId;
+      agentId?: string;
       provider: string;
       model: string;
       inputTokens: number;
@@ -73,6 +74,7 @@ export function createPrismaUsageStore(prisma: PrismaClient): UsageStore {
         data: {
           id: nanoid(),
           projectId: entry.projectId,
+          agentId: entry.agentId ?? null,
           sessionId: 'system',
           traceId: 'system',
           provider: entry.provider,

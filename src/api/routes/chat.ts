@@ -8,6 +8,7 @@
 import type { FastifyInstance } from 'fastify';
 import { createAgentRunner } from '@/core/agent-runner.js';
 import type { RouteDependencies } from '../types.js';
+import type { ProjectId, SessionId } from '@/core/types.js';
 import { sendSuccess, sendError } from '../error-handler.js';
 import {
   chatRequestSchema,
@@ -83,6 +84,7 @@ export function chatRoutes(
     const result = await agentRunner.run({
       message: sanitizedMessage,
       agentConfig,
+      agentId: body.agentId,
       sessionId,
       systemPrompt,
       promptSnapshot,
@@ -105,6 +107,16 @@ export function chatRoutes(
       content: sanitizedMessage,
     }, trace.id);
 
+    deps.eventBus.emit({
+      kind: 'message.inbound',
+      projectId: agentConfig.projectId as ProjectId,
+      sessionId: sessionId as SessionId,
+      ...(body.agentId && { agentId: body.agentId }),
+      text: sanitizedMessage,
+      channel: 'webchat',
+      ts: Date.now(),
+    });
+
     const assistantText = extractAssistantResponse(trace.events);
     const toolCalls = extractToolCalls(trace.events);
 
@@ -112,6 +124,16 @@ export function chatRoutes(
       role: 'assistant',
       content: assistantText,
     }, trace.id);
+
+    deps.eventBus.emit({
+      kind: 'message.outbound',
+      projectId: agentConfig.projectId as ProjectId,
+      sessionId: sessionId as SessionId,
+      ...(body.agentId && { agentId: body.agentId }),
+      text: assistantText,
+      channel: 'webchat',
+      ts: Date.now(),
+    });
 
     // 7. Return response
     return sendSuccess(reply, {
